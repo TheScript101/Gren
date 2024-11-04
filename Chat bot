@@ -1,0 +1,59 @@
+function say(msg)
+    game.ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+end
+
+if current and type(current.Disconnect) == "function" then
+	current:Disconnect()
+end
+
+if slashtorespond then
+    say("Chatbot loaded. Say /botin [msg] to chat with a bot")
+end
+
+function send(conversation_msg, conversation_id)
+    conversation_msg = conversation_msg:gsub(" ", "+")
+    url              = "http://api.brainshop.ai/get?bid=169422&key=4GCemcdYgy50PlZ2&uid="..conversation_id.."&msg="..conversation_msg
+    local r = (syn and syn.request or http_request or request)({
+        Url    = url,
+        Method = "GET"
+    })
+    if r.Success and #r.Body > 0 and game.HttpService:JSONDecode(r.Body).cnt and #game.HttpService:JSONDecode(r.Body).cnt > 0 then
+        return game.HttpService:JSONDecode(r.Body).cnt:gsub("BOT_NAME", bot_name):gsub("BOT_OWNER", bot_owner)..""
+    end
+end
+
+local recognized = {}
+
+getgenv().current = game.ReplicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(msgg)
+    local msg = msgg.Message
+    local plr = game.Players[msgg.FromSpeaker]
+    
+    if msg:sub(1, 13) == "/chatbot stop" then
+        current:Disconnect()
+        return
+    end
+    if plr == game.Players.LocalPlayer or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    if (plr.Character.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude > max_dist then
+        return
+    end
+
+    if (slashtorespond and msg:sub(1, 6) == "/botin" or slashtorespond == false) then
+        if slashtorespond then
+            msg = msg:sub(8, #msg)
+        end
+        if not recognized[plr.Name] then
+            local recognization_id = ((game.Players.LocalPlayer.Name)..(plr.Name)):lower()
+
+            send("My name is "..plr.Name, recognization_id)
+            send("Yes"                  , recognization_id)
+
+            recognized[plr.Name] = recognization_id
+        end
+        if recognized[plr.Name] ~= nil then
+            reply = send(msg, recognized[plr.Name])
+            say(reply)
+        end
+    end
+end)
