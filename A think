@@ -1,0 +1,91 @@
+-- Local script put inside the button 💬
+-- Made by Kuro Lite 😎
+-- Like and Subscribe ✨✨
+-- You can changing few thing if you see this emoji 📝
+ 
+ 
+ 
+local button = script.Parent
+local animationId = "rbxassetid://204062532" -- You can use your Animation id 📝
+local soundId = "rbxassetid://5989939664" -- You can use your Sound id 📝
+local cooldown = false
+local cooldownTime = 5 -- This is CD 📝
+local cooldownRemaining = cooldownTime
+ 
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local comboEvent = replicatedStorage:WaitForChild("ComboEvent")
+ 
+local function onButtonClick()
+    if cooldown then return end
+        
+        cooldown = true
+        button.Text = "Cooldown: " .. cooldownRemaining .. "s"
+        
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoid = character:FindFirstChild("Humanoid")
+        
+        if humanoid then
+            local animator = humanoid:FindFirstChild("Animator") or humanoid:WaitForChild("Animator")
+            local animation = Instance.new("Animation")
+            animation.AnimationId = animationId
+            local animationTrack = animator:LoadAnimation(animation)
+            
+            local sound
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                sound = Instance.new("Sound")
+                sound.SoundId = soundId
+                sound.Parent = rootPart
+                sound:Play()
+            end
+            
+            animationTrack.Stopped:Connect(function()
+                if sound and sound.IsPlaying then
+                    sound:Stop()
+                    sound:Destroy()
+                end
+            end)
+            
+            animationTrack:Play()
+            
+            local originalWalkSpeed = humanoid.WalkSpeed
+            humanoid.WalkSpeed = originalWalkSpeed * 4
+            
+            local function dealDamageNearby()
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    for _, other in pairs(workspace:GetDescendants()) do
+                        if other:IsA("Model") and other ~= character then
+                            local otherHumanoid = other:FindFirstChild("Humanoid")
+                            local otherRootPart = other:FindFirstChild("HumanoidRootPart")
+                            if otherHumanoid and otherRootPart and (rootPart.Position - otherRootPart.Position).Magnitude <= 10 then
+                                comboEvent:FireServer(otherHumanoid, 10, rootPart.Position)
+                            end
+                        end
+                    end
+                end
+            end
+            
+            task.wait(0.1)
+            dealDamageNearby()
+            
+            task.wait(0.1)
+            humanoid.WalkSpeed = originalWalkSpeed
+            
+            animationTrack:Stop()
+            animation:Destroy()
+        end
+        
+        while cooldownRemaining > 0 do
+            task.wait(1)
+            cooldownRemaining = cooldownRemaining - 1
+            button.Text = "Cooldown: " .. cooldownRemaining .. "s"
+        end
+        
+        cooldownRemaining = cooldownTime
+        cooldown = false
+        button.Text = "Combo!"
+    end
+    
+    button.MouseButton1Click:Connect(onButtonClick)
