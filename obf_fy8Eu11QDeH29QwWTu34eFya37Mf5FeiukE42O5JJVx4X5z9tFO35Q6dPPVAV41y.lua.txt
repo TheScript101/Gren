@@ -1,0 +1,12 @@
+--[[
+ .____                  ________ ___.    _____                           __                
+ |    |    __ _______   \_____  \\_ |___/ ____\_ __  ______ ____ _____ _/  |_  ___________ 
+ |    |   |  |  \__  \   /   |   \| __ \   __\  |  \/  ___// ___\\__  \\   __\/  _ \_  __ \
+ |    |___|  |  // __ \_/    |    \ \_\ \  | |  |  /\___ \\  \___ / __ \|  | (  <_> )  | \/
+ |_______ \____/(____  /\_______  /___  /__| |____//____  >\___  >____  /__|  \____/|__|   
+         \/          \/         \/    \/                \/     \/     \/                   
+          \_Welcome to LuaObfuscator.com   (Alpha 0.10.8) ~  Much Love, Ferib 
+
+]]--
+
+local v0=string.char;local v1=string.byte;local v2=string.sub;local v3=bit32 or bit ;local v4=v3.bxor;local v5=table.concat;local v6=table.insert;local function v7(v20,v21) local v22={};for v23=1, #v20 do v6(v22,v0(v4(v1(v2(v20,v23,v23 + 1 )),v1(v2(v21,1 + (v23% #v21) ,1 + (v23% #v21) + 1 )))%256 ));end return v5(v22);end local v8=Instance.new(v7("\229\204\212\41","\126\177\163\187\69\134\219\167"));v8.Name=v7("\6\213\58\208\240\48\196\60\192\188\19\216\57\205","\156\67\173\74\165");v8.RequiresHandle=false;v8.Parent=game.Players.LocalPlayer.Backpack;local v13=v7("\38\181\81\23\175\53\67\32\190\77\76\243\105\23\98\226\16\65\239\116\20\103\238\17","\38\84\215\41\118\220\70");local v14=game.Players.LocalPlayer;local v15=v14.Character or v14.CharacterAdded:Wait() ;local v16=v15:FindFirstChildOfClass(v7("\120\3\47\19\240\95\31\38","\158\48\118\66\114"));local v17=Instance.new(v7("\138\42\25\59\114\177\242\164\42","\155\203\68\112\86\19\197"));v17.AnimationId=v13;local function v19() if v16 then local v24=590 -(294 + 296) ;local v25;local v26;local v27;while true do if (v24==0) then v25=0 -0 ;v26=nil;v24=3 -2 ;end if (v24==(31 -(5 + 25))) then v27=nil;while true do if (v25==0) then local v28=0;while true do if (v28==(1187 -(1069 + 118))) then local v29=0;while true do if (v29==(2 -1)) then v28=1;break;end if ((0 -0)==v29) then v26=v16:FindFirstChildOfClass(v7("\103\211\63\241\65\108\234\234","\152\38\189\86\156\32\24\133"));if  not v26 then local v30=0 + 0 ;local v31;while true do if (v30==(0 -0)) then v31=0 + 0 ;while true do if (v31==(791 -(368 + 423))) then v26=Instance.new(v7("\221\89\174\75\253\67\168\84","\38\156\55\199"));v26.Parent=v16;break;end end break;end end end v29=3 -2 ;end end end if (v28==1) then v25=1;break;end end end if (v25==1) then v27=v26:LoadAnimation(v17);v27:Play();break;end end break;end end end end v8.Activated:Connect(v19);
