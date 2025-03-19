@@ -1,0 +1,56 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local Player = Players.LocalPlayer
+local Cooldown = tick()
+local IsParried = false
+local Connection = nil
+local a = false  -- This controls whether the functionality is enabled or not (default is false)
+
+-- Function to get the ball in the workspace
+local function GetBall()
+    for _, Ball in ipairs(workspace.Balls:GetChildren()) do
+        if Ball:GetAttribute("realBall") then
+            return Ball
+        end
+    end
+end
+
+local function ResetConnection()
+    if Connection then
+        Connection:Disconnect()
+        Connection = nil
+    end
+end
+
+workspace.Balls.ChildAdded:Connect(function()
+    local Ball = GetBall()
+    if not Ball then return end
+    ResetConnection()
+    Connection = Ball:GetAttributeChangedSignal("target"):Connect(function()
+        IsParried = false
+    end)
+end)
+
+RunService.PreSimulation:Connect(function()
+    if not a then return end  -- If a is false, exit the function (no parrying)
+
+    local Ball, HRP = GetBall(), Player.Character.HumanoidRootPart
+    if not Ball or not HRP then
+        return
+    end
+
+    local Speed = Ball.zoomies.VectorVelocity.Magnitude
+    local Distance = (HRP.Position - Ball.Position).Magnitude
+
+    if Ball:GetAttribute("target") == Player.Name and not IsParried and Distance / Speed <= 0.55 then
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        IsParried = true
+        Cooldown = tick()
+
+        if (tick() - Cooldown) >= 1 then
+            IsParried = false
+        end
+    end
+end)
