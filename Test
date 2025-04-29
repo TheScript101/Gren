@@ -1,0 +1,158 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+local AlwaysAnchorModels = false
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ModelSpawnerUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0,400,0,360)
+Frame.AnchorPoint = Vector2.new(0.5,0.5)
+Frame.Position = UDim2.new(0.5,0,0.5,-0)
+Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+Frame.BorderSizePixel = 2
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0,8)
+
+local ToggleButton = Instance.new("TextButton", ScreenGui)
+ToggleButton.Size = UDim2.new(0,50,0,50)
+ToggleButton.Position = UDim2.new(1,-60,0,10)
+ToggleButton.Text = "☰"
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 28
+ToggleButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+ToggleButton.TextColor3 = Color3.new(1,1,1)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1,-10,0,40)
+Title.Position = UDim2.new(0,5,0,5)
+Title.Text = "Model Id Spawner"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 22
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local ModelBox = Instance.new("TextBox", Frame)
+ModelBox.Size = UDim2.new(0.65,-5,0,40)
+ModelBox.Position = UDim2.new(0,10,0,50)
+ModelBox.PlaceholderText = "Insert Model Id"
+ModelBox.Font = Enum.Font.Gotham
+ModelBox.TextSize = 18
+ModelBox.TextColor3 = Color3.new(1,1,1)
+ModelBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+Instance.new("UICorner", ModelBox).CornerRadius = UDim.new(0,6)
+
+local SpawnButton = Instance.new("TextButton", Frame)
+SpawnButton.Size = UDim2.new(0.3,0,0,40)
+SpawnButton.Position = UDim2.new(0.7,0,0,50)
+SpawnButton.Text = "Spawn"
+SpawnButton.Font = Enum.Font.GothamBold
+SpawnButton.TextSize = 18
+SpawnButton.TextColor3 = Color3.new(1,1,1)
+SpawnButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+Instance.new("UICorner", SpawnButton).CornerRadius = UDim.new(0,6)
+
+local Thumbnail = Instance.new("ImageLabel", Frame)
+Thumbnail.Size = UDim2.new(1,-20,0,250)
+Thumbnail.Position = UDim2.new(0,10,0,100)
+Thumbnail.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Thumbnail.ScaleType = Enum.ScaleType.Fit
+Thumbnail.Image = ""
+Instance.new("UICorner", Thumbnail).CornerRadius = UDim.new(0,6)
+
+local SettingsButton = Instance.new("TextButton", Frame)
+SettingsButton.Size = UDim2.new(0,30,0,30)
+SettingsButton.Position = UDim2.new(1,-40,0,5)
+SettingsButton.Text = "⚙"
+SettingsButton.Font = Enum.Font.GothamBold
+SettingsButton.TextSize = 20
+SettingsButton.TextColor3 = Color3.new(1,1,1)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+Instance.new("UICorner", SettingsButton).CornerRadius = UDim.new(0,6)
+
+local SettingsFrame = Instance.new("Frame", Frame)
+SettingsFrame.Size = UDim2.new(0,180,0,80)
+SettingsFrame.Position = UDim2.new(1,5,0,5)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(42,42,42)
+SettingsFrame.BorderSizePixel = 2
+SettingsFrame.Visible = false
+Instance.new("UICorner", SettingsFrame).CornerRadius = UDim.new(0,6)
+
+local AnchorToggle = Instance.new("TextButton", SettingsFrame)
+AnchorToggle.Size = UDim2.new(1,-10,0,30)
+AnchorToggle.Position = UDim2.new(0,5,0,5)
+AnchorToggle.Text = "Always Anchor: OFF"
+AnchorToggle.Font = Enum.Font.Gotham
+AnchorToggle.TextSize = 16
+AnchorToggle.TextColor3 = Color3.new(1,1,1)
+AnchorToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+Instance.new("UICorner", AnchorToggle).CornerRadius = UDim.new(0,6)
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Frame.Visible = not Frame.Visible
+end)
+SettingsButton.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = not SettingsFrame.Visible
+end)
+AnchorToggle.MouseButton1Click:Connect(function()
+    AlwaysAnchorModels = not AlwaysAnchorModels
+    AnchorToggle.Text = "Always Anchor: " .. (AlwaysAnchorModels and "ON" or "OFF")
+end)
+
+ModelBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local id = tonumber(ModelBox.Text)
+    Thumbnail.Image = id and ("rbxthumb://type=Asset&id="..id.."&w=420&h=420") or ""
+end)
+
+SpawnButton.MouseButton1Click:Connect(function()
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    local assetId = tonumber(ModelBox.Text)
+    if not (hrp and assetId) then return end
+
+    local success, modelOrError = pcall(function()
+        return game:GetObjects("rbxassetid://"..assetId)
+    end)
+
+    if not success then
+        warn("Failed to load model: ", modelOrError)
+        return
+    end
+
+    local model = modelOrError[1]
+    if not model then
+        warn("Model not found!")
+        return
+    end
+
+    model.Parent = workspace
+
+    -- Invisible Spawn Part
+    local spawnPart = Instance.new("Part")
+    spawnPart.Name = "SpawnPart"
+    spawnPart.Size = Vector3.new(1,1,1)
+    spawnPart.Transparency = 1
+    spawnPart.Anchored = true
+    spawnPart.CanCollide = false
+    spawnPart.CFrame = hrp.CFrame * CFrame.new(0,0,-10)
+    spawnPart.Parent = model
+
+    -- Move whole model
+    if model:IsA("Model") then
+        model.PrimaryPart = spawnPart
+        model:SetPrimaryPartCFrame(spawnPart.CFrame)
+
+        if AlwaysAnchorModels then
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("BasePart") and part ~= spawnPart then
+                    part.Anchored = true
+                    part.CanCollide = false
+                end
+            end
+        end
+    elseif model:IsA("BasePart") then
+        model.CFrame = spawnPart.CFrame
+    end
+end)
