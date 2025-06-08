@@ -21,8 +21,8 @@ HintGui.Text = "Mastery Farm Gui Loading... ( Loading Variables & Functions )"
 --[[
 Global variables ( and some functions ).
 ]]--
-_G.IsUserPremium = false -- This is responsible for whether the user has a premium or not, don't change it bucko 🤠
-_G.IsUserFollowed = false -- This is responsible for whether the user is followed me or not, don't change it too
+_G.IsUserPremium = true -- This is responsible for whether the user has a premium or not, don't change it bucko 🤠
+_G.IsUserFollowed = true -- This is responsible for whether the user is followed me or not, don't change it too
 EnterPortal = function(a,b) a = a or "Teleport1"; b = b or 0.6; NEX:EnterPortal(a,b) end
 EquipGlove = function(a,b) a = a or "Default"; b = b or 0.4; NEX:EquipGlove(a,b) end
 
