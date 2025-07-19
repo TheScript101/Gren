@@ -11,184 +11,167 @@ local map
 
 -- Config with default tween speed
 getgenv().TweenSpeed = 20
-
--- Slider to control tween speed (range 5 to 35)
 w:Slider("Tween Speed", 5, 35, getgenv().TweenSpeed, function(val)
-	getgenv().TweenSpeed = val
+    getgenv().TweenSpeed = val
 end)
 
--- Murder detection
+-- Detect murderer
 local function findMurder()
-	for _, player in ipairs(game.Players:GetPlayers()) do
-		local char = player.Character
-		if char and char:FindFirstChild("Knife") then
-			return char
-		end
-	end
-	return nil
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        local char = player.Character
+        if char and char:FindFirstChild("Knife") then
+            return char
+        end
+    end
+    return nil
 end
 
--- Character respawn tracking
+-- Track respawn
 plr.CharacterAdded:Connect(function(char)
-	character = char
-	humPart = char:WaitForChild("HumanoidRootPart")
+    character = char
+    humPart = char:WaitForChild("HumanoidRootPart")
 end)
 
--- Map tracking
+-- Track map
 game.Workspace.DescendantAdded:Connect(function(m)
-	if m:IsA("Model") and m:GetAttribute("MapID") then
-		map = m
-	end
+    if m:IsA("Model") and m:GetAttribute("MapID") then
+        map = m
+    end
 end)
 game.Workspace.DescendantRemoving:Connect(function(m)
-	if m == map then
-		map = nil
-	end
+    if m == map then
+        map = nil
+    end
 end)
 
--- Teleport function with tween
+-- Tween teleport with anchoring
 local tweenService = game:GetService("TweenService")
 local function teleport(obj)
-	if obj and obj:IsDescendantOf(workspace) and humPart and humPart:IsDescendantOf(workspace) then
-		local dist = (humPart.Position - obj.Position).Magnitude
-		local time = math.clamp(dist / 20, 0.2, 5)
-		local tween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
-			CFrame = obj.CFrame * CFrame.new(0, -4, 0)
-		})
-		tween:Play()
-		tween.Completed:Wait(.5)
-		if obj:FindFirstChild("TouchInterest") then
-			firetouchinterest(humPart, obj, 0)
-			firetouchinterest(humPart, obj, 1)
-		end
-	end
+    if obj and obj:IsDescendantOf(workspace) and humPart and humPart:IsDescendantOf(workspace) then
+        humPart.Anchored = false -- unanchor before tween
+        local dist = (humPart.Position - obj.Position).Magnitude
+        local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
+        local tween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
+            CFrame = obj.CFrame * CFrame.new(0, -4, 0)
+        })
+        tween:Play()
+        tween.Completed:Wait(.5)
+        humPart.Anchored = true -- anchor after tween complete
+        if obj:FindFirstChild("TouchInterest") then
+            firetouchinterest(humPart, obj, 0)
+            firetouchinterest(humPart, obj, 1)
+        end
+    end
 end
 
--- Respawn check
+-- Check alive status
 local function isAlive()
-	return character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+    return character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
 end
 
--- Kill player
-local function die()
-	if character and character:FindFirstChild("Head") then
-		character.Head:Destroy()
-	end
+-- Get BeachBall coin count
+local function getBeachBallCount()
+    local coinsText = game.Players.LocalPlayer.PlayerGui.MainGUI
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame.Icon
+        and game.Players.LocalPlayer.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame.Icon.Coins
+
+    if coinsText and coinsText:IsA("TextLabel") then
+        local value = tonumber(coinsText.Text:match("%d+"))
+        return value or 0
+    end
+    return 0
 end
 
--- Fling the murderer
+-- Find closest BeachBall
+local function findClosestBeachBall()
+    local minDist, closest = math.huge, nil
+    local container = map and map:FindFirstChild("CoinContainer")
+    if container then
+        for _, coin in ipairs(container:GetChildren()) do
+            if coin:IsA("Part") and coin.Name == "Coin_Server" and coin:GetAttribute("CoinID") == "BeachBall" then
+                local vis = coin:FindFirstChild("CoinVisual")
+                if vis and vis.Transparency ~= 1 and coin:IsDescendantOf(workspace) then
+                    local dist = (humPart.Position - coin.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = coin
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- BodyThrust-based fling method
 local function fling(target)
-	while target and target:FindFirstChild("HumanoidRootPart") do
-		task.wait()
-		if not isAlive() then break end
-		humPart.Velocity = Vector3.new(9999,9999,9999)
-		humPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
-	end
+    local thrust = Instance.new('BodyThrust', humPart)
+    thrust.Force = Vector3.new(9999, 9999, 9999)
+    thrust.Name = "YeetForce"
+    repeat
+        humPart.CFrame = target.HumanoidRootPart.CFrame
+        thrust.Location = target.HumanoidRootPart.Position
+        game:GetService("RunService").Heartbeat:Wait()
+    until not target:FindFirstChild("Head")
+    thrust:Destroy()
 end
 
--- Check if bag is full
-local function isBagFull()
-	local backpackGui = plr:FindFirstChild("PlayerGui") and plr.PlayerGui:FindFirstChild("MainGUI")
-	if backpackGui then
-		local txt = backpackGui:FindFirstChild("CoinLabel") or backpackGui:FindFirstChildWhichIsA("TextLabel", true)
-		if txt and txt:IsA("TextLabel") then
-			local text = txt.Text:match("%d+")
-			local value = tonumber(text)
-			if value and value >= 50 then
-				return true
-			end
-		end
-	end
-	return false
-end
+-- Smart BeachBall Farm toggle
+w:Toggle("BeachBall Farm (Smart Fling)", false, function(enabled)
+    getgenv().farm = enabled
+    while getgenv().farm do
+        if not isAlive() then repeat task.wait() until isAlive() end
 
--- BeachBall farm toggle
-getgenv().farm = false
-w:Toggle("BeachBall Farm", false, function(enabled)
-	getgenv().farm = enabled
-	if not enabled then
-		if workspace.Gravity ~= 196.2 then workspace.Gravity = 196.2 end
-		return
-	end
-	while getgenv().farm do
-		-- Get map
-		if not map then
-			for _,m in ipairs(game.Workspace:GetDescendants()) do
-				if m:IsA("Model") and m:GetAttribute("MapID") then
-					map = m
-					break
-				end
-			end
-		end
+        if not map then
+            for _, m in ipairs(game.Workspace:GetDescendants()) do
+                if m:IsA("Model") and m:GetAttribute("MapID") then
+                    map = m
+                    break
+                end
+            end
+        end
 
-		if not isAlive() then
-			repeat task.wait() until isAlive()
-		end
+        local targetBall = findClosestBeachBall()
+        if targetBall then
+            teleport(targetBall)
+            task.wait(0.5)
+        end
 
-		local container = map and map:FindFirstChild("CoinContainer")
-		if container then
-			local collected = false
-			for _,coin in ipairs(container:GetChildren()) do
-				if coin:IsA("Part") and coin.Name == "Coin_Server" and coin:GetAttribute("CoinID") == "BeachBall" then
-					local vis = coin:FindFirstChild("CoinVisual")
-					if vis and vis.Transparency ~= 1 then
-						teleport(coin)
-						collected = true
-						if not getgenv().farm then break end
-						if isBagFull() then break end
-					end
-				end
-			end
+        if getBeachBallCount() >= 40 then
+            murder = findMurder()
+            if murder then
+                humPart.Anchored = false -- unanchor before fling
+                fling(murder)
+                repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+                humPart.Anchored = true -- re-anchor after fling
+            end
+        end
 
-			-- If bag is full
-			if isBagFull() then
-				if plr:GetRole() == "Murderer" then
-					task.wait(1)
-					die()
-				else
-					murder = findMurder()
-					if murder then
-						while isAlive() and isBagFull() do
-							fling(murder)
-							task.wait()
-						end
-						if not isAlive() then
-							repeat task.wait() until isAlive()
-							if getgenv().farm then
-								murder = findMurder()
-								if murder then
-									fling(murder)
-								end
-							end
-						end
-					end
-				end
-			end
-
-			if not collected then
-				humPart.CFrame = CFrame.new(93, 140, 61)
-				task.wait(2)
-			end
-		end
-		task.wait(0.5)
-	end
+        task.wait(0.5)
+    end
 end)
 
--- Anti AFK button
+-- Anti AFK
 local GC = getconnections or get_signal_cons
 w:Button("Anti AFK", function()
-	if GC then
-		for _,v in pairs(GC(plr.Idled)) do
-			if v.Disable then v:Disable() elseif v.Disconnect then v:Disconnect() end
-		end
-	else
-		local vu = cloneref(game:GetService("VirtualUser"))
-		plr.Idled:Connect(function()
-			vu:CaptureController()
-			vu:ClickButton2(Vector2.new())
-		end)
-	end
+    if GC then
+        for _,v in pairs(GC(plr.Idled)) do
+            if v.Disable then v:Disable() elseif v.Disconnect then v:Disconnect() end
+        end
+    else
+        local vu = cloneref(game:GetService("VirtualUser"))
+        plr.Idled:Connect(function()
+            vu:CaptureController()
+            vu:ClickButton2(Vector2.new())
+        end)
+    end
 end)
 
+-- Signature label
 w:Label("~ t.me/arceusxscripts", Color3.fromRGB(127, 143, 166))
-
