@@ -196,13 +196,26 @@ gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
             task.wait(0.5)
         end
 
-        if getBeachBallCount() >= 40 then
-            local murderPlayer = findMurder()
-            if murderPlayer then
-                SkidFling(murderPlayer)
-                repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
-            end
-        end
+if getBeachBallCount() >= 40 then
+    local isMurderer = plr:GetRole and plr:GetRole() == "Murderer"
+    local murderPlayer = findMurder()
+
+    if murderPlayer then
+        SkidFling(murderPlayer)
+    end
+
+    repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+
+    -- Wait 35 seconds before resuming farming
+    task.wait(35)
+
+    -- If the player is the murderer, force a reset
+    if isMurderer and isAlive() then
+        local head = character:FindFirstChild("Head")
+        if head then head:Destroy() end
+    end
+end
+
 
         task.wait(0.5)
     end
