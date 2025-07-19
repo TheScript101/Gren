@@ -182,11 +182,16 @@ end)
 gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
-        if not isAlive() then repeat task.wait() until isAlive() end
+        if not isAlive() then
+            repeat task.wait() until isAlive()
+        end
 
         if not map then
             for _, m in pairs(workspace:GetDescendants()) do
-                if m:IsA("Model") and m:GetAttribute("MapID") then map = m break end
+                if m:IsA("Model") and m:GetAttribute("MapID") then
+                    map = m
+                    break
+                end
             end
         end
 
@@ -196,26 +201,27 @@ gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
             task.wait(0.5)
         end
 
-if getBeachBallCount() >= 40 then
-    local isMurderer = plr:GetRole and plr:GetRole() == "Murderer"
-    local murderPlayer = findMurder()
+        if getBeachBallCount() >= 40 then
+            local isMurderer = plr:GetRole and plr:GetRole() == "Murderer"
+            local murderPlayer = findMurder()
 
-    if murderPlayer then
-        SkidFling(murderPlayer)
-    end
+            if murderPlayer then
+                SkidFling(murderPlayer)
+            end
 
-    repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+            repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
 
-    -- Wait 35 seconds before resuming farming
-    task.wait(35)
+            -- Wait 35 seconds before resuming farming
+            task.wait(35)
 
-    -- If the player is the murderer, force a reset
-    if isMurderer and isAlive() then
-        local head = character:FindFirstChild("Head")
-        if head then head:Destroy() end
-    end
-end
-
+            -- If the player is the murderer, force a reset
+            if isMurderer and isAlive() then
+                local head = character:FindFirstChild("Head")
+                if head then
+                    head:Destroy()
+                end
+            end
+        end
 
         task.wait(0.5)
     end
