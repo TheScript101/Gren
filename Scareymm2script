@@ -1,5 +1,8 @@
 -- Load TurtleLib
-local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua"))()
+local libSource = game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua")
+local libFunc = loadstring(libSource)
+assert(libFunc, "Failed to load TurtleLib")
+local lib = libFunc()
 local gui = lib:Window("MM2 Summer Autofarm")
 
 -- Services
@@ -20,8 +23,21 @@ gui:Slider("Tween Speed", 5, 35, getgenv().TweenSpeed, function(val)
     getgenv().TweenSpeed = val
 end)
 
+-- Is player alive
+local function isAlive()
+    return character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
+end
+
+-- Safe fetch character and HRP
+local function updateCharacterRefs()
+    character = plr.Character or plr.CharacterAdded:Wait()
+    humPart = character:WaitForChild("HumanoidRootPart")
+end
+
 -- Teleport directly onto the coin
 local function teleport(obj)
+    updateCharacterRefs()
+
     if obj and humPart and obj:IsDescendantOf(workspace) then
         local dist = (humPart.Position - obj.Position).Magnitude
         local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
@@ -47,17 +63,14 @@ local function teleport(obj)
         tween.Completed:Wait()
         if deathConn then deathConn:Disconnect() end
 
-        -- Touch coin if still alive
         if not cancelled and obj:FindFirstChild("TouchInterest") then
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
         end
 
-        -- Wait for respawn if death occurred mid-tween
         if diedDuringTween then
             repeat
-                character = plr.Character or plr.CharacterAdded:Wait()
-                humPart = character:FindFirstChild("HumanoidRootPart")
+                updateCharacterRefs()
                 task.wait()
             until isAlive()
 
@@ -67,12 +80,6 @@ local function teleport(obj)
             end
         end
     end
-end
-
-
--- Is player alive
-local function isAlive()
-    return character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid")
 end
 
 -- Get BeachBall coin count from GUI
@@ -122,6 +129,7 @@ end
 
 -- SkidFling logic
 local function SkidFling(TargetPlayer)
+    updateCharacterRefs()
     local Character = plr.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Humanoid and Humanoid.RootPart
@@ -181,7 +189,7 @@ workspace.DescendantRemoving:Connect(function(m)
     if m == map then map = nil end
 end)
 
--- On respawn: auto fling if bag is full
+-- On respawn
 plr.CharacterAdded:Connect(function(char)
     character = char
     humPart = char:WaitForChild("HumanoidRootPart")
@@ -207,6 +215,8 @@ gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
                 end
             end
         end
+
+
 
         local ball = findClosestBeachBall()
         if ball then
