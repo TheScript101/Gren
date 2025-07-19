@@ -44,19 +44,15 @@ game.Workspace.DescendantRemoving:Connect(function(m)
     end
 end)
 
--- Tween teleport with anchoring
-local tweenService = game:GetService("TweenService")
 local function teleport(obj)
     if obj and obj:IsDescendantOf(workspace) and humPart and humPart:IsDescendantOf(workspace) then
-        humPart.Anchored = false -- unanchor before tween
         local dist = (humPart.Position - obj.Position).Magnitude
         local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
         local tween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
-            CFrame = obj.CFrame * CFrame.new(0, -4, 0)
+            CFrame = obj.CFrame -- 💎 direct position, no offset
         })
         tween:Play()
         tween.Completed:Wait(.5)
-        humPart.Anchored = true -- anchor after tween complete
         if obj:FindFirstChild("TouchInterest") then
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
