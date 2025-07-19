@@ -1,9 +1,18 @@
 -- Load TurtleLib
 local libSource = game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua")
-local libFunc = loadstring(libSource)
-assert(libFunc, "Failed to load TurtleLib")
-local lib = libFunc()
-local gui = lib:Window("MM2 Summer Autofarm")
+
+-- Try compiling with loadstring
+local success, libFuncOrError = pcall(loadstring, libSource)
+
+if success and type(libFuncOrError) == "function" then
+    local lib = libFuncOrError()
+    local gui = lib:Window("MM2 Summer Autofarm")
+else
+    warn("❌ Failed to compile TurtleLib.")
+    warn("Type returned by loadstring:", type(libFuncOrError))
+    warn("Value returned:", tostring(libFuncOrError))
+end
+
 
 -- Services
 local tweenService = game:GetService("TweenService")
