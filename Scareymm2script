@@ -30,18 +30,16 @@ local function teleport(obj)
             CFrame = obj.CFrame
         })
 
-        -- Flag to cancel tween if player dies
-        local cancelled = false
         local humanoid = character:FindFirstChild("Humanoid")
+        local cancelled = false
+        local diedDuringTween = false
 
-        -- Detect death during tween
         local deathConn
         if humanoid then
             deathConn = humanoid.Died:Connect(function()
                 cancelled = true
+                diedDuringTween = true
                 tween:Cancel()
-                local killer = findMurder()
-                if killer then SkidFling(killer) end
             end)
         end
 
@@ -49,13 +47,28 @@ local function teleport(obj)
         tween.Completed:Wait()
         if deathConn then deathConn:Disconnect() end
 
-        -- Interact with coin only if still alive
+        -- Touch coin if still alive
         if not cancelled and obj:FindFirstChild("TouchInterest") then
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
         end
+
+        -- Wait for respawn if death occurred mid-tween
+        if diedDuringTween then
+            repeat
+                character = plr.Character or plr.CharacterAdded:Wait()
+                humPart = character:FindFirstChild("HumanoidRootPart")
+                task.wait()
+            until isAlive()
+
+            local murderPlayer = findMurder()
+            if murderPlayer then
+                SkidFling(murderPlayer)
+            end
+        end
     end
 end
+
 
 -- Is player alive
 local function isAlive()
