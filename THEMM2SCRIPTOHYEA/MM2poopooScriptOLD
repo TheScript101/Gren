@@ -1,12 +1,12 @@
--- Load TurtleLib
+-- Load TurtleLib UI
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua"))()
 local gui = lib:Window("MM2 Summer Autofarm")
 
 -- Services
 local tweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local plr = Players.LocalPlayer
-local character = plr.Character or plr.CharacterAdded:Wait()
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
 local humPart = character:WaitForChild("HumanoidRootPart")
 local map
 
@@ -16,46 +16,71 @@ gui:Slider("Tween Speed", 5, 35, getgenv().TweenSpeed, function(val)
     getgenv().TweenSpeed = val
 end)
 
--- Check if alive
+-- Function to kill the character
+local function killCharacter()
+    if player.Character then
+        player.Character:BreakJoints()
+    end
+end
+
+-- "Bye world" billboard on respawn
+local function onCharacterAdded(char)
+    character = char
+    humPart = char:WaitForChild("HumanoidRootPart")
+    task.wait(1)
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.DisplayName = "Bye world"
+        local head = char:FindFirstChild("Head")
+        if head then
+            local gui = Instance.new("BillboardGui")
+            gui.Size = UDim2.new(5, 0, 2, 0)
+            gui.StudsOffset = Vector3.new(0, 3, 0)
+            gui.Adornee = head
+            gui.Parent = head
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.Text = "Bye world"
+            label.BackgroundTransparency = 1
+            label.TextScaled = true
+            label.Parent = gui
+        end
+    end
+end
+
+-- Attach respawn logic
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Check if player is alive
 local function isAlive()
     return character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
 end
 
--- Respawn tracker
-plr.CharacterAdded:Connect(function(char)
-    character = char
-    humPart = char:WaitForChild("HumanoidRootPart")
-end)
-
--- Track map
+-- Track map loading/unloading
 workspace.DescendantAdded:Connect(function(m)
-    if m:IsA("Model") and m:GetAttribute("MapID") then
-        map = m
-    end
+    if m:IsA("Model") and m:GetAttribute("MapID") then map = m end
 end)
 workspace.DescendantRemoving:Connect(function(m)
-    if m == map then
-        map = nil
-    end
+    if m == map then map = nil end
 end)
 
--- Get current BeachBall coin count
+-- Get BeachBall coin count
 local function getBeachBallCount()
-    local guiPath = plr:FindFirstChild("PlayerGui") and plr.PlayerGui:FindFirstChild("MainGUI")
-        and plr.PlayerGui.MainGUI:FindFirstChild("Lobby") and plr.PlayerGui.MainGUI.Lobby:FindFirstChild("Dock")
-        and plr.PlayerGui.MainGUI.Lobby.Dock:FindFirstChild("CoinBags") and plr.PlayerGui.MainGUI.Lobby.Dock.CoinBags:FindFirstChild("Container")
-        and plr.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container:FindFirstChild("BeachBall") and plr.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall:FindFirstChild("CurrencyFrame")
-        and plr.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame:FindFirstChild("Icon")
-        and plr.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame.Icon:FindFirstChild("Coins")
+    local guiPath = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGUI")
+        and player.PlayerGui.MainGUI:FindFirstChild("Lobby") and player.PlayerGui.MainGUI.Lobby:FindFirstChild("Dock")
+        and player.PlayerGui.MainGUI.Lobby.Dock:FindFirstChild("CoinBags") and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags:FindFirstChild("Container")
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container:FindFirstChild("BeachBall") and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall:FindFirstChild("CurrencyFrame")
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame:FindFirstChild("Icon")
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame.Icon:FindFirstChild("Coins")
 
     if guiPath and guiPath:IsA("TextLabel") then
-        local val = tonumber(guiPath.Text:match("%d+"))
-        return val or 0
+        return tonumber(guiPath.Text:match("%d+")) or 0
     end
     return 0
 end
 
--- Find closest BeachBall coin
+-- Find closest coin
 local function findClosestBeachBall()
     local closest, dist = nil, math.huge
     local container = map and map:FindFirstChild("CoinContainer")
@@ -76,7 +101,7 @@ local function findClosestBeachBall()
     return closest
 end
 
--- Tween-based teleport
+-- Tween to coin
 local function teleport(obj)
     if obj and humPart and obj:IsDescendantOf(workspace) then
         local dist = (humPart.Position - obj.Position).Magnitude
@@ -93,7 +118,7 @@ local function teleport(obj)
     end
 end
 
--- Main autofarm loop
+-- Main loop
 gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
@@ -108,17 +133,14 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
             end
         end
 
-        local ball = findClosestBeachBall()
-        if ball then
-            teleport(ball)
+        local coin = findClosestBeachBall()
+        if coin then
+            teleport(coin)
             task.wait(0.5)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
-            local root = character:FindFirstChild("HumanoidRootPart")
-            if root then
-                root:BreakJoints() -- reliable forced reset
-            end
+            killCharacter() -- real reset
             repeat task.wait() until not isAlive()
         end
 
