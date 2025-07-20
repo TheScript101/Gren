@@ -228,10 +228,26 @@ local roles
 local HighlightEnabled = false
 local Murder, Sheriff, Hero
 
+local function RemoveHighlights()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character then
+            local hl = player.Character:FindFirstChild("Highlight")
+            if hl then
+                hl:Destroy()
+            end
+        end
+    end
+end
+
+
 -- > TurtleLib Toggle < --
 gui:Toggle("Highlight Roles", false, function(state)
     HighlightEnabled = state
+    if not state then
+        RemoveHighlights()
+    end
 end)
+
 
 -- > Helper: IsAlive < --
 local function IsAlive(Player)
