@@ -203,17 +203,10 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
             end
 
             local player = game:GetService("Players").LocalPlayer
-            local resetCooldown = false
-
-            if not resetCooldown then
-                resetCooldown = true
-                if player.Character then
-                    player.Character:BreakJoints()
-                end
-                task.delay(6, function()
-                    resetCooldown = false
-                end)
+            if player.Character then
+                player.Character:BreakJoints()
             end
+
 
 
             repeat task.wait() until not isAlive()
