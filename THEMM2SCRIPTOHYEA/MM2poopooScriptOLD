@@ -1,4 +1,4 @@
-UK-- Load TurtleLib UI
+azUK-- Load TurtleLib UI
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua"))()
 local gui = lib:Window("MM2 Summer Autofarm")
 
@@ -112,8 +112,21 @@ local function findClosestBeachBall()
 end
 
 -- Tween and detect death or coin cap mid-motion
-local function teleport(obj)
-    if obj and humPart and obj:IsDescendantOf(workspace) then
+local function teleportToValidBall()
+    local maxRetries = 5
+    local attempt = 0
+
+    while attempt < maxRetries do
+        local obj = findClosestBeachBall()
+        if not obj or not obj:IsDescendantOf(workspace) then return end
+
+        local vis = obj:FindFirstChild("CoinVisual")
+        if not vis or vis.Transparency == 1 then
+            attempt += 1
+            task.wait(0.1)
+            continue
+        end
+
         local dist = (humPart.Position - obj.Position).Magnitude
         local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
 
@@ -121,11 +134,10 @@ local function teleport(obj)
             CFrame = obj.CFrame
         })
 
-        local humanoid = character:FindFirstChild("Humanoid")
         local cancelled = false
-
-        -- Monitor for death or coin cap
+        local humanoid = character:FindFirstChild("Humanoid")
         local connA, connB
+
         if humanoid then
             connA = humanoid.Died:Connect(function()
                 cancelled = true
@@ -137,25 +149,25 @@ local function teleport(obj)
             if getBeachBallCount() >= 40 then
                 cancelled = true
                 activeTween:Cancel()
+            elseif not obj:IsDescendantOf(workspace) or vis.Transparency == 1 then
+                cancelled = true
+                activeTween:Cancel()
             end
         end)
 
         activeTween:Play()
         activeTween.Completed:Wait()
         activeTween = nil
-
         if connA then connA:Disconnect() end
         if connB then connB:Disconnect() end
 
-        if not cancelled and obj:FindFirstChild("TouchInterest") then
+        if cancelled then
+            attempt += 1
+            task.wait(0.2)
+        else
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
-        end
-
-        -- If reset happened mid-tween
-        if cancelled then
-            repeat task.wait() until not isAlive()
-            waitForRound()
+            return
         end
     end
 end
@@ -180,7 +192,7 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
 
         local coin = findClosestBeachBall()
         if coin then
-            teleport(coin)
+            teleportToValidBall()
             task.wait(0.17)
         end
 
