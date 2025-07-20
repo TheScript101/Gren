@@ -1,4 +1,4 @@
-azUK-- Load TurtleLib UI
+-- Load TurtleLib UI
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua"))()
 local gui = lib:Window("MM2 Summer Autofarm")
 
