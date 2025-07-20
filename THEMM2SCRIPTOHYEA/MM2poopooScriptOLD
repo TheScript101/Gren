@@ -115,11 +115,11 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
-            local humanoid = character:FindFirstChild("Humanoid")
-            if humanoid then
-                humanoid.Health = 0 -- full death reset
+            local root = character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root:BreakJoints() -- reliable forced reset
             end
-            repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+            repeat task.wait() until not isAlive()
         end
 
         task.wait(0.5)
