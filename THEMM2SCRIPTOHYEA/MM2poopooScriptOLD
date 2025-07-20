@@ -190,10 +190,29 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
                 activeTween = nil
             end
 
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:Destroy()
+            local char = player.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:Destroy()
+
+                    if humanoid.Health > 0 then
+                        humanoid.Health = 0
+                    end
+                end
+
+                local head = char:FindFirstChild("Head")
+                if head then
+                    head:Destroy()
+                end
+
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    root:Destroy()
+                end
             end
+
+
 
 
             repeat task.wait() until not isAlive()
