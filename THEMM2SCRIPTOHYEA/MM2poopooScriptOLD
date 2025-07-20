@@ -28,6 +28,42 @@ player.CharacterAdded:Connect(function(char)
     humPart = char:WaitForChild("HumanoidRootPart")
 end)
 
+-- Show waiting text
+local function showWaitingMessage()
+    local gui = Instance.new("BillboardGui")
+    local label = Instance.new("TextLabel")
+    gui.Size = UDim2.new(5, 0, 2, 0)
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.AlwaysOnTop = true
+    gui.Name = "WaitMessage"
+    gui.Adornee = humPart
+    gui.Parent = humPart
+
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = "Waiting for new round..."
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = gui
+
+    return gui
+end
+
+-- Wait for RoleSelector UI before farming
+local function waitForRound()
+    local pg = player:WaitForChild("PlayerGui")
+    local waitGui = showWaitingMessage()
+
+    repeat task.wait()
+    until pg:FindFirstChild("MainGUI")
+        and pg.MainGUI:FindFirstChild("Game")
+        and pg.MainGUI.Game:FindFirstChild("RoleSelector")
+        and pg.MainGUI.Game.RoleSelector.Visible
+
+    waitGui:Destroy()
+end
+
 -- Track map load/unload
 workspace.DescendantAdded:Connect(function(m)
     if m:IsA("Model") and m:GetAttribute("MapID") then map = m end
@@ -51,7 +87,7 @@ local function getBeachBallCount()
     return 0
 end
 
--- Find nearest BeachBall
+-- Find closest BeachBall coin
 local function findClosestBeachBall()
     local closest, dist = nil, math.huge
     local container = map and map:FindFirstChild("CoinContainer")
@@ -72,76 +108,63 @@ local function findClosestBeachBall()
     return closest
 end
 
--- Tween to coin with cancellation tracking
+-- Tween and detect death or coin cap mid-motion
 local function teleport(obj)
     if obj and humPart and obj:IsDescendantOf(workspace) then
         local dist = (humPart.Position - obj.Position).Magnitude
         local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
+
         activeTween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
             CFrame = obj.CFrame
         })
+
+        local humanoid = character:FindFirstChild("Humanoid")
+        local cancelled = false
+
+        -- Monitor for death or coin cap
+        local connA, connB
+        if humanoid then
+            connA = humanoid.Died:Connect(function()
+                cancelled = true
+                activeTween:Cancel()
+            end)
+        end
+
+        connB = game:GetService("RunService").RenderStepped:Connect(function()
+            if getBeachBallCount() >= 40 then
+                cancelled = true
+                activeTween:Cancel()
+            end
+        end)
+
         activeTween:Play()
         activeTween.Completed:Wait()
         activeTween = nil
-        if obj:FindFirstChild("TouchInterest") then
+
+        if connA then connA:Disconnect() end
+        if connB then connB:Disconnect() end
+
+        if not cancelled and obj:FindFirstChild("TouchInterest") then
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
+        end
+
+        -- If reset happened mid-tween
+        if cancelled then
+            repeat task.wait() until not isAlive()
+            waitForRound()
         end
     end
 end
 
--- Show "Waiting for new round..." floating text
-local function showWaitingMessage()
-    local gui = Instance.new("BillboardGui")
-    local label = Instance.new("TextLabel")
-    gui.Size = UDim2.new(5, 0, 2, 0)
-    gui.StudsOffset = Vector3.new(0, 3, 0)
-    gui.AlwaysOnTop = true
-    gui.Name = "WaitMessage"
-    gui.Adornee = humPart
-    gui.Parent = humPart
-
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.Text = "Waiting for new round..."
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 1, 0)
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.Parent = gui
-
-    return gui
-end
-
--- Reset player and wait for GUI
-local function killCharacterAndWait()
-    if activeTween then
-        activeTween:Cancel()
-        activeTween = nil
-    end
-
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart:BreakJoints()
-    end
-
-    repeat task.wait() until not isAlive()
-
-    local waitGui = showWaitingMessage()
-
-    local pg = player:WaitForChild("PlayerGui")
-    repeat task.wait()
-    until pg:FindFirstChild("MainGUI")
-        and pg.MainGUI:FindFirstChild("Game")
-        and pg.MainGUI.Game:FindFirstChild("RoleSelector")
-        and pg.MainGUI.Game.RoleSelector.Visible
-
-    waitGui:Destroy()
-end
-
--- Farming loop
+-- Main loop
 gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
-        if not isAlive() then repeat task.wait() until isAlive() end
+        if not isAlive() then
+            repeat task.wait() until isAlive()
+            waitForRound()
+        end
 
         if not map then
             for _, m in pairs(workspace:GetDescendants()) do
@@ -159,7 +182,17 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
-            killCharacterAndWait()
+            if activeTween then
+                activeTween:Cancel()
+                activeTween = nil
+            end
+
+            if character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart:BreakJoints()
+            end
+
+            repeat task.wait() until not isAlive()
+            waitForRound()
         end
 
         task.wait(0.5)
