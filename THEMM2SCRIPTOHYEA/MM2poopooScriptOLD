@@ -176,13 +176,38 @@ gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
             task.wait(0.5)
         end
 
-        if getBeachBallCount() >= 40 then
-            local murderPlayer = findMurder()
-            if murderPlayer then
-                SkidFling(murderPlayer)
-                repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
-            end
+if getBeachBallCount() >= 40 then
+    local murderPlayer = findMurder()
+    if murderPlayer then
+        SkidFling(murderPlayer)
+    end
+
+    -- Wait until bag is no longer full or you die
+    repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+
+    -- If you died, wait for respawn then refling
+    if not isAlive() then
+        repeat
+            character = plr.Character or plr.CharacterAdded:Wait()
+            humPart = character:FindFirstChild("HumanoidRootPart")
+            task.wait()
+        until isAlive()
+
+        murderPlayer = findMurder()
+        if murderPlayer then
+            SkidFling(murderPlayer)
         end
+    end
+
+    -- After fling finishes, wait 35 seconds before restarting farm loop
+    task.wait(35)
+
+    -- Resume farming
+    local resumedBall = findClosestBeachBall()
+    if resumedBall then
+        teleport(resumedBall)
+    end
+end
 
         task.wait(0.5)
     end
