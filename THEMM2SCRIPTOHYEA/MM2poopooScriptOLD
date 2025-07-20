@@ -1,4 +1,4 @@
--- Load TurtleLib UI
+UK-- Load TurtleLib UI
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Lib/main/source.lua"))()
 local gui = lib:Window("MM2 Summer Autofarm")
 
@@ -181,7 +181,7 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         local coin = findClosestBeachBall()
         if coin then
             teleport(coin)
-            task.wait(0.5)
+            task.wait(0.17)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
@@ -190,29 +190,18 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
                 activeTween = nil
             end
 
-            local char = player.Character
-            if char then
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:Destroy()
+            local player = game:GetService("Players").LocalPlayer
+            local resetCooldown = false
 
-                    if humanoid.Health > 0 then
-                        humanoid.Health = 0
-                    end
+            if not resetCooldown then
+                resetCooldown = true
+                if player.Character then
+                    player.Character:BreakJoints()
                 end
-
-                local head = char:FindFirstChild("Head")
-                if head then
-                    head:Destroy()
-                end
-
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    root:Destroy()
-                end
+                task.delay(6, function()
+                    resetCooldown = false
+                end)
             end
-
-
 
 
             repeat task.wait() until not isAlive()
