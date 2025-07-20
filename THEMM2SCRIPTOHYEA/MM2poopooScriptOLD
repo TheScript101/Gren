@@ -12,8 +12,8 @@ local map
 local activeTween = nil
 
 -- Settings
-getgenv().TweenSpeed = 20
-gui:Slider("Tween Speed", 5, 35, getgenv().TweenSpeed, function(val)
+getgenv().TweenSpeed = 5
+gui:Slider("Tween Speed", 5, 40, getgenv().TweenSpeed, function(val)
     getgenv().TweenSpeed = val
 end)
 
