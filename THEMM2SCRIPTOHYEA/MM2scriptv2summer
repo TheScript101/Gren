@@ -123,7 +123,7 @@ local function teleportToValidBall()
         local vis = obj:FindFirstChild("CoinVisual")
         if not vis or vis.Transparency == 1 then
             attempt += 1
-            task.wait(0.1)
+            task.wait(0.01)
             continue
         end
 
@@ -163,7 +163,7 @@ local function teleportToValidBall()
 
         if cancelled then
             attempt += 1
-            task.wait(0.2)
+            task.wait(0.1)
         else
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
@@ -193,7 +193,7 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         local coin = findClosestBeachBall()
         if coin then
             teleportToValidBall()
-            task.wait(0.17)
+            task.wait(0.01) 
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
