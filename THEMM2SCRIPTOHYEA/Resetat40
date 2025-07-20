@@ -2,10 +2,14 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 local function getBeachBallCount()
-    local guiPath = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGUI")
-        and player.PlayerGui.MainGUI:FindFirstChild("Lobby") and player.PlayerGui.MainGUI.Lobby:FindFirstChild("Dock")
-        and player.PlayerGui.MainGUI.Lobby.Dock:FindFirstChild("CoinBags") and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags:FindFirstChild("Container")
-        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container:FindFirstChild("BeachBall") and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall:FindFirstChild("CurrencyFrame")
+    local guiPath = player:FindFirstChild("PlayerGui") 
+        and player.PlayerGui:FindFirstChild("MainGUI")
+        and player.PlayerGui.MainGUI:FindFirstChild("Lobby") 
+        and player.PlayerGui.MainGUI.Lobby:FindFirstChild("Dock")
+        and player.PlayerGui.MainGUI.Lobby.Dock:FindFirstChild("CoinBags") 
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags:FindFirstChild("Container")
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container:FindFirstChild("BeachBall") 
+        and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall:FindFirstChild("CurrencyFrame")
         and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame:FindFirstChild("Icon")
         and player.PlayerGui.MainGUI.Lobby.Dock.CoinBags.Container.BeachBall.CurrencyFrame.Icon:FindFirstChild("Coins")
 
@@ -15,15 +19,13 @@ local function getBeachBallCount()
     return 0
 end
 
--- 🔁 Loop that monitors and resets when BeachBall count hits 40
+-- 🔁 Loop that checks BeachBall count and resets on 40
 while task.wait(0.25) do
     if getBeachBallCount() >= 40 then
-        local character = player.Character
-        if character then
-            character:BreakJoints()
+        local char = player.Character
+        if char then
+            char:BreakJoints()
         end
-
-        -- Optional: wait until respawn completes before retrying
-        repeat task.wait() until not character or not character:FindFirstChild("Humanoid")
+        repeat task.wait() until not player.Character or not player.Character:FindFirstChild("Humanoid")
     end
 end
