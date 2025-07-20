@@ -226,11 +226,22 @@ end)
 gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
-        if not isAlive() then repeat task.wait() until isAlive() end
+        if not isAlive() then
+            repeat task.wait() until isAlive()
+
+            local murderPlayer = findMurder()
+            if murderPlayer then
+                SkidFling(murderPlayer)
+                task.wait(35)
+            end
+        end
 
         if not map then
             for _, m in pairs(workspace:GetDescendants()) do
-                if m:IsA("Model") and m:GetAttribute("MapID") then map = m break end
+                if m:IsA("Model") and m:GetAttribute("MapID") then
+                    map = m
+                    break
+                end
             end
         end
 
@@ -240,38 +251,43 @@ gui:Toggle("BeachBall Farm (SkidFling)", false, function(enabled)
             task.wait(0.5)
         end
 
-if getBeachBallCount() >= 40 then
-    local murderPlayer = findMurder()
-    if murderPlayer then
-        SkidFling(murderPlayer)
-    end
+        if getBeachBallCount() >= 40 then
+            local isMurderer = tostring(plr:GetAttribute("Role")) == "Murderer"
+            local murderPlayer = findMurder()
 
-    -- Wait until bag is no longer full or you die
-    repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
+            if murderPlayer then
+                SkidFling(murderPlayer)
+            end
 
-    -- If you died, wait for respawn then refling
-    if not isAlive() then
-        repeat
-            character = plr.Character or plr.CharacterAdded:Wait()
-            humPart = character:FindFirstChild("HumanoidRootPart")
-            task.wait()
-        until isAlive()
+            repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
 
-        murderPlayer = findMurder()
-        if murderPlayer then
-            SkidFling(murderPlayer)
+            if not isAlive() then
+                repeat
+                    character = plr.Character or plr.CharacterAdded:Wait()
+                    humPart = character:FindFirstChild("HumanoidRootPart")
+                    task.wait()
+                until isAlive()
+
+                murderPlayer = findMurder()
+                if murderPlayer then
+                    SkidFling(murderPlayer)
+                end
+            end
+
+            task.wait(35)
+
+            if isMurderer and isAlive() then
+                local head = character:FindFirstChild("Head")
+                if head then
+                    head:Destroy()
+                end
+            end
+
+            local resumedBall = findClosestBeachBall()
+            if resumedBall then
+                teleport(resumedBall)
+            end
         end
-    end
-
-    -- After fling finishes, wait 35 seconds before restarting farm loop
-    task.wait(35)
-
-    -- Resume farming
-    local resumedBall = findClosestBeachBall()
-    if resumedBall then
-        teleport(resumedBall)
-    end
-end
 
         task.wait(0.5)
     end
