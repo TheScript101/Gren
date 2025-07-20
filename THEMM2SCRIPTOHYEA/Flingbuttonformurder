@@ -1,37 +1,29 @@
 -- Services
-local Players           = game:GetService("Players")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService        = game:GetService("RunService")
-local StarterGui        = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
--- Player references
-local Player    = Players.LocalPlayer
+local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
-local Humanoid  = Character:WaitForChild("Humanoid")
-local RootPart  = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Keep Character, Humanoid and RootPart up-to-date on respawn
 Player.CharacterAdded:Connect(function(char)
     Character = char
-    Humanoid  = char:WaitForChild("Humanoid")
-    RootPart  = char:WaitForChild("HumanoidRootPart")
+    Humanoid = char:WaitForChild("Humanoid")
+    RootPart = char:WaitForChild("HumanoidRootPart")
 end)
 
--- Notification helper
 local function Message(title, text, duration)
-    StarterGui:SetCore("SendNotification", {
-        Title    = title,
-        Text     = text,
-        Duration = duration or 3
-    })
+    StarterGui:SetCore("SendNotification", {Title = title, Text = text, Duration = duration})
 end
 
--- 💥 Original SkidFling function, untouched
+-- 💥 Your original SkidFling function, untouched
 local function SkidFling(TargetPlayer)
     local TCharacter = TargetPlayer.Character
-    if not TCharacter then return end
-
     local THumanoid, TRootPart, THead, Accessory, Handle
+
     if TCharacter:FindFirstChildOfClass("Humanoid") then
         THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
     end
@@ -53,7 +45,6 @@ local function SkidFling(TargetPlayer)
             getgenv().OldPos = RootPart.CFrame
         end
         if THumanoid and THumanoid.Sit then return end
-
         if THead then
             workspace.CurrentCamera.CameraSubject = THead
         elseif Handle then
@@ -61,110 +52,100 @@ local function SkidFling(TargetPlayer)
         elseif TRootPart then
             workspace.CurrentCamera.CameraSubject = THumanoid
         end
-
         if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
 
         local function FPos(BasePart, Pos, Ang)
-            local cf = CFrame.new(BasePart.Position) * Pos * Ang
-            RootPart.CFrame              = cf
-            Character:SetPrimaryPartCFrame(cf)
-            RootPart.Velocity            = Vector3.new(9e7, 9e7 * 10, 9e7)
-            RootPart.RotVelocity         = Vector3.new(9e8, 9e8, 9e8)
+            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+            Character:SetPrimaryPartCFrame(RootPart.CFrame)
+            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
         end
 
         local function SFBasePart(BasePart)
-            local startTime = tick()
-            local Angle     = 0
-
-            -- Prevent parts from disappearing
-            local oldFDH = workspace.FallenPartsDestroyHeight
-            workspace.FallenPartsDestroyHeight = 0/0
-
-            -- BodyVelocity spike
-            local BV = Instance.new("BodyVelocity")
-            BV.Name     = "EpixVel"
-            BV.Parent   = RootPart
-            BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-            BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-
-            Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-
+            local TimeToWait = 2
+            local Time = tick()
+            local Angle = 0
             repeat
-                Angle += 100
-                FPos(BasePart, CFrame.new(0,  1.5,  0), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
-                FPos(BasePart, CFrame.new(0, -1.5,  0), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
-                FPos(BasePart, CFrame.new(2.25, 1.5, -2.25), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
-                FPos(BasePart, CFrame.new(-2.25,-1.5,  2.25), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
-            until BasePart.Velocity.Magnitude > 500 or tick() > startTime + 2
-
-            BV:Destroy()
-            Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-            workspace.CurrentCamera.CameraSubject = Humanoid
-            workspace.FallenPartsDestroyHeight = oldFDH
-
-            -- Return to old position
-            repeat
-                local returnCF = getgenv().OldPos * CFrame.new(0, .5, 0)
-                RootPart.CFrame              = returnCF
-                Character:SetPrimaryPartCFrame(returnCF)
-                Humanoid:ChangeState("GettingUp")
-                for _, x in pairs(Character:GetChildren()) do
-                    if x:IsA("BasePart") then
-                        x.Velocity    = Vector3.new()
-                        x.RotVelocity = Vector3.new()
-                    end
+                if RootPart and THumanoid then
+                    Angle += 100
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0,0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0,0)); task.wait()
+                    FPos(BasePart, CFrame.new(2.25, 1.5, -2.25), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
+                    FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25), CFrame.Angles(math.rad(Angle),0,0)); task.wait()
+                else
+                    break
                 end
-                task.wait()
-            until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
+            until BasePart.Velocity.Magnitude > 500 or tick() > Time + TimeToWait
         end
 
-        local flingPart = THead or TRootPart or Handle
-        if flingPart then
-            SFBasePart(flingPart)
+        workspace.FallenPartsDestroyHeight = 0/0
+
+        local BV = Instance.new("BodyVelocity")
+        BV.Name = "EpixVel"
+        BV.Parent = RootPart
+        BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+        BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+        if TRootPart and THead then
+            SFBasePart((TRootPart.Position - THead.Position).Magnitude > 5 and THead or TRootPart)
+        elseif TRootPart then
+            SFBasePart(TRootPart)
+        elseif THead then
+            SFBasePart(THead)
+        elseif Handle then
+            SFBasePart(Handle)
         else
-            Message("SkidFling", "No valid fling part", 3)
+            Message("SkidFling", "Target is missing fling parts", 3)
         end
+
+        BV:Destroy()
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        workspace.CurrentCamera.CameraSubject = Humanoid
+
+        repeat
+            RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+            Character:SetPrimaryPartCFrame(RootPart.CFrame)
+            Humanoid:ChangeState("GettingUp")
+            for _, x in pairs(Character:GetChildren()) do
+                if x:IsA("BasePart") then
+                    x.Velocity = Vector3.zero
+                    x.RotVelocity = Vector3.zero
+                end
+            end
+            task.wait()
+        until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
+        workspace.FallenPartsDestroyHeight = -500
     end
 end
 
--- Prevent notification spam: run fling once per death
-local hasFlingRun = false
-
--- Monitor health and trigger fling once
+-- 🔁 Monitor death and run SkidFling on Murderer
 RunService.Heartbeat:Connect(function()
-    if Humanoid and Humanoid.Health <= 0 then
-        if not hasFlingRun then
-            hasFlingRun = true
+    if not Character or not Character:FindFirstChild("Humanoid") or Humanoid.Health <= 0 then
+        repeat task.wait() until Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        Character = Player.Character
+        Humanoid  = Character:FindFirstChild("Humanoid")
+        RootPart  = Character:FindFirstChild("HumanoidRootPart")
+        task.wait(0.5)
 
-            -- Wait for respawn
-            repeat task.wait() until Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            Character = Player.Character
-            Humanoid  = Character:FindFirstChild("Humanoid")
-            RootPart  = Character:FindFirstChild("HumanoidRootPart")
-            task.wait(0.5)
+        local success, roles = pcall(function()
+            return ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+        end)
 
-            -- Fetch roles once
-            local success, roles = pcall(function()
-                return ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
-            end)
-
-            if success and roles then
-                for name, info in pairs(roles) do
-                    if info.Role == "Murderer" then
-                        local target = Players:FindFirstChild(name)
-                        if target and target ~= Player then
-                            Message("SkidFling", "Targeting Murderer: "..target.Name, 3)
-                            SkidFling(target)
-                        end
-                        break
+        if success and roles then
+            for name, info in pairs(roles) do
+                if info.Role == "Murderer" then
+                    local target = Players:FindFirstChild(name)
+                    if target and target ~= Player then
+                        Message("SkidFling", "Targeting Murderer: " .. target.Name, 3)
+                        SkidFling(target)
                     end
+                    break
                 end
-            else
-                Message("SkidFling", "Role data failed", 3)
             end
+        else
+            Message("SkidFling", "Role data failed", 3)
         end
-
-    elseif Humanoid and Humanoid.Health > 0 then
-        hasFlingRun = false
     end
 end)
