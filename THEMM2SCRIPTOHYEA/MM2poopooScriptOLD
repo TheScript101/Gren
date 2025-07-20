@@ -199,8 +199,8 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     end
 end)
 
-local GC = getconnections or get_signal_cons
-w:Button("Anti AFK", function()
+gui:Button("Anti AFK", function()
+    local GC = getconnections or get_signal_cons
     if GC then
         for _,v in pairs(GC(plr.Idled)) do
             if v.Disable then v:Disable() elseif v.Disconnect then v:Disconnect() end
@@ -213,4 +213,88 @@ w:Button("Anti AFK", function()
         end)
     end
 end)
-w:Label("~ use anti-afk if overnight farming", Color3.fromRGB(127, 143, 166))
+
+gui:Label("~ use anti-afk if overnight farming", Color3.fromRGB(127, 143, 166))
+
+
+
+
+-- > Services & Setup < --
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+local roles
+local HighlightEnabled = false
+local Murder, Sheriff, Hero
+
+-- > TurtleLib Toggle < --
+gui:Toggle("Highlight Roles", false, function(state)
+    HighlightEnabled = state
+end)
+
+-- > Helper: IsAlive < --
+local function IsAlive(Player)
+    for name, info in pairs(roles or {}) do
+        if Player.Name == name then
+            return not info.Killed and not info.Dead
+        end
+    end
+    return false
+end
+
+-- > Create Highlights < --
+local function CreateHighlight()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character and not player.Character:FindFirstChild("Highlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Highlight"
+            highlight.FillTransparency = 0.3
+            highlight.OutlineTransparency = 0
+            highlight.OutlineColor = Color3.new(1, 1, 1)
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Adornee = player.Character
+            highlight.Parent = player.Character
+        end
+    end
+end
+
+-- > Update Highlight Colors Based on Roles < --
+local function UpdateHighlights()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character then
+            local highlight = player.Character:FindFirstChild("Highlight")
+            if highlight then
+                if player.Name == Sheriff and IsAlive(player) then
+                    highlight.FillColor = Color3.fromRGB(0, 0, 225) -- Blue
+                elseif player.Name == Murder and IsAlive(player) then
+                    highlight.FillColor = Color3.fromRGB(225, 0, 0) -- Red
+                elseif player.Name == Hero and IsAlive(player) and not IsAlive(Players[Sheriff]) then
+                    highlight.FillColor = Color3.fromRGB(255, 250, 0) -- Yellow
+                else
+                    highlight.FillColor = Color3.fromRGB(0, 225, 0) -- Green
+                end
+            end
+        end
+    end
+end
+
+-- > Highlight Update Loop (Only if Toggle Enabled) < --
+RunService.RenderStepped:Connect(function()
+    if not HighlightEnabled then return end
+
+    roles = ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+
+    for name, info in pairs(roles) do
+        if info.Role == "Murderer" then
+            Murder = name
+        elseif info.Role == "Sheriff" then
+            Sheriff = name
+        elseif info.Role == "Hero" then
+            Hero = name
+        end
+    end
+
+    CreateHighlight()
+    UpdateHighlights()
+end)
