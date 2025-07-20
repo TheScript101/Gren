@@ -341,7 +341,7 @@ end)
 -------------------fling button------------------
 -- Button in TurtleLib GUI (place this after gui = lib:Window(...))
 gui:Button("Fling Murd on Die", function()
-    local content = game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/main/THEMM2SCRIPTOHYEA/Flingbuttonformurder.lua")
-    loadstring(content)()
+    loadstring(game:HttpGet("https://github.com/TheScript101/Gren/blob/main/THEMM2SCRIPTOHYEA/Flingbuttonformurder"))()
 end)
+
 
