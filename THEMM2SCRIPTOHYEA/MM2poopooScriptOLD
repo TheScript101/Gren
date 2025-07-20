@@ -115,9 +115,9 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
-            local head = character:FindFirstChild("Head")
-            if head then
-                head:Destroy() -- resets character
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.Health = 0 -- full death reset
             end
             repeat task.wait() until getBeachBallCount() < 40 or not isAlive()
         end
