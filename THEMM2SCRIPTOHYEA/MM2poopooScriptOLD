@@ -135,56 +135,74 @@ end
 
 -- SkidFling logic
 local function SkidFling(TargetPlayer)
+    if not TargetPlayer or not TargetPlayer.Character then
+        warn("SkidFling: No valid target character.")
+        return
+    end
+
     local Character = plr.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Humanoid and Humanoid.RootPart
 
     local TCharacter = TargetPlayer.Character
-    local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
+    local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
     local TRootPart = THumanoid and THumanoid.RootPart
-    local THead = TCharacter and TCharacter:FindFirstChild("Head")
+    local THead = TCharacter:FindFirstChild("Head")
 
-    if not Character or not Humanoid or not RootPart then return end
-    if not TCharacter or not THumanoid or not TRootPart then return end
-
-    local function flingCore(BasePart)
-        workspace.FallenPartsDestroyHeight = 0/0
-        local BV = Instance.new("BodyVelocity")
-        BV.Name = "EpixVel"
-        BV.Parent = RootPart
-        BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-        BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-
-        local function apply(pos, ang)
-            RootPart.CFrame = CFrame.new(BasePart.Position) * pos * ang
-            Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * pos * ang)
-            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-        end
-
-        local angle, start = 0, tick()
-        while tick() - start < 2 and THumanoid.Health > 0 and BasePart.Parent == TCharacter do
-            angle += 100
-            local move = THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25
-            apply(CFrame.new(0, 1.5, 0) + move, CFrame.Angles(math.rad(angle), 0, 0))
-            task.wait()
-            apply(CFrame.new(0, -1.5, 0) + move, CFrame.Angles(math.rad(angle), 0, 0))
-            task.wait()
-        end
-
-        BV:Destroy()
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        workspace.CurrentCamera.CameraSubject = Humanoid
-        workspace.FallenPartsDestroyHeight = getgenv().FPDH
+    if not Character or not Humanoid or not RootPart then
+        warn("SkidFling: Local character invalid.")
+        return
+    end
+    if not THumanoid or not TRootPart then
+        warn("SkidFling: Target humanoid or root part missing.")
+        return
+    end
+    if THumanoid.Health <= 0 then
+        warn("SkidFling: Target already dead.")
+        return
     end
 
-    if TRootPart and THead then
-        flingCore(THead)
-    elseif TRootPart then
-        flingCore(TRootPart)
+    print("SkidFling initiated →", TargetPlayer.Name)
+
+    local BasePart = THead or TRootPart
+    workspace.FallenPartsDestroyHeight = math.huge
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+    local BV = Instance.new("BodyVelocity")
+    BV.Name = "EpixVel"
+    BV.Velocity = Vector3.new(1e9, 1e9, 1e9)
+    BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BV.Parent = RootPart
+
+    local function apply(pos, ang)
+        local cframe = CFrame.new(BasePart.Position) * pos * ang
+        RootPart.CFrame = cframe
+        Character:SetPrimaryPartCFrame(cframe)
+        RootPart.Velocity = Vector3.new(1e8, 1e8, 1e8)
+        RootPart.RotVelocity = Vector3.new(1e9, 1e9, 1e9)
     end
+
+    local angle = 0
+    local start = tick()
+
+    while tick() - start < 2 and THumanoid.Health > 0 and BasePart.Parent == TCharacter do
+        angle += 100
+        local move = THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25
+
+        apply(CFrame.new(0, 1.5, 0) + move, CFrame.Angles(math.rad(angle), 0, 0))
+        task.wait()
+        apply(CFrame.new(0, -1.5, 0) + move, CFrame.Angles(math.rad(angle), 0, 0))
+        task.wait()
+    end
+
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    workspace.CurrentCamera.CameraSubject = Humanoid
+    workspace.FallenPartsDestroyHeight = getgenv().FPDH
+
+    print("SkidFling completed.")
 end
+
 
 -- Track map
 workspace.DescendantAdded:Connect(function(m)
