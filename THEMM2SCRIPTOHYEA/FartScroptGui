@@ -177,9 +177,42 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
         if not isAlive() then
-            repeat task.wait() until isAlive()
+            repeat task.wait() until not isAlive()
+
+            -- Wait for floating "Waiting for new round..." BillboardGui to appear
+            local waitGui
+            repeat
+                task.wait()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    waitGui = player.Character.HumanoidRootPart:FindFirstChild("WaitMessage")
+                end
+            until waitGui
+
+            -- Fling Murderer if toggle is enabled
+            if getgenv().FlingMurderOnDeath then
+                local success, roles = pcall(function()
+                    return game:GetService("ReplicatedStorage"):FindFirstChild("GetPlayerData", true):InvokeServer()
+                end)
+
+                if success and roles then
+                    for name, info in pairs(roles) do
+                        if info.Role == "Murderer" then
+                            local target = Players:FindFirstChild(name)
+                            if target and target ~= player and typeof(SkidFling) == "function" then
+                                SkidFling(target)
+                            end
+                            break
+                        end
+                    end
+                end
+            end
+
             waitForRound()
         end
+    end
+end)
+
+
 
         if not map then
             for _, m in pairs(workspace:GetDescendants()) do
@@ -216,6 +249,11 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         task.wait(0.5)
     end
 end)
+
+gui:Toggle("Fling Murderer on Death", false, function(state)
+    getgenv().FlingMurderOnDeath = state
+end)
+
 
 gui:Button("Anti AFK", function()
     local GC = getconnections or get_signal_cons
