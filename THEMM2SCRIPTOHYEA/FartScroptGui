@@ -297,11 +297,6 @@ end)
     end
 end)
 
-gui:Toggle("Fling Murderer on Death", false, function(state)
-    getgenv().FlingMurderOnDeath = state
-end)
-
-
 gui:Button("Anti AFK", function()
     local GC = getconnections or get_signal_cons
     if GC then
@@ -416,4 +411,9 @@ RunService.RenderStepped:Connect(function()
 
     CreateHighlight()
     UpdateHighlights()
+end)
+
+
+gui:Toggle("Fling Murderer on Death", false, function(state)
+    getgenv().FlingMurderOnDeath = state
 end)
