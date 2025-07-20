@@ -9,6 +9,7 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humPart = character:WaitForChild("HumanoidRootPart")
 local map
+local activeTween = nil
 
 -- Settings
 getgenv().TweenSpeed = 20
@@ -16,48 +17,18 @@ gui:Slider("Tween Speed", 5, 35, getgenv().TweenSpeed, function(val)
     getgenv().TweenSpeed = val
 end)
 
--- Function to kill the character
-local function killCharacter()
-    if player.Character then
-        player.Character:BreakJoints()
-    end
-end
-
--- "Bye world" billboard on respawn
-local function onCharacterAdded(char)
-    character = char
-    humPart = char:WaitForChild("HumanoidRootPart")
-    task.wait(1)
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.DisplayName = "Bye world"
-        local head = char:FindFirstChild("Head")
-        if head then
-            local gui = Instance.new("BillboardGui")
-            gui.Size = UDim2.new(5, 0, 2, 0)
-            gui.StudsOffset = Vector3.new(0, 3, 0)
-            gui.Adornee = head
-            gui.Parent = head
-
-            local label = Instance.new("TextLabel")
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.Text = "Bye world"
-            label.BackgroundTransparency = 1
-            label.TextScaled = true
-            label.Parent = gui
-        end
-    end
-end
-
--- Attach respawn logic
-player.CharacterAdded:Connect(onCharacterAdded)
-
--- Check if player is alive
+-- Alive check
 local function isAlive()
     return character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
 end
 
--- Track map loading/unloading
+-- Respawn tracker
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humPart = char:WaitForChild("HumanoidRootPart")
+end)
+
+-- Track map load/unload
 workspace.DescendantAdded:Connect(function(m)
     if m:IsA("Model") and m:GetAttribute("MapID") then map = m end
 end)
@@ -80,7 +51,7 @@ local function getBeachBallCount()
     return 0
 end
 
--- Find closest coin
+-- Find nearest BeachBall
 local function findClosestBeachBall()
     local closest, dist = nil, math.huge
     local container = map and map:FindFirstChild("CoinContainer")
@@ -101,16 +72,17 @@ local function findClosestBeachBall()
     return closest
 end
 
--- Tween to coin
+-- Tween to coin with cancellation tracking
 local function teleport(obj)
     if obj and humPart and obj:IsDescendantOf(workspace) then
         local dist = (humPart.Position - obj.Position).Magnitude
         local time = math.clamp(dist / getgenv().TweenSpeed, 0.2, 5)
-        local tween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
+        activeTween = tweenService:Create(humPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {
             CFrame = obj.CFrame
         })
-        tween:Play()
-        tween.Completed:Wait()
+        activeTween:Play()
+        activeTween.Completed:Wait()
+        activeTween = nil
         if obj:FindFirstChild("TouchInterest") then
             firetouchinterest(humPart, obj, 0)
             firetouchinterest(humPart, obj, 1)
@@ -118,7 +90,54 @@ local function teleport(obj)
     end
 end
 
--- Main loop
+-- Show "Waiting for new round..." floating text
+local function showWaitingMessage()
+    local gui = Instance.new("BillboardGui")
+    local label = Instance.new("TextLabel")
+    gui.Size = UDim2.new(5, 0, 2, 0)
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.AlwaysOnTop = true
+    gui.Name = "WaitMessage"
+    gui.Adornee = humPart
+    gui.Parent = humPart
+
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = "Waiting for new round..."
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = gui
+
+    return gui
+end
+
+-- Reset player and wait for GUI
+local function killCharacterAndWait()
+    if activeTween then
+        activeTween:Cancel()
+        activeTween = nil
+    end
+
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart:BreakJoints()
+    end
+
+    repeat task.wait() until not isAlive()
+
+    local waitGui = showWaitingMessage()
+
+    local pg = player:WaitForChild("PlayerGui")
+    repeat task.wait()
+    until pg:FindFirstChild("MainGUI")
+        and pg.MainGUI:FindFirstChild("Game")
+        and pg.MainGUI.Game:FindFirstChild("RoleSelector")
+        and pg.MainGUI.Game.RoleSelector.Visible
+
+    waitGui:Destroy()
+end
+
+-- Farming loop
 gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     getgenv().farm = enabled
     while getgenv().farm do
@@ -140,10 +159,25 @@ gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
         end
 
         if getBeachBallCount() >= 40 and isAlive() then
-            killCharacter() -- real reset
-            repeat task.wait() until not isAlive()
+            killCharacterAndWait()
         end
 
         task.wait(0.5)
     end
 end)
+
+local GC = getconnections or get_signal_cons
+w:Button("Anti AFK", function()
+    if GC then
+        for _,v in pairs(GC(plr.Idled)) do
+            if v.Disable then v:Disable() elseif v.Disconnect then v:Disconnect() end
+        end
+    else
+        local vu = cloneref(game:GetService("VirtualUser"))
+        plr.Idled:Connect(function()
+            vu:CaptureController()
+            vu:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+w:Label("~ use anti-afk if overnight farming", Color3.fromRGB(127, 143, 166))
