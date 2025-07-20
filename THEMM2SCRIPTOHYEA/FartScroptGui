@@ -172,6 +172,53 @@ local function teleportToValidBall()
     end
 end
 
+
+function SkidFling(TargetPlayer)
+    local Character = player.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+
+    local TChar = TargetPlayer.Character
+    local THumanoid = TChar and TChar:FindFirstChildOfClass("Humanoid")
+    local THead = TChar and TChar:FindFirstChild("Head")
+    local TRoot = THumanoid and THumanoid.RootPart
+
+    if Character and Humanoid and RootPart and TChar and THumanoid then
+        local function FPos(part, offset, ang)
+            RootPart.CFrame = CFrame.new(part.Position) * offset * ang
+            Character:SetPrimaryPartCFrame(RootPart.CFrame)
+            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        end
+
+        local function SFLoop(part)
+            local start = tick()
+            local angle = 0
+            repeat
+                if RootPart and THumanoid and part then
+                    angle += 100
+                    FPos(part, CFrame.new(0, 1.5, 0), CFrame.Angles(math.rad(angle), 0, 0))
+                    task.wait()
+                    FPos(part, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(angle), 0, 0))
+                    task.wait()
+                    FPos(part, CFrame.new(2, 2, -2), CFrame.Angles(math.rad(angle), 0, 0))
+                    task.wait()
+                    FPos(part, CFrame.new(-2, -2, 2), CFrame.Angles(math.rad(angle), 0, 0))
+                    task.wait()
+                else
+                    break
+                end
+            until tick() - start > 2 or part.Velocity.Magnitude > 500
+        end
+
+        local flingTarget = THead or TRoot
+        if flingTarget then SFLoop(flingTarget) end
+    end
+end
+
+
+
+
 -- Main loop
 gui:Toggle("BeachBall Farm (Auto Reset)", false, function(enabled)
     getgenv().farm = enabled
