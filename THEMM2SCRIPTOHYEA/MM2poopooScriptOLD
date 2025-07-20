@@ -17,6 +17,9 @@ gui:Slider("Tween Speed", 5, 40, getgenv().TweenSpeed, function(val)
     getgenv().TweenSpeed = val
 end)
 
+gui:Label("~ recommended speed 30-35", Color3.fromRGB(127, 143, 166))
+
+
 -- Alive check
 local function isAlive()
     return character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart")
