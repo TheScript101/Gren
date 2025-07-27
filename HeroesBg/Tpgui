@@ -1,0 +1,189 @@
+-- // Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- // Variables
+local TPEnabled = false
+local selectedDestination = nil
+local animId = "rbxassetid://14821238892"
+
+-- // GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TeleportAnimationGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+-- // Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 300, 0, 250)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- // Title
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, -40, 0, 30)
+Title.Position = UDim2.new(0, 10, 0, 5)
+Title.Text = "Teleport Animation"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSansSemibold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- // Minimize Button
+local Minimize = Instance.new("TextButton", MainFrame)
+Minimize.Size = UDim2.new(0, 25, 0, 25)
+Minimize.Position = UDim2.new(1, -30, 0, 5)
+Minimize.Text = "_"
+Minimize.TextSize = 18
+Minimize.Font = Enum.Font.SourceSansBold
+Minimize.TextColor3 = Color3.fromRGB(255, 255, 255)
+Minimize.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Minimize.BorderSizePixel = 0
+
+-- // Toggle Button (when minimized)
+local ToggleFrame = Instance.new("TextButton", ScreenGui)
+ToggleFrame.Size = UDim2.new(0, 100, 0, 30)
+ToggleFrame.Position = UDim2.new(0, 20, 0, 20)
+ToggleFrame.Text = "Open GUI"
+ToggleFrame.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleFrame.Visible = false
+ToggleFrame.Active = true
+ToggleFrame.Draggable = true
+
+Minimize.MouseButton1Click:Connect(function()
+	MainFrame.Visible = false
+	ToggleFrame.Visible = true
+end)
+
+ToggleFrame.MouseButton1Click:Connect(function()
+	MainFrame.Visible = true
+	ToggleFrame.Visible = false
+end)
+
+-- // Enable Toggle
+local EnableToggle = Instance.new("TextButton", MainFrame)
+EnableToggle.Size = UDim2.new(0, 120, 0, 30)
+EnableToggle.Position = UDim2.new(0, 10, 0, 40)
+EnableToggle.Text = "Enable TP Anim: OFF"
+EnableToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+EnableToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+EnableToggle.Font = Enum.Font.SourceSans
+EnableToggle.TextSize = 14
+
+EnableToggle.MouseButton1Click:Connect(function()
+	TPEnabled = not TPEnabled
+	EnableToggle.Text = "Enable TP Anim: " .. (TPEnabled and "ON" or "OFF")
+end)
+
+-- // Teleport Back
+local TeleportBack = Instance.new("TextButton", MainFrame)
+TeleportBack.Size = UDim2.new(0, 120, 0, 30)
+TeleportBack.Position = UDim2.new(0, 10, 0, 80)
+TeleportBack.Text = "Teleport Back"
+TeleportBack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+TeleportBack.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBack.Font = Enum.Font.SourceSans
+TeleportBack.TextSize = 14
+
+TeleportBack.MouseButton1Click:Connect(function()
+	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(99, 4, -48))
+	end
+end)
+
+-- // Dropdown
+local DropButton = Instance.new("TextButton", MainFrame)
+DropButton.Size = UDim2.new(0, 120, 0, 30)
+DropButton.Position = UDim2.new(0, 10, 0, 120)
+DropButton.Text = "Select Destination ▼"
+DropButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+DropButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+DropButton.Font = Enum.Font.SourceSans
+DropButton.TextSize = 14
+
+local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
+ScrollFrame.Size = UDim2.new(0, 120, 0, 80)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 160)
+ScrollFrame.Visible = false
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.ScrollBarThickness = 6
+
+DropButton.MouseButton1Click:Connect(function()
+	ScrollFrame.Visible = not ScrollFrame.Visible
+end)
+
+local Destinations = {
+	["Ragdoll Pit"] = Vector3.new(-350.0425720214844, 42.233463287353516, -565.783935546875),
+	["BigAir Building 1"] = Vector3.new(-733.8858642578125, 488.1827087402344, -233.63153076171875),
+	["SmallGround Building 1"] = Vector3.new(-513.49658203125, 331.6254577636719, -599.0336303710938),
+	["BigGround Building 1"] = Vector3.new(-155.409423828125, 560.733642578125, -826.358154296875),
+}
+
+local function updateScroll()
+	local yPos = 0
+	for _, child in pairs(ScrollFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child.Position = UDim2.new(0, 0, 0, yPos)
+			yPos = yPos + 30
+		end
+	end
+	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+for name, pos in pairs(Destinations) do
+	local Btn = Instance.new("TextButton", ScrollFrame)
+	Btn.Size = UDim2.new(1, 0, 0, 30)
+	Btn.Text = name
+	Btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Btn.BorderSizePixel = 0
+	Btn.Font = Enum.Font.SourceSans
+	Btn.TextSize = 14
+
+	Btn.MouseButton1Click:Connect(function()
+		for _, other in pairs(ScrollFrame:GetChildren()) do
+			if other:IsA("TextButton") then
+				other.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+			end
+		end
+		Btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+		selectedDestination = pos
+		ScrollFrame.Visible = false
+	end)
+end
+
+updateScroll()
+
+-- // Connect animation logic to the current Humanoid
+local function hookTeleportAnim(humanoid)
+	humanoid.AnimationPlayed:Connect(function(track)
+		if TPEnabled and track.Animation.AnimationId == animId and selectedDestination then
+			task.wait(1.3)
+			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+				LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(selectedDestination))
+			end
+		end
+	end)
+end
+
+-- // Initial connect
+hookTeleportAnim(Character:WaitForChild("Humanoid"))
+
+-- // On Respawn, rebind everything
+LocalPlayer.CharacterAdded:Connect(function(char)
+	Character = char
+	local newHumanoid = char:WaitForChild("Humanoid")
+	hookTeleportAnim(newHumanoid)
+end)
