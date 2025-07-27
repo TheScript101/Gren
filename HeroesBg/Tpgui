@@ -134,6 +134,8 @@ local Destinations = {
 	["On Stadium Screen"] = Vector3.new(-356.23822021484375, 369.88153076171875, 185.9773406982422),
 	["To The Ground"] = Vector3.new(437.76104736328125, 303.215087890625, -444.104248046875),
 	["On Top Of Rim"] = Vector3.new(255.04234313964844, 482.1382141113281, -358.9897766113281),
+	["Ragdoll Pit Outside"] = Vector3.new(-361.52838134765625, 42.13269805908203, -565.728515625),
+	["Ragdoll Pit Block"] = Vector3.new(-334.9476013183594, 26.788593292236328, -574.78466796875),
 }
 
 local function updateScroll()
