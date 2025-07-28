@@ -139,6 +139,7 @@ local Destinations = {
 	["Baseplate"] = Vector3.new(-453.4462890625, 2.333385467529297, 301.43572998046875),
 	["Void"] = Vector3.new(1135.474853515625, 2.581144332885742, 992.1065673828125),
 	["Villian Hideout"] = Vector3.new(609.5298461914062, 5.495975971221924, -54.79743957519531),
+	["Stadium"] = Vector3.new(90.48225402832031, 111.05747985839844, 536.368896484375),
 }
 
 local function updateScroll()
@@ -180,7 +181,7 @@ updateScroll()
 local function hookTeleportAnim(humanoid)
 	humanoid.AnimationPlayed:Connect(function(track)
 		if TPEnabled and track.Animation.AnimationId == animId and selectedDestination then
-			task.wait(0.5)
+			task.wait(0.3)
 			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
 				LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(selectedDestination))
 			end
