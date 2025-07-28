@@ -104,10 +104,9 @@ toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextSize = 16
 toggleButton.Name = "ToggleButton"
-toggleButton.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("VFXGui") -- Change "VFXGui" to your GUI name
+toggleButton.Parent = screenGui -- ✅ correct parent
 
--- Toggle Visibility
-local targetGui = toggleButton.Parent.MainFrame -- Change MainFrame to your actual GUI main frame name
+-- Toggle visibility of main VFX input frame
 toggleButton.MouseButton1Click:Connect(function()
-	targetGui.Visible = not targetGui.Visible
+	frame.Visible = not frame.Visible
 end)
