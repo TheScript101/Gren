@@ -1,0 +1,113 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "PathCloneGui"
+
+local frame = Instance.new("Frame", screenGui)
+frame.Position = UDim2.new(0.5, -200, 0.5, -50)
+frame.Size = UDim2.new(0, 400, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+
+local textBox = Instance.new("TextBox", frame)
+textBox.PlaceholderText = "Enter path to object (ex: game:GetService('ReplicatedStorage').Resources.Blackholevfx.Blackhole)"
+textBox.Size = UDim2.new(1, -10, 0.5, -5)
+textBox.Position = UDim2.new(0, 5, 0, 5)
+textBox.ClearTextOnFocus = false
+textBox.Text = ""
+textBox.TextWrapped = true
+textBox.TextColor3 = Color3.new(1,1,1)
+textBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1, -10, 0.4, -5)
+button.Position = UDim2.new(0, 5, 0.6, 0)
+button.Text = "Clone in front"
+button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+button.TextColor3 = Color3.new(1,1,1)
+
+-- Function to safely evaluate a path
+local function getObjectFromPath(path)
+	local segments = string.split(path, ".")
+
+	local current = _G
+	for i, segment in ipairs(segments) do
+		if segment:find("game:GetService%(['\"](.-)['\"]%)") then
+			local serviceName = segment:match("game:GetService%(['\"](.-)['\"]%)")
+			current = game:GetService(serviceName)
+		elseif segment == "game" then
+			current = game
+		else
+			if typeof(current) == "Instance" and current:FindFirstChild(segment) then
+				current = current[segment]
+			else
+				return nil
+			end
+		end
+	end
+
+	return current
+end
+
+-- Spawn object in front
+button.MouseButton1Click:Connect(function()
+	local input = textBox.Text
+	local target = getObjectFromPath(input)
+
+	if not target then
+		warn("Invalid path or object not found.")
+		return
+	end
+
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local clone = target:Clone()
+	local cf = root.CFrame + root.CFrame.LookVector * 10
+	clone.Parent = workspace
+
+	-- Positioning
+	if clone:IsA("Model") then
+		if not clone.PrimaryPart then
+			clone.PrimaryPart = clone:FindFirstChildWhichIsA("BasePart")
+		end
+		if clone.PrimaryPart then
+			clone:SetPrimaryPartCFrame(cf)
+		end
+	elseif clone:IsA("BasePart") then
+		clone.CFrame = cf
+	end
+
+	-- Enable VFX and disable collisions (NO transparency edit)
+	for _, v in pairs(clone:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.CanCollide = false
+		elseif v:IsA("ParticleEmitter") or v:IsA("Beam") then
+			v.Enabled = true
+		end
+	end
+end)
+
+
+-- Create Toggle Button in Top-Left
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "Toggle VFX"
+toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 16
+toggleButton.Name = "ToggleButton"
+toggleButton.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("VFXGui") -- Change "VFXGui" to your GUI name
+
+-- Toggle Visibility
+local targetGui = toggleButton.Parent.MainFrame -- Change MainFrame to your actual GUI main frame name
+toggleButton.MouseButton1Click:Connect(function()
+	targetGui.Visible = not targetGui.Visible
+end)
