@@ -21,19 +21,22 @@ uiCorner.CornerRadius = UDim.new(0, 8)
 
 
 
-local flingEnabled = true
+-- Toggle Button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "Toggle GUI"
+toggleButton.Parent = screenGui
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSans
+toggleButton.TextSize = 18
 
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 100, 0, 30)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Fling: ON"
-ToggleButton.Parent = mainFrame
-
-ToggleButton.MouseButton1Click:Connect(function()
-	flingEnabled = not flingEnabled
-	ToggleButton.Text = "Fling: " .. (flingEnabled and "ON" or "OFF")
+-- Toggle function
+local guiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+	guiVisible = not guiVisible
+	mainFrame.Visible = guiVisible
 end)
 
 
