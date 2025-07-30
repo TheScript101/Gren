@@ -71,6 +71,9 @@ RotationForceBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 RotationForceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 RotationForceBox.ClearTextOnFocus = false
 RotationForceBox.Parent = ScrollFrame
+local function getRotationForceMultiplier()
+    return tonumber(RotationForceBox.Text) or 1
+end
 
 
 
