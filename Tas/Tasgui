@@ -139,6 +139,8 @@ end
 
 -- TAS Fling Function with Rotation
 local function flingTo(position, speed)
+	if not flingEnabled then return end  -- ⬅️ Make sure fling toggle is respected
+
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
@@ -149,11 +151,13 @@ local function flingTo(position, speed)
 	bv.P = 10000
 	bv.Parent = hrp
 
+	local rotForceMultiplier = tonumber(RotationForceBox.Text) or 1
+
 	local bav = Instance.new("BodyAngularVelocity")
 	bav.AngularVelocity = Vector3.new(
-		math.random(-30, 30),
-		math.random(-30, 30),
-		math.random(-30, 30)
+		0,
+		math.rad(500 * rotForceMultiplier),
+		0
 	)
 	bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 	bav.P = 10000
@@ -162,6 +166,7 @@ local function flingTo(position, speed)
 	game.Debris:AddItem(bv, 0.5)
 	game.Debris:AddItem(bav, 0.5)
 end
+
 
 -- Send Button Logic
 sendButton.MouseButton1Click:Connect(function()
