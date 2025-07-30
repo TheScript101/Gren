@@ -29,7 +29,7 @@ ToggleButton.Position = UDim2.new(0, 10, 0, 10)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Text = "Fling: ON"
-ToggleButton.Parent = MainFrame
+ToggleButton.Parent = mainFrame
 
 ToggleButton.MouseButton1Click:Connect(function()
     flingEnabled = not flingEnabled
