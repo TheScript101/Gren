@@ -192,3 +192,114 @@ addButton.MouseButton1Click:Connect(addPositionBox)
 -- Initialize First Entry
 addPositionBox()
 
+-- Settings Button
+local settingsButton = Instance.new("TextButton")
+settingsButton.Size = UDim2.new(0, 100, 0, 30)
+settingsButton.Position = UDim2.new(0.5, -50, 1, -90)
+settingsButton.Text = "Settings"
+settingsButton.Font = Enum.Font.Gotham
+settingsButton.TextSize = 16
+settingsButton.TextColor3 = Color3.new(1, 1, 1)
+settingsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+settingsButton.Parent = mainFrame
+
+-- Settings Panel
+local settingsPanel = Instance.new("Frame")
+settingsPanel.Size = UDim2.new(0, 200, 0, 150)
+settingsPanel.Position = UDim2.new(1, 10, 0, 0)
+settingsPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+settingsPanel.Visible = false
+settingsPanel.Parent = mainFrame
+
+local corner = Instance.new("UICorner", settingsPanel)
+corner.CornerRadius = UDim.new(0, 6)
+
+settingsButton.MouseButton1Click:Connect(function()
+	settingsPanel.Visible = not settingsPanel.Visible
+end)
+
+-- Save Config Box
+local saveBox = Instance.new("TextBox", settingsPanel)
+saveBox.Size = UDim2.new(1, -20, 0, 30)
+saveBox.Position = UDim2.new(0, 10, 0, 10)
+saveBox.PlaceholderText = "Save Config Name"
+saveBox.Text = ""
+saveBox.TextColor3 = Color3.new(1, 1, 1)
+saveBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+saveBox.ClearTextOnFocus = false
+
+local saveButton = Instance.new("TextButton", settingsPanel)
+saveButton.Size = UDim2.new(1, -20, 0, 30)
+saveButton.Position = UDim2.new(0, 10, 0, 50)
+saveButton.Text = "Save Config"
+saveButton.TextColor3 = Color3.new(1, 1, 1)
+saveButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+
+-- Load Config Box
+local loadBox = Instance.new("TextBox", settingsPanel)
+loadBox.Size = UDim2.new(1, -20, 0, 30)
+loadBox.Position = UDim2.new(0, 10, 0, 90)
+loadBox.PlaceholderText = "Load Config Name"
+loadBox.TextColor3 = Color3.new(1, 1, 1)
+loadBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+loadBox.ClearTextOnFocus = false
+
+local loadButton = Instance.new("TextButton", settingsPanel)
+loadButton.Size = UDim2.new(1, -20, 0, 30)
+loadButton.Position = UDim2.new(0, 10, 0, 130)
+loadButton.Text = "Load Config"
+loadButton.TextColor3 = Color3.new(1, 1, 1)
+loadButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+
+-- Config Save/Load Logic
+local HttpService = game:GetService("HttpService")
+local configFolder = "TAS_Configs"
+if not isfolder(configFolder) then
+	makefolder(configFolder)
+end
+
+saveButton.MouseButton1Click:Connect(function()
+	local name = saveBox.Text
+	if name == "" then return end
+	local data = {
+		speed = speedBox.Text,
+		positions = {},
+	}
+	for _, box in ipairs(scrollFrame:GetChildren()) do
+		if box:IsA("TextBox") then
+			table.insert(data.positions, box.Text)
+		end
+	end
+	writefile(configFolder.."/"..name..".json", HttpService:JSONEncode(data))
+end)
+
+loadButton.MouseButton1Click:Connect(function()
+	local name = loadBox.Text
+	if name == "" then return end
+	local path = configFolder.."/"..name..".json"
+	if not isfile(path) then
+		game.StarterGui:SetCore("SendNotification", {
+			Title = "Config Error",
+			Text = "Config not found!",
+			Duration = 3
+		})
+		return
+	end
+
+	local data = HttpService:JSONDecode(readfile(path))
+	speedBox.Text = data.speed or ""
+
+	-- Clear old boxes
+	for _, child in ipairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextBox") then
+			child:Destroy()
+		end
+	end
+
+	-- Load positions
+	for _, pos in ipairs(data.positions) do
+		addPositionBox()
+		scrollFrame:GetChildren()[#scrollFrame:GetChildren()].Text = pos
+	end
+end)
+
