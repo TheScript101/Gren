@@ -32,8 +32,8 @@ ToggleButton.Text = "Fling: ON"
 ToggleButton.Parent = mainFrame
 
 ToggleButton.MouseButton1Click:Connect(function()
-    flingEnabled = not flingEnabled
-    ToggleButton.Text = "Fling: " .. (flingEnabled and "ON" or "OFF")
+	flingEnabled = not flingEnabled
+	ToggleButton.Text = "Fling: " .. (flingEnabled and "ON" or "OFF")
 end)
 
 
