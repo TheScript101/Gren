@@ -1,0 +1,194 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- UI Setup
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "TASGui"
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 300, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+local uiCorner = Instance.new("UICorner", mainFrame)
+uiCorner.CornerRadius = UDim.new(0, 8)
+
+
+
+-- Toggle Button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "Toggle GUI"
+toggleButton.Parent = screenGui
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSans
+toggleButton.TextSize = 18
+
+-- Toggle function
+local guiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+	guiVisible = not guiVisible
+	mainFrame.Visible = guiVisible
+end)
+
+
+
+
+-- Fling Speed TextBox
+local speedBox = Instance.new("TextBox", mainFrame)
+speedBox.Size = UDim2.new(1, -20, 0, 30)
+speedBox.Position = UDim2.new(0, 10, 0, 10)
+speedBox.PlaceholderText = "Fling Speed (Default: 80)"
+speedBox.Text = ""
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 16
+speedBox.ClearTextOnFocus = false
+
+local speedCorner = Instance.new("UICorner", speedBox)
+speedCorner.CornerRadius = UDim.new(0, 6)
+
+
+
+local RotationForceLabel = Instance.new("TextLabel")
+RotationForceLabel.Size = UDim2.new(1, 0, 0, 20)
+RotationForceLabel.BackgroundTransparency = 1
+RotationForceLabel.Text = "Rotation Force Multiplier"
+RotationForceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+RotationForceLabel.Parent = ScrollFrame
+
+local RotationForceBox = Instance.new("TextBox")
+RotationForceBox.Size = UDim2.new(1, 0, 0, 30)
+RotationForceBox.PlaceholderText = "Default: 1"
+RotationForceBox.Text = ""
+RotationForceBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+RotationForceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+RotationForceBox.ClearTextOnFocus = false
+RotationForceBox.Parent = ScrollFrame
+local function getRotationForceMultiplier()
+    return tonumber(RotationForceBox.Text) or 1
+end
+
+
+
+
+
+-- Scroll Frame
+local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
+scrollFrame.Size = UDim2.new(1, -20, 1, -130)
+scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+scrollFrame.BorderSizePixel = 0
+
+local layout = Instance.new("UIListLayout", scrollFrame)
+layout.Padding = UDim.new(0, 6)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Add Button
+local addButton = Instance.new("TextButton", mainFrame)
+addButton.Size = UDim2.new(0.5, -15, 0, 40)
+addButton.Position = UDim2.new(0, 10, 1, -45)
+addButton.Text = "+ Add"
+addButton.TextSize = 20
+addButton.Font = Enum.Font.GothamBold
+addButton.TextColor3 = Color3.new(1, 1, 1)
+addButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+local addCorner = Instance.new("UICorner", addButton)
+addCorner.CornerRadius = UDim.new(0, 6)
+
+-- Send Button
+local sendButton = Instance.new("TextButton", mainFrame)
+sendButton.Size = UDim2.new(0.5, -15, 0, 40)
+sendButton.Position = UDim2.new(0.5, 5, 1, -45)
+sendButton.Text = "Send"
+sendButton.TextSize = 20
+sendButton.Font = Enum.Font.GothamBold
+sendButton.TextColor3 = Color3.new(1, 1, 1)
+sendButton.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+
+local sendCorner = Instance.new("UICorner", sendButton)
+sendCorner.CornerRadius = UDim.new(0, 6)
+
+-- Add TextBox Function
+local function addPositionBox()
+	local box = Instance.new("TextBox")
+	box.Parent = scrollFrame
+	box.Size = UDim2.new(1, -10, 0, 30)
+	box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	box.PlaceholderText = "Enter X, Y, Z"
+	box.Text = ""
+	box.TextColor3 = Color3.new(1, 1, 1)
+	box.ClearTextOnFocus = false
+	box.Font = Enum.Font.Gotham
+	box.TextSize = 16
+
+	local corner = Instance.new("UICorner", box)
+	corner.CornerRadius = UDim.new(0, 6)
+
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+end
+
+-- TAS Fling Function with Rotation
+local function flingTo(position, speed)
+	if not flingEnabled then return end  -- ⬅️ Make sure fling toggle is respected
+
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local direction = (position - hrp.Position)
+	local bv = Instance.new("BodyVelocity")
+	bv.Velocity = direction.Unit * speed + Vector3.new(0, 50, 0)
+	bv.MaxForce = Vector3.new(1, 1, 1) * math.huge
+	bv.P = 10000
+	bv.Parent = hrp
+
+	local rotForceMultiplier = tonumber(RotationForceBox.Text) or 1
+
+	local bav = Instance.new("BodyAngularVelocity")
+	bav.AngularVelocity = Vector3.new(
+		0,
+		math.rad(500 * rotForceMultiplier),
+		0
+	)
+	bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+	bav.P = 10000
+	bav.Parent = hrp
+
+	game.Debris:AddItem(bv, 0.5)
+	game.Debris:AddItem(bav, 0.5)
+end
+
+
+-- Send Button Logic
+sendButton.MouseButton1Click:Connect(function()
+	local flingSpeed = tonumber(speedBox.Text) or 80
+	for _, box in ipairs(scrollFrame:GetChildren()) do
+		if box:IsA("TextBox") and box.Text ~= "" then
+			local x, y, z = string.match(box.Text, "([^,]+),%s*([^,]+),%s*([^,]+)")
+			if x and y and z then
+				local vec = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+				flingTo(vec, flingSpeed)
+				task.wait(0.7)
+			end
+		end
+	end
+end)
+
+-- Add Button Logic
+addButton.MouseButton1Click:Connect(addPositionBox)
+
+-- Initialize First Entry
+addPositionBox()
+
