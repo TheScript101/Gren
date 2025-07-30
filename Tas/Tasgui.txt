@@ -58,30 +58,6 @@ local speedCorner = Instance.new("UICorner", speedBox)
 speedCorner.CornerRadius = UDim.new(0, 6)
 
 
-
-local RotationForceLabel = Instance.new("TextLabel")
-RotationForceLabel.Size = UDim2.new(1, 0, 0, 20)
-RotationForceLabel.BackgroundTransparency = 1
-RotationForceLabel.Text = "Rotation Force Multiplier"
-RotationForceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-RotationForceLabel.Parent = ScrollFrame
-
-local RotationForceBox = Instance.new("TextBox")
-RotationForceBox.Size = UDim2.new(1, 0, 0, 30)
-RotationForceBox.PlaceholderText = "Default: 1"
-RotationForceBox.Text = ""
-RotationForceBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-RotationForceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-RotationForceBox.ClearTextOnFocus = false
-RotationForceBox.Parent = ScrollFrame
-local function getRotationForceMultiplier()
-    return tonumber(RotationForceBox.Text) or 1
-end
-
-
-
-
-
 -- Scroll Frame
 local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
 scrollFrame.Size = UDim2.new(1, -20, 1, -130)
