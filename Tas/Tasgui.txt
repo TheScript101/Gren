@@ -9,7 +9,7 @@ screenGui.Name = "TASGui"
 screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 300, 0, 420)
+mainFrame.Size = UDim2.new(0, 300, 0, 350)
 mainFrame.Position = UDim2.new(0.5, -150, 0.5, -210)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.BorderSizePixel = 0
@@ -60,7 +60,7 @@ speedCorner.CornerRadius = UDim.new(0, 6)
 
 -- Scroll Frame
 local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
-scrollFrame.Size = UDim2.new(1, -20, 1, -130)
+scrollFrame.Size = UDim2.new(1, -20, 1, -170)
 scrollFrame.Position = UDim2.new(0, 10, 0, 50)
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.ScrollBarThickness = 6
@@ -71,6 +71,19 @@ local layout = Instance.new("UIListLayout", scrollFrame)
 layout.Padding = UDim.new(0, 6)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 
+-- Premade Button
+local premadeButton = Instance.new("TextButton", mainFrame)
+premadeButton.Size = UDim2.new(0.5, -15, 0, 40)
+premadeButton.Position = UDim2.new(0, 80, 1, -90)
+premadeButton.Text = "⬅️ Premades"
+premadeButton.TextSize = 20
+premadeButton.Font = Enum.Font.GothamBold
+premadeButton.TextColor3 = Color3.new(1, 1, 1)
+premadeButton.BackgroundColor3 = Color3.fromRGB(40, 100, 150)
+
+local premadesCorner = Instance.new("UICorner", premadeButton)
+premadesCorner.CornerRadius = UDim.new(0, 6)
+
 -- Add Button
 local addButton = Instance.new("TextButton", mainFrame)
 addButton.Size = UDim2.new(0.5, -15, 0, 40)
@@ -79,7 +92,7 @@ addButton.Text = "+ Add"
 addButton.TextSize = 20
 addButton.Font = Enum.Font.GothamBold
 addButton.TextColor3 = Color3.new(1, 1, 1)
-addButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+addButton.BackgroundColor3 = Color3.fromRGB(40, 100, 150)
 
 local addCorner = Instance.new("UICorner", addButton)
 addCorner.CornerRadius = UDim.new(0, 6)
@@ -88,11 +101,11 @@ addCorner.CornerRadius = UDim.new(0, 6)
 local sendButton = Instance.new("TextButton", mainFrame)
 sendButton.Size = UDim2.new(0.5, -15, 0, 40)
 sendButton.Position = UDim2.new(0.5, 5, 1, -45)
-sendButton.Text = "Send"
+sendButton.Text = "👆 Send"
 sendButton.TextSize = 20
 sendButton.Font = Enum.Font.GothamBold
 sendButton.TextColor3 = Color3.new(1, 1, 1)
-sendButton.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+sendButton.BackgroundColor3 = Color3.fromRGB(40, 100, 150)
 
 local sendCorner = Instance.new("UICorner", sendButton)
 sendCorner.CornerRadius = UDim.new(0, 6)
@@ -167,4 +180,3 @@ addButton.MouseButton1Click:Connect(addPositionBox)
 
 -- Initialize First Entry
 addPositionBox()
-
