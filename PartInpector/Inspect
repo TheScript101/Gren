@@ -1,0 +1,184 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "PartInspectorGui"
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 250, 0, 370)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Name = "MainFrame"
+frame.ClipsDescendants = true
+
+-- Toggle
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(1, -20, 0, 30)
+toggle.Position = UDim2.new(0, 10, 0, 10)
+toggle.Text = "Toggle: OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.Font = Enum.Font.Gotham
+toggle.TextSize = 14
+
+-- Scrollable container
+local scrollFrame = Instance.new("ScrollingFrame", frame)
+scrollFrame.Name = "ScrollFrame"
+scrollFrame.Active = true
+scrollFrame.Position = UDim2.new(0, 0, 0, 50)
+scrollFrame.Size = UDim2.new(1, 0, 1, -50)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.ClipsDescendants = true
+
+local layout = Instance.new("UIListLayout", scrollFrame)
+layout.Padding = UDim.new(0, 5)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local padding = Instance.new("UIPadding", scrollFrame)
+padding.PaddingLeft = UDim.new(0, 10)
+padding.PaddingTop = UDim.new(0, 5)
+padding.PaddingRight = UDim.new(0, 10)
+
+-- Helper to create labeled textbox
+local function createLabeledTextbox(name)
+	local container = Instance.new("Frame", scrollFrame)
+	container.Size = UDim2.new(1, 0, 0, 30)
+	container.BackgroundTransparency = 1
+
+	local label = Instance.new("TextLabel", container)
+	label.Text = name .. ":"
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextColor3 = Color3.new(1,1,1)
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(0, 80, 1, 0)
+	label.Position = UDim2.new(0, 0, 0, 0)
+
+	local textbox = Instance.new("TextBox", container)
+	textbox.Size = UDim2.new(1, -90, 1, 0)
+	textbox.Position = UDim2.new(0, 90, 0, 0)
+	textbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	textbox.TextColor3 = Color3.new(1,1,1)
+	textbox.Font = Enum.Font.Gotham
+	textbox.TextSize = 14
+	textbox.ClearTextOnFocus = false
+	textbox.Text = ""
+	return textbox
+end
+
+-- Core property boxes
+local posBox         = createLabeledTextbox("Position")
+local sizeBox        = createLabeledTextbox("Size")
+local colorBox       = createLabeledTextbox("Color")
+local nameBox        = createLabeledTextbox("Name")
+local materialBox    = createLabeledTextbox("Material")
+local transparencyBox= createLabeledTextbox("Transparency")
+local rotationBox    = createLabeledTextbox("Rotation")
+
+-- Conditional text-related boxes
+local fontBox        = createLabeledTextbox("Font")
+local textContentBox = createLabeledTextbox("Text Content")
+fontBox.Visible        = false
+textContentBox.Visible = false
+
+-- Color preview box
+local colorDisplay = Instance.new("Frame", frame)
+colorDisplay.Size = UDim2.new(0, 20, 0, 20)
+colorDisplay.Position = UDim2.new(1, -30, 0, 115)
+colorDisplay.BackgroundColor3 = Color3.new(1, 1, 1)
+colorDisplay.BorderSizePixel = 0
+
+-- Selection Variables
+local selecting = false
+local selectedPart = nil
+local selectionBox = Instance.new("SelectionBox")
+selectionBox.Color3 = Color3.fromRGB(0, 120, 255)
+selectionBox.LineThickness = 0.1
+selectionBox.Adornee = nil
+selectionBox.Parent = screenGui
+
+-- Toggle logic
+toggle.MouseButton1Click:Connect(function()
+	selecting = not selecting
+	toggle.Text = selecting and "Toggle: ON" or "Toggle: OFF"
+
+	if not selecting then
+		selectionBox.Adornee = nil
+		selectedPart = nil
+		posBox.Text = ""
+		rotationBox.Text = ""
+		sizeBox.Text = ""
+		colorBox.Text = ""
+		nameBox.Text = ""
+		materialBox.Text = ""
+		transparencyBox.Text = ""
+		fontBox.Visible = false
+		textContentBox.Visible = false
+		fontBox.Text = ""
+		textContentBox.Text = ""
+	end
+end)
+
+-- Adjust scroll height dynamically
+scrollFrame.ChildAdded:Connect(function()
+	wait()
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + padding.PaddingTop.Offset + 5)
+end)
+
+-- Click detection
+UserInputService.InputBegan:Connect(function(input, processed)
+	if not selecting or processed then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		local target = mouse.Target
+		if target and target:IsA("BasePart") then
+			selectedPart = target
+			selectionBox.Adornee = selectedPart
+
+			-- Basic fields
+			posBox.Text = tostring(selectedPart.Position)
+			sizeBox.Text = tostring(selectedPart.Size)
+			colorBox.Text = tostring(selectedPart.Color)
+			nameBox.Text = selectedPart.Name
+			materialBox.Text = selectedPart.Material.Name
+			transparencyBox.Text = tostring(selectedPart.Transparency)
+			colorDisplay.BackgroundColor3 = selectedPart.Color
+			rotationBox.Text = tostring(selectedPart.Orientation)
+
+			-- Text-related fields
+			fontBox.Visible = false
+			textContentBox.Visible = false
+			fontBox.Text = ""
+			textContentBox.Text = ""
+
+			-- Detect TextPart
+			if selectedPart:IsA("TextPart") then
+				fontBox.Visible = true
+				textContentBox.Visible = true
+				fontBox.Text = selectedPart.Font.Name
+				textContentBox.Text = selectedPart.Text
+
+			-- Detect SurfaceGui with TextLabel
+			elseif selectedPart:FindFirstChildOfClass("SurfaceGui") then
+				local surfaceGui = selectedPart:FindFirstChildOfClass("SurfaceGui")
+				local textLabel = surfaceGui:FindFirstChildWhichIsA("TextLabel")
+				if textLabel then
+					fontBox.Visible = true
+					textContentBox.Visible = true
+					fontBox.Text = textLabel.Font.Name
+					textContentBox.Text = textLabel.Text
+				end
+			end
+		end
+	end
+end)
