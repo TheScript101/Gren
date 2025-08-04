@@ -10,8 +10,8 @@ screenGui.Name = "PartInspectorGui"
 screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 250, 0, 370)
-frame.Position = UDim2.new(0.5, 0, 0.5, 100)
+frame.Size = UDim2.new(0, 250, 0, 400)
+frame.Position = UDim2.new(0.5, 0, 0.5, -30) 
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
@@ -22,8 +22,8 @@ frame.ClipsDescendants = true
 
 local guiToggleBtn = Instance.new("TextButton", screenGui)
 guiToggleBtn.Name = "GuiToggleBtn"
-guiToggleBtn.Size = UDim2.new(0, 40, 0, 100)
-guiToggleBtn.Position = UDim2.new(0, 0, 0.5, -50)
+guiToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+guiToggleBtn.Position = UDim2.new(0, 0, 0.5, -80)
 guiToggleBtn.AnchorPoint = Vector2.new(0, 0.5)
 guiToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 guiToggleBtn.TextColor3 = Color3.new(1, 1, 1)
