@@ -89,6 +89,8 @@ local rotationBox    = createLabeledTextbox("Rotation")
 -- Conditional text-related boxes
 local fontBox        = createLabeledTextbox("Font")
 local textContentBox = createLabeledTextbox("Text Content")
+local imageIdBox = createLabeledTextbox("Image ID")
+imageIdBox.Visible = false
 fontBox.Visible        = false
 textContentBox.Visible = false
 
@@ -123,6 +125,8 @@ toggle.MouseButton1Click:Connect(function()
 		nameBox.Text = ""
 		materialBox.Text = ""
 		transparencyBox.Text = ""
+		imageIdBox.Visible = false
+		imageIdBox.Text = ""
 		fontBox.Visible = false
 		textContentBox.Visible = false
 		fontBox.Text = ""
@@ -168,17 +172,25 @@ UserInputService.InputBegan:Connect(function(input, processed)
 				fontBox.Text = selectedPart.Font.Name
 				textContentBox.Text = selectedPart.Text
 
-			-- Detect SurfaceGui with TextLabel
-			elseif selectedPart:FindFirstChildOfClass("SurfaceGui") then
-				local surfaceGui = selectedPart:FindFirstChildOfClass("SurfaceGui")
-				local textLabel = surfaceGui:FindFirstChildWhichIsA("TextLabel")
-				if textLabel then
-					fontBox.Visible = true
-					textContentBox.Visible = true
-					fontBox.Text = textLabel.Font.Name
-					textContentBox.Text = textLabel.Text
-				end
-			end
+-- Detect SurfaceGui with TextLabel or ImageLabel
+elseif selectedPart:FindFirstChildOfClass("SurfaceGui") then
+	local surfaceGui = selectedPart:FindFirstChildOfClass("SurfaceGui")
+	
+	if surfaceGui then
+		-- Handle TextLabel
+		local textLabel = surfaceGui:FindFirstChildWhichIsA("TextLabel")
+		if textLabel then
+			fontBox.Visible = true
+			textContentBox.Visible = true
+			fontBox.Text = textLabel.Font.Name
+			textContentBox.Text = textLabel.Text
+		end
+
+		-- Handle ImageLabel
+		local imageLabel = surfaceGui:FindFirstChildWhichIsA("ImageLabel")
+		if imageLabel then
+			imageIdBox.Visible = true
+			imageIdBox.Text = imageLabel.Image
 		end
 	end
-end)
+end
