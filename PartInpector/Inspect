@@ -159,11 +159,13 @@ UserInputService.InputBegan:Connect(function(input, processed)
 			colorDisplay.BackgroundColor3 = selectedPart.Color
 			rotationBox.Text = tostring(selectedPart.Orientation)
 
-			-- Text-related fields
+			-- Reset text fields visibility
 			fontBox.Visible = false
 			textContentBox.Visible = false
+			imageIdBox.Visible = false
 			fontBox.Text = ""
 			textContentBox.Text = ""
+			imageIdBox.Text = ""
 
 			-- Detect TextPart
 			if selectedPart:IsA("TextPart") then
@@ -172,25 +174,28 @@ UserInputService.InputBegan:Connect(function(input, processed)
 				fontBox.Text = selectedPart.Font.Name
 				textContentBox.Text = selectedPart.Text
 
--- Detect SurfaceGui with TextLabel or ImageLabel
-elseif selectedPart:FindFirstChildOfClass("SurfaceGui") then
-	local surfaceGui = selectedPart:FindFirstChildOfClass("SurfaceGui")
-	
-	if surfaceGui then
-		-- Handle TextLabel
-		local textLabel = surfaceGui:FindFirstChildWhichIsA("TextLabel")
-		if textLabel then
-			fontBox.Visible = true
-			textContentBox.Visible = true
-			fontBox.Text = textLabel.Font.Name
-			textContentBox.Text = textLabel.Text
-		end
+			-- Detect SurfaceGui with TextLabel or ImageLabel
+			elseif selectedPart:FindFirstChildOfClass("SurfaceGui") then
+				local surfaceGui = selectedPart:FindFirstChildOfClass("SurfaceGui")
 
-		-- Handle ImageLabel
-		local imageLabel = surfaceGui:FindFirstChildWhichIsA("ImageLabel")
-		if imageLabel then
-			imageIdBox.Visible = true
-			imageIdBox.Text = imageLabel.Image
+				if surfaceGui then
+					-- Check for TextLabel
+					local textLabel = surfaceGui:FindFirstChildWhichIsA("TextLabel")
+					if textLabel then
+						fontBox.Visible = true
+						textContentBox.Visible = true
+						fontBox.Text = textLabel.Font.Name
+						textContentBox.Text = textLabel.Text
+					end
+
+					-- Check for ImageLabel
+					local imageLabel = surfaceGui:FindFirstChildWhichIsA("ImageLabel")
+					if imageLabel then
+						imageIdBox.Visible = true
+						imageIdBox.Text = imageLabel.Image
+					end
+				end
+			end
 		end
 	end
-end
+end)
