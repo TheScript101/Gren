@@ -1,0 +1,168 @@
+-- Combined Script Loader
+
+-- Auto Block v4
+pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/skibidi399/Auto-block-script/refs/heads/main/Auto%20block%20v4"))()
+end)
+
+-- Camlock/Aimlock
+pcall(function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
+end)
+
+-- Executor Script
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui")
+gui.Parent = CoreGui
+gui.ResetOnSpawn = false
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0, 160, 0, 40)
+toggle.Position = UDim2.new(0, 20, 0.5, -20)
+toggle.Text = "Movement Anim: OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.BorderSizePixel = 0
+toggle.Draggable = true
+toggle.Active = true
+toggle.Parent = gui
+
+-- Create animation assets
+local function createAnim(id)
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://" .. id
+	return anim
+end
+
+local idleAnim = createAnim("134624270247120")
+local walkAnim = createAnim("132377038617766")
+local runAnim  = createAnim("115946474977409")
+
+local connection, idleTrack, walkTrack, runTrack
+local playing = false
+
+-- Animation control
+local function stopOtherTracks(humanoid)
+	for _, track in humanoid:GetPlayingAnimationTracks() do
+		if track ~= idleTrack and track ~= walkTrack and track ~= runTrack then
+			track:Stop()
+		end
+	end
+end
+
+-- Core logic handler
+local function applyMovementAnimations(character)
+	local humanoid = character:WaitForChild("Humanoid")
+	local rootPart = character:WaitForChild("HumanoidRootPart")
+
+	idleTrack = humanoid:LoadAnimation(idleAnim)
+	walkTrack = humanoid:LoadAnimation(walkAnim)
+	runTrack  = humanoid:LoadAnimation(runAnim)
+
+	for _, track in {idleTrack, walkTrack, runTrack} do
+		track.Looped = true
+		track.Priority = Enum.AnimationPriority.Action
+	end
+
+	connection = RunService.RenderStepped:Connect(function()
+		if not playing or not character or not character.Parent then return end
+		local velocity = (rootPart.Velocity * Vector3.new(1, 0, 1)).Magnitude
+
+		stopOtherTracks(humanoid)
+
+		if velocity < 1 then
+			if not idleTrack.IsPlaying then idleTrack:Play() end
+			walkTrack:Stop()
+			runTrack:Stop()
+		elseif velocity <= 23 then
+			if not walkTrack.IsPlaying then walkTrack:Play() end
+			idleTrack:Stop()
+			runTrack:Stop()
+		else
+			if not runTrack.IsPlaying then runTrack:Play() end
+			idleTrack:Stop()
+			walkTrack:Stop()
+		end
+	end)
+end
+
+-- On toggle click
+toggle.MouseButton1Click:Connect(function()
+	playing = not playing
+	toggle.Text = playing and "Movement Anim: ON" or "Movement Anim: OFF"
+
+	if not playing then
+		if connection then connection:Disconnect() end
+		for _, t in {idleTrack, walkTrack, runTrack} do
+			if t then t:Stop() end
+		end
+	else
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		applyMovementAnimations(char)
+	end
+end)
+
+-- Handle respawn / reset
+LocalPlayer.CharacterAdded:Connect(function(char)
+	if connection then connection:Disconnect() end
+	if playing then
+		playing = false
+		toggle.Text = "Movement Anim: OFF"
+	end
+end)
+
+-- Auto Dash on Animation Detection
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Settings
+local dashDistance = 5
+local dashTime = 0.15
+local targetAnimId = "rbxassetid://116618003477002"
+
+-- Dash function (BV)
+local function dash()
+	local char = LocalPlayer.Character
+	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+	local root = char.HumanoidRootPart
+	local direction = root.CFrame.LookVector
+
+	local bv = Instance.new("BodyVelocity")
+	bv.Velocity = direction * dashDistance * 10
+	bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+	bv.Parent = root
+
+	task.delay(dashTime, function()
+		bv:Destroy()
+	end)
+end
+
+-- Detect animation playing
+local function setupAnimDetection(char)
+	local humanoid = char:WaitForChild("Humanoid")
+
+	humanoid.AnimationPlayed:Connect(function(track)
+		if track.Animation.AnimationId == targetAnimId then
+			dash()
+		end
+	end)
+end
+
+-- Initial setup
+if LocalPlayer.Character then
+	setupAnimDetection(LocalPlayer.Character)
+end
+
+-- Reconnect on respawn
+LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
+
+-- Forsaken ESP Fix
+pcall(function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Forsaken-esp-fix-29432"))()
+end)
