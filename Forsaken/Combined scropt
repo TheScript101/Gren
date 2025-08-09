@@ -116,76 +116,88 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	end
 end)
 
---------------------------------------------------- Auto Dash on Animation Detection (with 0.6s delay)
--- Auto Dash on Animation Detection (with speed boost after dash)
+---------------------------------------------------
+-- Auto Dash on Animation Detection (with configurable delays per animation)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- Settings
 local dashDistance = 5
 local dashTime = 0.15
-local dashDelay = 0.56 -- delay before dash after anim detected
-local speedBoostDelay = 1 -- wait after dash before speed boost
+local dashDelay = 0.56 -- delay before dash after anim detected (for first anim)
+local speedBoostDelay = 1 -- wait after dash before speed boost (for first anim)
 local speedBoostTime = 2 -- duration of speed boost
 local speedBoostValue = 34
 local restoreSpeed = 28
-local targetAnimId = "rbxassetid://116618003477002"
 
--- Dash function (BV)
+-- Animation IDs and their delay settings
+local targetAnims = {
+    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay },
+    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1 },
+}
+
+-- Helper function to check if animation is in targetAnims
+local function getAnimDelays(animId)
+    return targetAnims[animId]
+end
+
+-- Dash function (BodyVelocity)
 local function dash()
-	local char = LocalPlayer.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-	local root = char.HumanoidRootPart
-	local direction = root.CFrame.LookVector
+    local root = char.HumanoidRootPart
+    local direction = root.CFrame.LookVector
 
-	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = direction * dashDistance * 10
-	bv.MaxForce = Vector3.new(1e5, 0, 1e5)
-	bv.Parent = root
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = direction * dashDistance * 10
+    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+    bv.Parent = root
 
-	task.delay(dashTime, function()
-		bv:Destroy()
-	end)
+    task.delay(dashTime, function()
+        bv:Destroy()
+    end)
 end
 
 -- Speed boost function
 local function applySpeedBoost()
-	local char = LocalPlayer.Character
-	if not char then return end
+    local char = LocalPlayer.Character
+    if not char then return end
 
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
 
-	local startTime = tick()
-	while tick() - startTime < speedBoostTime do
-		humanoid.WalkSpeed = speedBoostValue
-		task.wait(0.01)
-	end
+    local startTime = tick()
+    while tick() - startTime < speedBoostTime do
+        humanoid.WalkSpeed = speedBoostValue
+        task.wait(0.01)
+    end
 
-	-- Restore normal speed after boost
-	humanoid.WalkSpeed = restoreSpeed
+    -- Restore normal speed after boost
+    humanoid.WalkSpeed = restoreSpeed
 end
 
 -- Detect animation playing
 local function setupAnimDetection(char)
-	local humanoid = char:WaitForChild("Humanoid")
+    local humanoid = char:WaitForChild("Humanoid")
 
-	humanoid.AnimationPlayed:Connect(function(track)
-		if track.Animation.AnimationId == targetAnimId then
-			task.delay(dashDelay, function()
-				dash()
-				task.delay(speedBoostDelay, function()
-					applySpeedBoost()
-				end)
-			end)
-		end
-	end)
+    humanoid.AnimationPlayed:Connect(function(track)
+        local animId = track.Animation.AnimationId
+        local delays = getAnimDelays(animId)
+        if delays then
+            task.delay(delays.dashDelay, function()
+                dash()
+                task.delay(delays.speedBoostDelay, function()
+                    applySpeedBoost()
+                end)
+            end)
+        end
+    end)
 end
 
 -- Initial setup
 if LocalPlayer.Character then
-	setupAnimDetection(LocalPlayer.Character)
+    setupAnimDetection(LocalPlayer.Character)
 end
 
 -- Reconnect on respawn
