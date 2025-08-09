@@ -116,7 +116,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	end
 end)
 
--- Auto Dash on Animation Detection
+--------------------------------------------------- Auto Dash on Animation Detection (with 0.6s delay)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
@@ -124,6 +124,7 @@ local LocalPlayer = Players.LocalPlayer
 local dashDistance = 5
 local dashTime = 0.15
 local targetAnimId = "rbxassetid://116618003477002"
+local dashDelay = 0.6 -- delay before dashing after anim detected
 
 -- Dash function (BV)
 local function dash()
@@ -149,7 +150,9 @@ local function setupAnimDetection(char)
 
 	humanoid.AnimationPlayed:Connect(function(track)
 		if track.Animation.AnimationId == targetAnimId then
-			dash()
+			task.delay(dashDelay, function()
+				dash()
+			end)
 		end
 	end)
 end
