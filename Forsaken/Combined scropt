@@ -117,14 +117,19 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --------------------------------------------------- Auto Dash on Animation Detection (with 0.6s delay)
+-- Auto Dash on Animation Detection (with speed boost after dash)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- Settings
 local dashDistance = 5
 local dashTime = 0.15
+local dashDelay = 0.56 -- delay before dash after anim detected
+local speedBoostDelay = 1 -- wait after dash before speed boost
+local speedBoostTime = 2 -- duration of speed boost
+local speedBoostValue = 34
+local restoreSpeed = 28
 local targetAnimId = "rbxassetid://116618003477002"
-local dashDelay = 0.6 -- delay before dashing after anim detected
 
 -- Dash function (BV)
 local function dash()
@@ -144,6 +149,24 @@ local function dash()
 	end)
 end
 
+-- Speed boost function
+local function applySpeedBoost()
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	local startTime = tick()
+	while tick() - startTime < speedBoostTime do
+		humanoid.WalkSpeed = speedBoostValue
+		task.wait(0.01)
+	end
+
+	-- Restore normal speed after boost
+	humanoid.WalkSpeed = restoreSpeed
+end
+
 -- Detect animation playing
 local function setupAnimDetection(char)
 	local humanoid = char:WaitForChild("Humanoid")
@@ -152,6 +175,9 @@ local function setupAnimDetection(char)
 		if track.Animation.AnimationId == targetAnimId then
 			task.delay(dashDelay, function()
 				dash()
+				task.delay(speedBoostDelay, function()
+					applySpeedBoost()
+				end)
 			end)
 		end
 	end)
