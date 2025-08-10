@@ -2,7 +2,7 @@
 
 -- Auto Block v4
 pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/skibidi399/Auto-block-script/refs/heads/main/Auto%20block%20v4"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/skibidi399/Auto-block-script/refs/heads/main/FINAL%20AUTO%20BLOCK"))()
 end)
 
 -- Camlock/Aimlock
@@ -116,13 +116,13 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 	end
 end)
 
----------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------
 -- Auto Dash on Animation Detection (with configurable delays per animation)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- Settings
-local dashDistance = 5
+local dashDistance = 6
 local dashTime = 0.15
 local dashDelay = 0.56 -- delay before dash after anim detected (for first anim)
 local speedBoostDelay = 1 -- wait after dash before speed boost (for first anim)
@@ -132,7 +132,11 @@ local restoreSpeed = 28
 
 -- Animation IDs and their delay settings
 local targetAnims = {
+    -- Shedletsky
     ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay },
+    ["rbxassetid://121781457295101"] = { dashDelay = 0, speedBoostDelay = 1 },
+
+    -- Two Time
     ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1 },
 }
 
