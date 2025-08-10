@@ -117,36 +117,44 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --------------------------------------------------------------------------------------------------------------------
--- Auto Dash on Animation Detection (with configurable delays per animation)
+-- Auto Dash on Animation Detection (with configurable delays & dash distance per animation)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Settings
-local dashDistance = 6
-local dashTime = 0.15
-local dashDelay = 0.56 -- delay before dash after anim detected (for first anim)
-local speedBoostDelay = 1 -- wait after dash before speed boost (for first anim)
-local speedBoostTime = 2 -- duration of speed boost
-local speedBoostValue = 34
-local restoreSpeed = 28
+-- Global Settings (used as defaults if not specified in the table)
+local defaultDashDistance = 6        -- default dash distance
+local dashTime = 0.15                 -- time before dash velocity stops
+local dashDelay = 0.56                -- default delay before dash (used for first anim example)
+local speedBoostDelay = 1             -- default delay before speed boost
+local speedBoostTime = 2              -- duration of speed boost
+local speedBoostValue = 34            -- boosted walk speed
+local restoreSpeed = 28                -- speed after boost ends
 
--- Animation IDs and their delay settings
+-- Animation IDs with per-animation settings
 local targetAnims = {
     -- Shedletsky
-    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay },
-    ["rbxassetid://121781457295101"] = { dashDelay = 0, speedBoostDelay = 1 },
+    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay, dashDistance = 6 },
+    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 8 },
 
     -- Two Time
-    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1 },
+    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1, dashDistance = 6 },
 }
 
--- Helper function to check if animation is in targetAnims
-local function getAnimDelays(animId)
-    return targetAnims[animId]
+-- Get animation config (falls back to defaults if missing keys)
+local function getAnimConfig(animId)
+    local cfg = targetAnims[animId]
+    if cfg then
+        return {
+            dashDelay = cfg.dashDelay or dashDelay,
+            speedBoostDelay = cfg.speedBoostDelay or speedBoostDelay,
+            dashDistance = cfg.dashDistance or defaultDashDistance
+        }
+    end
+    return nil
 end
 
 -- Dash function (BodyVelocity)
-local function dash()
+local function dash(distance)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
@@ -154,7 +162,7 @@ local function dash()
     local direction = root.CFrame.LookVector
 
     local bv = Instance.new("BodyVelocity")
-    bv.Velocity = direction * dashDistance * 10
+    bv.Velocity = direction * distance * 10
     bv.MaxForce = Vector3.new(1e5, 0, 1e5)
     bv.Parent = root
 
@@ -187,11 +195,11 @@ local function setupAnimDetection(char)
 
     humanoid.AnimationPlayed:Connect(function(track)
         local animId = track.Animation.AnimationId
-        local delays = getAnimDelays(animId)
-        if delays then
-            task.delay(delays.dashDelay, function()
-                dash()
-                task.delay(delays.speedBoostDelay, function()
+        local cfg = getAnimConfig(animId)
+        if cfg then
+            task.delay(cfg.dashDelay, function()
+                dash(cfg.dashDistance)
+                task.delay(cfg.speedBoostDelay, function()
                     applySpeedBoost()
                 end)
             end)
@@ -206,6 +214,7 @@ end
 
 -- Reconnect on respawn
 LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
+--------------------------------------------------------------------------------------------------------------------
 
 -- Forsaken ESP Fix
 pcall(function()
