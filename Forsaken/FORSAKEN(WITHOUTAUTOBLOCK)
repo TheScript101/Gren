@@ -241,7 +241,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Global Settings
 local defaultDashDistance = 6
-local dashTime = 0.176
+local dashTime = 0.15
 local dashDelay = 0.56
 local speedBoostDelay = 1
 local speedBoostTime = 2
