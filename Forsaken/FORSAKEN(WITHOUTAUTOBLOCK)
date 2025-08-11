@@ -652,13 +652,131 @@ local stamina = require(Sprinting)
 spawn(function()
     while true do
         stamina.MaxStamina = 150
-        stamina.MinStamina = -20
-        stamina.StaminaGain = 50
+        stamina.MinStamina = -10
+        stamina.StaminaGain = 35
         stamina.StaminaLoss = 10
         stamina.SprintSpeed = 28
         stamina.StaminaLossDisabled = false
 
         wait(1)
+    end
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local PlayerCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- Keep deleting Trails inside JohnDoeTrail as fast as possible
+spawn(function()
+    while true do
+        local killers = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
+        if killers then
+            local playerFolder = killers:FindFirstChild("JohnDoe")
+            if playerFolder then
+                local trailPart = playerFolder:FindFirstChild("JohnDoeTrail")
+                if trailPart then
+                    for _, child in pairs(trailPart:GetChildren()) do
+                        if child.Name == "Trails" then
+                            child:Destroy()
+                        end
+                    end
+                end
+            end
+        end
+        wait(0)  -- fastest safe yield
+    end
+end)
+
+-- Helper function: Create BillboardGui for chams
+local function createBillboardGui(parent)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ChamsBillboard"
+    billboard.Adornee = parent
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.ResetOnSpawn = false
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Parent = billboard
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 0.5
+    textLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.Text = parent.Name
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 18
+    textLabel.TextWrapped = true
+    textLabel.ZIndex = 10
+
+    return billboard
+end
+
+-- Main cham/highlight updater
+spawn(function()
+    local chamsFolder = workspace:FindFirstChild("Map")
+    if not chamsFolder then return end
+    chamsFolder = chamsFolder:FindFirstChild("Ingame")
+    if not chamsFolder then return end
+
+    while true do
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, shadowFolder in pairs(chamsFolder:GetChildren()) do
+                if shadowFolder:IsA("Folder") and string.match(shadowFolder.Name, "Shadows$") then
+                    -- loop all descendants that are BaseParts
+                    for _, part in pairs(shadowFolder:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            local dist = (hrp.Position - part.Position).Magnitude
+                            if dist <= 50 then
+                                -- Add Highlight if not present
+                                local highlight = part:FindFirstChildWhichIsA("Highlight")
+                                if not highlight then
+                                    highlight = Instance.new("Highlight")
+                                    highlight.Name = "ChamsHighlight"
+                                    highlight.Parent = part
+                                    highlight.Adornee = part
+                                    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Red fill
+                                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255) -- White outline
+                                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                    highlight.OutlineTransparency = 0.3
+                                    highlight.FillTransparency = 0.4
+                                    highlight.Enabled = true
+                                else
+                                    highlight.Enabled = true
+                                end
+
+                                -- Add BillboardGui if not present
+                                local billboard = part:FindFirstChild("ChamsBillboard")
+                                if not billboard then
+                                    billboard = createBillboardGui(part)
+                                    billboard.Parent = part
+                                end
+                                billboard.Enabled = true
+
+                            else
+                                -- Disable cham/highlight when far away
+                                local highlight = part:FindFirstChildWhichIsA("Highlight")
+                                if highlight and highlight.Name == "ChamsHighlight" then
+                                    highlight.Enabled = false
+                                end
+                                local billboard = part:FindFirstChild("ChamsBillboard")
+                                if billboard then
+                                    billboard.Enabled = false
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        wait(1) -- check 10 times a second for smooth updates
     end
 end)
 
