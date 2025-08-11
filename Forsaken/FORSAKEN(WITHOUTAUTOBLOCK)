@@ -1,0 +1,446 @@
+-- Combined Script Loader
+-- Camlock/Aimlock
+pcall(function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
+end)
+
+-- Executor Script
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui")
+gui.Parent = CoreGui
+gui.ResetOnSpawn = false
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0, 160, 0, 40)
+toggle.Position = UDim2.new(0, 20, 0.5, -20)
+toggle.Text = "Movement Anim: OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.BorderSizePixel = 0
+toggle.Draggable = true
+toggle.Active = true
+toggle.Parent = gui
+
+-- Create animation assets
+local function createAnim(id)
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://" .. id
+	return anim
+end
+
+local idleAnim = createAnim("134624270247120")
+local walkAnim = createAnim("132377038617766")
+local runAnim  = createAnim("115946474977409")
+
+local connection, idleTrack, walkTrack, runTrack
+local playing = false
+
+-- Animation control
+local function stopOtherTracks(humanoid)
+	for _, track in humanoid:GetPlayingAnimationTracks() do
+		if track ~= idleTrack and track ~= walkTrack and track ~= runTrack then
+			track:Stop()
+		end
+	end
+end
+
+-- Core logic handler
+local function applyMovementAnimations(character)
+	local humanoid = character:WaitForChild("Humanoid")
+	local rootPart = character:WaitForChild("HumanoidRootPart")
+
+	idleTrack = humanoid:LoadAnimation(idleAnim)
+	walkTrack = humanoid:LoadAnimation(walkAnim)
+	runTrack  = humanoid:LoadAnimation(runAnim)
+
+	for _, track in {idleTrack, walkTrack, runTrack} do
+		track.Looped = true
+		track.Priority = Enum.AnimationPriority.Action
+	end
+
+	connection = RunService.RenderStepped:Connect(function()
+		if not playing or not character or not character.Parent then return end
+		local velocity = (rootPart.Velocity * Vector3.new(1, 0, 1)).Magnitude
+
+		stopOtherTracks(humanoid)
+
+		if velocity < 1 then
+			if not idleTrack.IsPlaying then idleTrack:Play() end
+			walkTrack:Stop()
+			runTrack:Stop()
+		elseif velocity <= 23 then
+			if not walkTrack.IsPlaying then walkTrack:Play() end
+			idleTrack:Stop()
+			runTrack:Stop()
+		else
+			if not runTrack.IsPlaying then runTrack:Play() end
+			idleTrack:Stop()
+			walkTrack:Stop()
+		end
+	end)
+end
+
+-- On toggle click
+toggle.MouseButton1Click:Connect(function()
+	playing = not playing
+	toggle.Text = playing and "Movement Anim: ON" or "Movement Anim: OFF"
+
+	if not playing then
+		if connection then connection:Disconnect() end
+		for _, t in {idleTrack, walkTrack, runTrack} do
+			if t then t:Stop() end
+		end
+	else
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		applyMovementAnimations(char)
+	end
+end)
+
+-- Handle respawn / reset
+LocalPlayer.CharacterAdded:Connect(function(char)
+	if connection then connection:Disconnect() end
+	if playing then
+		playing = false
+		toggle.Text = "Movement Anim: OFF"
+	end
+end)
+
+--------------------------------------------------------------------------------------------------------------------
+-- Auto Dash on Animation Detection (with configurable delays & dash distance per animation)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Global Settings
+local defaultDashDistance = 6
+local dashTime = 0.176
+local dashDelay = 0.56
+local speedBoostDelay = 1
+local speedBoostTime = 2
+local speedBoostValue = 34
+local restoreSpeed = 28
+
+-- Dash animations (HP-based)
+local dashAnimOver50 = "rbxassetid://136252471123500"
+local dashAnimUnder50 = "rbxassetid://115946474977409"
+
+-- Animation IDs with per-animation settings
+local targetAnims = {
+    -- Shedletsky
+    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay, dashDistance = 6 },
+    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 7.5 },
+
+    -- Two Time
+    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1, dashDistance = 6 },
+
+    -- Noob
+    ["rbxassetid://124033675853489"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 7.5 },
+    ["rbxassetid://96771054624545"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 7.5 },
+}
+
+-- Get animation config
+local function getAnimConfig(animId)
+    local cfg = targetAnims[animId]
+    if cfg then
+        return {
+            dashDelay = cfg.dashDelay or dashDelay,
+            speedBoostDelay = cfg.speedBoostDelay or speedBoostDelay,
+            dashDistance = cfg.dashDistance or defaultDashDistance
+        }
+    end
+    return nil
+end
+
+-- Dash function (adds HP animation alongside trigger anim)
+local function dash(distance)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    -- Choose dash animation based on HP
+    local hpRatio = humanoid.Health / humanoid.MaxHealth
+    local dashAnimId = hpRatio > 0.5 and dashAnimOver50 or dashAnimUnder50
+    local anim = Instance.new("Animation")
+    anim.AnimationId = dashAnimId
+    local dashTrack = humanoid:LoadAnimation(anim)
+
+    -- Override other animations and play faster
+    dashTrack.Priority = Enum.AnimationPriority.Action4 -- Highest priority so it overrides everything
+    dashTrack:Play()
+    dashTrack:AdjustSpeed(2)
+
+    -- Apply dash velocity
+    local root = char.HumanoidRootPart
+    local direction = root.CFrame.LookVector
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = direction * distance * 10
+    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+    bv.Parent = root
+
+    task.delay(dashTime, function()
+        bv:Destroy()
+        dashTrack:Stop() -- Stop HP dash anim, allowing other anims to resume
+    end)
+end
+
+-- Speed boost function
+local function applySpeedBoost()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local startTime = tick()
+    while tick() - startTime < speedBoostTime do
+        humanoid.WalkSpeed = speedBoostValue
+        task.wait(0.01)
+    end
+
+    humanoid.WalkSpeed = restoreSpeed
+end
+
+-- Detect animation playing
+local function setupAnimDetection(char)
+    local humanoid = char:WaitForChild("Humanoid")
+
+    humanoid.AnimationPlayed:Connect(function(track)
+        local animId = track.Animation.AnimationId
+        local cfg = getAnimConfig(animId)
+        if cfg then
+            -- Keep trigger anim playing, add dash + HP anim after delay
+            task.delay(cfg.dashDelay, function()
+                dash(cfg.dashDistance)
+                task.delay(cfg.speedBoostDelay, function()
+                    applySpeedBoost()
+                end)
+            end)
+        end
+    end)
+end
+
+-- Initial setup
+if LocalPlayer.Character then
+    setupAnimDetection(LocalPlayer.Character)
+end
+
+-- Reconnect on respawn
+LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
+--------------------------------------------------------------------------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Function to create UI elements quickly
+local function create(className, props)
+    local obj = Instance.new(className)
+    for k,v in pairs(props or {}) do
+        obj[k] = v
+    end
+    return obj
+end
+
+-- Create the main ScreenGui
+local screenGui = create("ScreenGui", {
+    Name = "FeatureToggleGui",
+    Parent = PlayerGui,
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Global
+})
+
+-- Create a semi-transparent dark background
+local background = create("Frame", {
+    Parent = screenGui,
+    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+    BackgroundTransparency = 0.15,
+    Size = UDim2.new(1, 0, 1, 0),
+})
+
+-- Center frame for the popup window
+local popup = create("Frame", {
+    Parent = background,
+    Size = UDim2.new(0, 350, 0, 250),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    ClipsDescendants = true,
+})
+-- Rounded corners
+local corner = create("UICorner", {
+    Parent = popup,
+    CornerRadius = UDim.new(0, 15)
+})
+
+-- Title text
+local title = create("TextLabel", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "Do you want to enable the following features?",
+    Font = Enum.Font.Roboto,
+    TextSize = 20,
+    TextColor3 = Color3.fromRGB(230, 230, 230),
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+})
+
+-- Feature list container
+local featuresFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 110),
+    Position = UDim2.new(0, 20, 0, 80),
+    BackgroundTransparency = 1,
+})
+
+local features = {"Anti Lag", "Full Bright", "No Fog", "No Global Shadows"}
+
+for i, feature in ipairs(features) do
+    local featureText = create("TextLabel", {
+        Parent = featuresFrame,
+        Size = UDim2.new(1, 0, 0, 15),
+        Position = UDim2.new(0, 0, 0, (i-1)*28),
+        BackgroundTransparency = 1,
+        Text = "• "..feature,
+        Font = Enum.Font.Roboto,
+        TextSize = 18,
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+    })
+end
+
+-- Buttons container
+local buttonsFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 1, -70),
+    BackgroundTransparency = 1,
+})
+
+-- Helper to create buttons
+local function createButton(text, position)
+    local btn = create("TextButton", {
+        Parent = buttonsFrame,
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+        Text = text,
+        Font = Enum.Font.Roboto,
+        TextSize = 20,
+        TextColor3 = Color3.fromRGB(230, 230, 230),
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+    })
+    create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 12)})
+    return btn
+end
+
+local yesButton = createButton("Yes", UDim2.new(0, 0, 0, 0))
+local noButton = createButton("No", UDim2.new(0.55, 0, 0, 0))
+
+-- Hover effects for buttons
+for _, btn in pairs({yesButton, noButton}) do
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    end)
+end
+
+-- The function to enable all features (the combined script from before)
+local function enableFeatures()
+    -- Terrain water setup
+    local Terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if Terrain then
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterReflectance = 0
+        Terrain.WaterTransparency = 1
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogStart = 9e9
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+
+    settings().Rendering.QualityLevel = 1
+
+    -- Remove Atmosphere and disable PostEffects
+    for _, v in pairs(Lighting:GetDescendants()) do
+        if v:IsA("Atmosphere") then
+            v:Destroy()
+        elseif v:IsA("PostEffect") then
+            v.Enabled = false
+        end
+    end
+
+    -- Optimize parts, decals, particles, and trails
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
+            v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
+            v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+            v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
+            v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
+            v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
+            v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+        elseif v:IsA("Decal") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Lifetime = NumberRange.new(0)
+        end
+    end
+
+    -- Remove effects on spawn for antlag
+    Workspace.DescendantAdded:Connect(function(child)
+        if child:IsA("ForceField") or child:IsA("Sparkles") or child:IsA("Smoke") or child:IsA("Fire") or child:IsA("Beam") then
+            RunService.Heartbeat:Wait()
+            if child and child.Parent then
+                child:Destroy()
+            end
+        end
+    end)
+
+    -- Keep lighting bright every frame
+    local brightLoop
+    if brightLoop then brightLoop:Disconnect() end
+    brightLoop = RunService.RenderStepped:Connect(function()
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 9e9
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    end)
+end
+
+-- Yes button click
+yesButton.MouseButton1Click:Connect(function()
+    enableFeatures()
+    screenGui:Destroy()
+end)
+
+-- No button click
+noButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+
+-- Forsaken ESP Fix
+pcall(function()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Forsaken-esp-fix-29432"))()
+end)
