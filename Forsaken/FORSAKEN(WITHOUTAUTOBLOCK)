@@ -241,7 +241,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Global Settings
 local defaultDashDistance = 6
-local dashTime = 0.15
+local dashTime = 0.10
 local dashDelay = 0.56
 local speedBoostDelay = 1
 local speedBoostTime = 2
@@ -256,14 +256,14 @@ local dashAnimUnder50 = "rbxassetid://115946474977409"
 local targetAnims = {
     -- Shedletsky
     ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, speedBoostDelay = speedBoostDelay, dashDistance = 6 },
-    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 7.5 },
+    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 8 },
 
     -- Two Time
     ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1, dashDistance = 6 },
 
     -- Noob
-    ["rbxassetid://124033675853489"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 7.5 },
-    ["rbxassetid://96771054624545"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 7.5 },
+    ["rbxassetid://124033675853489"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 8 },
+    ["rbxassetid://96771054624545"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 8 },
 }
 
 -- Get animation config
