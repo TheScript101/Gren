@@ -138,6 +138,11 @@ local targetAnims = {
 
     -- Two Time
     ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1, dashDistance = 6 },
+
+    -- Noob
+    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 8 },
+    ["rbxassetid://124033675853489"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 8 },
+    ["rbxassetid://96771054624545"] = { dashDelay = 0.25, speedBoostDelay = 1, dashDistance = 8 },
 }
 
 -- Get animation config (falls back to defaults if missing keys)
