@@ -1,9 +1,92 @@
 -- Combined Script Loader
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Camlock..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 2 seconds, fade out and destroy the GUI
+task.delay(2, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+
+wait(2)
+
 -- Camlock/Aimlock
 pcall(function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
 end)
+--------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui2"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Fake Hurt Toggle..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 3 seconds, fade out and destroy the GUI
+task.delay(3, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(3)
 -- Executor Script
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -111,6 +194,47 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui3"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Dash On ButtonClick..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 2 seconds, fade out and destroy the GUI
+task.delay(2, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(2)
 -- Auto Dash on Animation Detection (with configurable delays & dash distance per animation)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -233,6 +357,47 @@ end
 -- Reconnect on respawn
 LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
 --------------------------------------------------------------------------------------------------------------------
+wait(0.5)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui4"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Antilag, Full bright, Etc..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 2 seconds, fade out and destroy the GUI
+task.delay(2, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(2)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -438,8 +603,48 @@ end)
 noButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
+--------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui5"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
 
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading ESP..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 1 seconds, fade out and destroy the GUI
+task.delay(1, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(1)
 -- Forsaken ESP Fix
 pcall(function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Forsaken-esp-fix-29432"))()
