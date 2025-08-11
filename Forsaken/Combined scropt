@@ -121,14 +121,18 @@ end)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Global Settings (used as defaults if not specified in the table)
-local defaultDashDistance = 6        -- default dash distance
-local dashTime = 0.15                 -- time before dash velocity stops
-local dashDelay = 0.56                -- default delay before dash (used for first anim example)
-local speedBoostDelay = 1             -- default delay before speed boost
-local speedBoostTime = 2              -- duration of speed boost
-local speedBoostValue = 34            -- boosted walk speed
-local restoreSpeed = 28                -- speed after boost ends
+-- Global Settings
+local defaultDashDistance = 6
+local dashTime = 0.30
+local dashDelay = 0.56
+local speedBoostDelay = 1
+local speedBoostTime = 2
+local speedBoostValue = 34
+local restoreSpeed = 28
+
+-- Dash animations (HP-based)
+local dashAnimOver50 = "rbxassetid://136252471123500"
+local dashAnimUnder50 = "rbxassetid://115946474977409"
 
 -- Animation IDs with per-animation settings
 local targetAnims = {
@@ -140,12 +144,11 @@ local targetAnims = {
     ["rbxassetid://86545133269813"] = { dashDelay = 0.05, speedBoostDelay = 1, dashDistance = 6 },
 
     -- Noob
-    ["rbxassetid://121781457295101"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 8 },
     ["rbxassetid://124033675853489"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 8 },
     ["rbxassetid://96771054624545"] = { dashDelay = 0.15, speedBoostDelay = 1, dashDistance = 8 },
 }
 
--- Get animation config (falls back to defaults if missing keys)
+-- Get animation config
 local function getAnimConfig(animId)
     local cfg = targetAnims[animId]
     if cfg then
@@ -158,14 +161,29 @@ local function getAnimConfig(animId)
     return nil
 end
 
--- Dash function (BodyVelocity)
+-- Dash function (adds HP animation alongside trigger anim)
 local function dash(distance)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    -- Choose dash animation based on HP
+    local hpRatio = humanoid.Health / humanoid.MaxHealth
+    local dashAnimId = hpRatio > 0.5 and dashAnimOver50 or dashAnimUnder50
+    local anim = Instance.new("Animation")
+    anim.AnimationId = dashAnimId
+    local dashTrack = humanoid:LoadAnimation(anim)
+
+    -- Override other animations and play faster
+    dashTrack.Priority = Enum.AnimationPriority.Action4 -- Highest priority so it overrides everything
+    dashTrack:Play()
+    dashTrack:AdjustSpeed(2)
+
+    -- Apply dash velocity
     local root = char.HumanoidRootPart
     local direction = root.CFrame.LookVector
-
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = direction * distance * 10
     bv.MaxForce = Vector3.new(1e5, 0, 1e5)
@@ -173,6 +191,7 @@ local function dash(distance)
 
     task.delay(dashTime, function()
         bv:Destroy()
+        dashTrack:Stop() -- Stop HP dash anim, allowing other anims to resume
     end)
 end
 
@@ -190,7 +209,6 @@ local function applySpeedBoost()
         task.wait(0.01)
     end
 
-    -- Restore normal speed after boost
     humanoid.WalkSpeed = restoreSpeed
 end
 
@@ -202,6 +220,7 @@ local function setupAnimDetection(char)
         local animId = track.Animation.AnimationId
         local cfg = getAnimConfig(animId)
         if cfg then
+            -- Keep trigger anim playing, add dash + HP anim after delay
             task.delay(cfg.dashDelay, function()
                 dash(cfg.dashDistance)
                 task.delay(cfg.speedBoostDelay, function()
@@ -220,6 +239,7 @@ end
 -- Reconnect on respawn
 LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
 --------------------------------------------------------------------------------------------------------------------
+
 
 -- Forsaken ESP Fix
 pcall(function()
