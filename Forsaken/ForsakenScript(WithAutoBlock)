@@ -94,7 +94,7 @@ pcall(function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
 end)
 --------------------------------------------------------------------------------------------------------------------
-wait(1)
+wait(3)
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
