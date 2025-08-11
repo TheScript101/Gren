@@ -46,7 +46,7 @@ pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/skibidi399/Auto-block-script/refs/heads/main/FINAL%20AUTO%20BLOCK"))()
 end)
 --------------------------------------------------------------------------------------------------------------------
-wait(3)
+wait(1.5)
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
