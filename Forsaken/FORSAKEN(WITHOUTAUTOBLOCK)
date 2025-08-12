@@ -95,12 +95,13 @@ local LocalPlayer = Players.LocalPlayer
 
 -- GUI Setup
 local gui = Instance.new("ScreenGui")
+gui.Name = "HurtAnim"
 gui.Parent = CoreGui
 gui.ResetOnSpawn = false
 
 local toggle = Instance.new("TextButton")
 toggle.Size = UDim2.new(0, 160, 0, 40)
-toggle.Position = UDim2.new(0, 20, 0.5, -20)
+toggle.Position = UDim2.new(0, 198, 0, -57)
 toggle.BackgroundColor3 = Color3.new(0, 0, 0)
 toggle.BorderColor3 = Color3.new(1, 0, 0)
 toggle.BorderSizePixel = 1
@@ -931,11 +932,11 @@ end)
 local gui = Instance.new("ScreenGui")
 gui.Name = "GhostFollowerGui"
 gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = CoreGui
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 160, 0, 40)
-toggle.Position = UDim2.new(0, 20, 0.5, 0)
+toggle.Position = UDim2.new(0, 708, 0, -55)
 toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
 toggleButton.BorderColor3 = Color3.new(1, 0, 0)
 toggleButton.BorderSizePixel = 1
