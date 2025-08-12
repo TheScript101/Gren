@@ -1314,6 +1314,255 @@ end)
 wait(1)
 --------------------------------------------------------------------------------------------------------------------
 -- Forsaken ESP Fix
-pcall(function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Forsaken-esp-fix-29432"))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local workspacePlayers = workspace:WaitForChild("Players")
+local killersFolder = workspacePlayers:WaitForChild("Killers")
+
+local ingameMapFolder = workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
+
+local REPEAT_DELAY = 2.5
+local CHECK_INTERVAL = 0.5
+local DISTANCE_THRESHOLD = 5
+
+-- Helper function to add highlight to a generator
+local function addGeneratorHighlight(gen, colorInside, colorOutline)
+    -- Remove old highlight if any
+    for _, child in ipairs(gen:GetChildren()) do
+        if child:IsA("Highlight") then
+            child:Destroy()
+        end
+    end
+
+    local hl = Instance.new("Highlight")
+    hl.FillColor = colorInside
+    hl.OutlineColor = colorOutline
+    hl.FillTransparency = 0.85 -- very very light inside color
+    hl.OutlineTransparency = 0.6 -- thin outline, slightly transparent
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = gen
+end
+
+-- Detect if both killers.Noli and ingameMapFolder exist (FakeGenerator highlighting)
+local function checkSpecialHighlight()
+    local noli = killersFolder:FindFirstChild("Noli")
+    local fakeGen = ingameMapFolder:FindFirstChild("FakeGenerator")
+    if noli and fakeGen then
+        -- Add very light red highlight & red outline to FakeGenerator
+        addGeneratorHighlight(fakeGen, Color3.fromRGB(255, 180, 180), Color3.fromRGB(255, 0, 0))
+    else
+        -- Remove highlight from FakeGenerator if exists and conditions no longer met
+        local existingHL = fakeGen and fakeGen:FindFirstChildWhichIsA("Highlight")
+        if existingHL then existingHL:Destroy() end
+    end
+end
+
+-- Main loop to check proximity and repair generators
+local function generatorRepairLoop()
+    while true do
+        if not character or not character.Parent then
+            character = player.Character or player.CharacterAdded:Wait()
+            humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+        end
+
+        for _, gen in ipairs(ingameMapFolder:GetChildren()) do
+            if gen.Name == "Generator" and gen:FindFirstChild("Progress") and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
+                local genProgress = gen.Progress.Value
+                local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
+                if not genPrimaryPart or not humanoidRootPart then
+                    -- Skip if no PrimaryPart or HumanoidRootPart
+                    goto continue
+                end
+                local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
+
+                if dist <= DISTANCE_THRESHOLD then
+                    if genProgress < 100 then
+                        -- Highlight generator yellow (incomplete)
+                        addGeneratorHighlight(gen, Color3.fromRGB(255, 255, 200), Color3.fromRGB(255, 255, 100))
+                        -- Fire repair event repeatedly until 100
+                        while gen.Progress.Value < 100 do
+                            gen.Remotes.RE:FireServer()
+                            wait(REPEAT_DELAY)
+                        end
+                        -- After repair completed, update highlight to green
+                        addGeneratorHighlight(gen, Color3.fromRGB(180, 255, 180), Color3.fromRGB(100, 255, 100))
+                    else
+                        -- Generator complete - light green highlight
+                        addGeneratorHighlight(gen, Color3.fromRGB(180, 255, 180), Color3.fromRGB(100, 255, 100))
+                    end
+                else
+                    -- Too far: remove highlight
+                    local hl = gen:FindFirstChildWhichIsA("Highlight")
+                    if hl then hl:Destroy() end
+                end
+            end
+            ::continue::
+        end
+
+        checkSpecialHighlight()
+
+        wait(CHECK_INTERVAL)
+    end
+end
+
+task.spawn(generatorRepairLoop)
+
+--------------------------------------------------------------------------------------------------------------------
+local Players = cloneref(game:GetService("Players"))
+local RunService = cloneref(game:GetService("RunService"))
+local Workspace = cloneref(game:GetService("Workspace"))
+
+local function createTextLabel(tool)
+    if tool:FindFirstChild("ToolNameLabel") then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ToolNameLabel"
+    billboard.Adornee = tool
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = math.huge
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = tool.Name
+    textLabel.TextColor3 = Color3.new(1, 1, 1) -- White text
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.Parent = billboard
+
+    billboard.Parent = tool
+end
+
+local function applyOutline(tool)
+    if not tool:FindFirstChildOfClass("Highlight") then
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = Color3.new(1, 1, 0) -- Yellow glow
+        highlight.OutlineColor = Color3.new(1, 0, 0) -- Red outline
+        highlight.Parent = tool
+    end
+    createTextLabel(tool)
+end
+
+for _, obj in Workspace:GetDescendants() do
+    if obj:IsA("Tool") and not (obj.Name == "RedFlag" or obj.Name == "BlueFlag" or obj.Name == "Item") then
+        applyOutline(obj)
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("Tool") then
+        applyOutline(obj)
+    end
 end)
+
+game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Item Esp"; Text = "Loaded!"; Duration = 5})
+
+local function createOutlineESP(model, outlineColor, fillColor)
+    if model and not model:FindFirstChildOfClass("Highlight") then
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = model
+        highlight.Adornee = model
+        highlight.FillTransparency = 0.75
+        highlight.FillColor = fillColor
+        highlight.OutlineColor = outlineColor
+        highlight.OutlineTransparency = 0
+    end
+end
+
+local function createHealthIndicator(character, textColor)
+    local head = character:FindFirstChild("Head")
+    if head and not head:FindFirstChild("HealthGui") then
+        local healthGui = Instance.new("BillboardGui")
+        healthGui.Name = "HealthGui"
+        healthGui.Size = UDim2.new(0, 100, 0, 30)
+        healthGui.AlwaysOnTop = true
+        healthGui.MaxDistance = math.huge
+        healthGui.Parent = head
+
+        local healthLabel = Instance.new("TextLabel")
+        healthLabel.Size = UDim2.new(1, 0, 1, 0)
+        healthLabel.BackgroundTransparency = 1
+        healthLabel.TextScaled = true
+        healthLabel.Text = ""
+        healthLabel.TextColor3 = textColor
+        healthLabel.Font = Enum.Font.SourceSansBold
+        healthLabel.Parent = healthGui
+    end
+end
+
+local function updateHealthIndicators()
+    for _, player in Players:GetPlayers() do
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local head = character:FindFirstChild("Head")
+            if humanoid and head then
+                local textColor = humanoid.MaxHealth > 500 and Color3.new(1, 0, 0) or Color3.new(1, 1, 1)
+                createHealthIndicator(character, textColor)
+
+                local healthGui = head:FindFirstChild("HealthGui")
+                if healthGui then
+                    local healthLabel = healthGui:FindFirstChildOfClass("TextLabel")
+                    if healthLabel then
+                        healthLabel.Text = math.floor(humanoid.Health) .. "/" .. humanoid.MaxHealth
+                        healthLabel.TextColor3 = textColor
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function createOutlineESPForGroup(group, outlineColor, fillColor)
+    if group then
+        for _, obj in group:GetChildren() do
+            local humanoid = obj:FindFirstChildOfClass("Humanoid")
+            local rootPart = obj:FindFirstChild("HumanoidRootPart")
+            if humanoid and rootPart then
+                createOutlineESP(obj, outlineColor, fillColor)
+            end
+        end
+    end
+end
+
+local function updateESP()
+    while true do
+        local players = Players:GetPlayers()
+
+        for _, player in players do
+            local character = player.Character
+            if character then
+                for _, obj in character:GetChildren() do
+                    if obj:IsA("Highlight") then
+                        obj:Destroy()
+                    end
+                end
+
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    if humanoid.MaxHealth > 500 then
+                        createOutlineESP(character, Color3.new(1, 0, 0), Color3.new(1, 0.5, 0.5))
+                        createHealthIndicator(character, Color3.new(1, 0, 0))
+                    else
+                        createOutlineESP(character, Color3.new(0.5, 0.5, 0.5), Color3.new(0.7, 0.7, 0.7))
+                        createHealthIndicator(character, Color3.new(1, 1, 1))
+                    end
+                end
+            end
+        end
+
+        updateHealthIndicators()
+        task.wait(3)
+    end
+end
+
+game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Esp"; Text = "Loaded!"; Duration = 20})
+task.spawn(updateESP)
+
