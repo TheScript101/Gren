@@ -476,7 +476,7 @@ local features = {"Anti Lag", "Full Bright", "No Fog", "No Global Shadows"}
 for i, feature in ipairs(features) do
     local featureText = create("TextLabel", {
         Parent = featuresFrame,
-        Size = UDim2.new(1, 0, 0, 15),
+        Size = UDim2.new(1, 0, 0, 10),
         Position = UDim2.new(0, 0, 0, (i-1)*28),
         BackgroundTransparency = 1,
         Text = "• "..feature,
