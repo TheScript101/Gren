@@ -99,7 +99,7 @@ gui.Parent = CoreGui
 gui.ResetOnSpawn = false
 
 local toggle = Instance.new("TextButton")
-toggle.Size = UDim2.new(1, -10, 1, -10)
+toggle.Size = UDim2.new(0, 160, 0, 40)
 toggle.Position = UDim2.new(0, 5, 0, 5)
 toggle.BackgroundColor3 = Color3.new(0, 0, 0)
 toggle.BorderColor3 = Color3.new(1, 0, 0)
@@ -933,58 +933,9 @@ gui.Name = "GhostFollowerGui"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 160, 0, 40)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -20)
-mainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-mainFrame.BorderColor3 = Color3.new(1, 0, 0)
-mainFrame.BorderSizePixel = 2
-mainFrame.Active = true
-mainFrame.Parent = gui
-
--- Make draggable
-local UserInputService = game:GetService("UserInputService")
-local dragging, dragInput, dragStart, startPos
-
-local function update(input)
-	local delta = input.Position - dragStart
-	mainFrame.Position = UDim2.new(
-		startPos.X.Scale,
-		startPos.X.Offset + delta.X,
-		startPos.Y.Scale,
-		startPos.Y.Offset + delta.Y
-	)
-end
-
-mainFrame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = mainFrame.Position
-
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
-		end)
-	end
-end)
-
-mainFrame.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
-		dragInput = input
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if input == dragInput and dragging then
-		update(input)
-	end
-end)
-
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -10, 1, -10)
-toggleButton.Position = UDim2.new(0, 5, 0, 5)
+toggleButton.Size = UDim2.new(0, 160, 0, 40)
+toggleButton.Position = UDim2.new(0, 5, 0, -5)
 toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
 toggleButton.BorderColor3 = Color3.new(1, 0, 0)
 toggleButton.BorderSizePixel = 1
@@ -992,7 +943,9 @@ toggleButton.Font = Enum.Font.GothamBlack
 toggleButton.TextSize = 22
 toggleButton.TextColor3 = Color3.new(1, 0, 0)
 toggleButton.Text = "Desync OFF"
-toggleButton.Parent = mainFrame
+toggleButton.Draggable = true
+toggleButton.Active = true
+toggleButton.Parent = gui
 
 toggleButton.MouseButton1Click:Connect(function()
 	if tracking then
