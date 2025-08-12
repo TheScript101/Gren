@@ -1155,12 +1155,53 @@ local StarterGui = game:GetService("StarterGui")
 local player = Players.LocalPlayer
 local MAX_DISTANCE = 10
 
-StarterGui:SetCore("SendNotification", {
-    Title = "Auto Collect",
-    Text = "Auto collecting Medkit and BloxyCola",
-    Duration = 3
-})
+-- Simple toggle variable to control auto collecting
+local autoCollectEnabled = false
 
+-- Function to update autoCollectEnabled based on presence of workspace.Map.Ingame.Map
+local function updateAutoCollect()
+    local mapFolder = workspace:FindFirstChild("Map")
+    if not mapFolder then
+        autoCollectEnabled = false
+        return
+    end
+    local ingame = mapFolder:FindFirstChild("Ingame")
+    if not ingame then
+        autoCollectEnabled = false
+        return
+    end
+
+    if ingame:FindFirstChild("Map") then
+        autoCollectEnabled = true
+    else
+        autoCollectEnabled = false
+    end
+end
+
+-- Initial check
+updateAutoCollect()
+
+-- Listen for map added/removed to enable/disable auto collect
+do
+    local mapFolder = workspace:WaitForChild("Map", 10)
+    if mapFolder then
+        local ingame = mapFolder:WaitForChild("Ingame", 10)
+        if ingame then
+            ingame.ChildAdded:Connect(function(child)
+                if child.Name == "Map" then
+                    autoCollectEnabled = true
+                end
+            end)
+            ingame.ChildRemoved:Connect(function(child)
+                if child.Name == "Map" then
+                    autoCollectEnabled = false
+                end
+            end)
+        end
+    end
+end
+
+-- Your original getItems function, unchanged
 local function getItems()
     local items = {}
     local map = workspace:FindFirstChild("Map")
@@ -1181,7 +1222,10 @@ local function getItems()
     return items
 end
 
+-- Your original auto collect loop, only runs if autoCollectEnabled is true
 RunService.Heartbeat:Connect(function()
+    if not autoCollectEnabled then return end
+
     local character = player.Character
     if not character then return end
     local hrp = character:FindFirstChild("HumanoidRootPart")
@@ -1198,6 +1242,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
