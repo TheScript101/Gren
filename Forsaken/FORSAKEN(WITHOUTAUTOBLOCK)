@@ -721,7 +721,7 @@ spawn(function()
                 end
             end
         end
-        wait(0)  -- fastest safe yield
+        wait(0.1)  -- fastest safe yield
     end
 end)
 
@@ -824,7 +824,7 @@ local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Create ScreenGui for loading overlay
 local loadingGui = Instance.new("ScreenGui")
-loadingGui.Name = "LoadingCamlockGui5"
+loadingGui.Name = "LoadingCamlockGui9"
 loadingGui.Parent = PlayerGui
 loadingGui.ResetOnSpawn = false
 
@@ -1000,7 +1000,7 @@ local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Create ScreenGui for loading overlay
 local loadingGui = Instance.new("ScreenGui")
-loadingGui.Name = "LoadingCamlockGui5"
+loadingGui.Name = "LoadingCamlockGui7"
 loadingGui.Parent = PlayerGui
 loadingGui.ResetOnSpawn = false
 
@@ -1105,6 +1105,76 @@ CoreGui.ChildAdded:Connect(function(child)
         end
     end
 end)
+--------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui8"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Auto Collect..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 2 seconds, fade out and destroy the GUI
+task.delay(2, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(2)
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local function fireNearbyPrompt()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = char.HumanoidRootPart
+    local mapFolder = workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
+
+    -- Loop through both Medkit and BloxyCola
+    for _, itemName in ipairs({"Medkit", "BloxyCola"}) do
+        for _, item in ipairs(mapFolder:GetChildren()) do
+            if item.Name == itemName and item:FindFirstChild("ItemRoot") and item.ItemRoot:FindFirstChild("ProximityPrompt") then
+                local prompt = item.ItemRoot.ProximityPrompt
+                local distance = (hrp.Position - item.ItemRoot.Position).Magnitude
+                if distance <= 10 then
+                    -- Fire the ProximityPrompt instantly
+                    fireproximityprompt(prompt)
+                end
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(fireNearbyPrompt)
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
