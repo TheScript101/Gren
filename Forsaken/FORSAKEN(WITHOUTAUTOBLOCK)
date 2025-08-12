@@ -986,9 +986,9 @@ toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
 toggleButton.BorderColor3 = Color3.new(1, 0, 0)
 toggleButton.BorderSizePixel = 1
 toggleButton.Font = Enum.Font.GothamBlack
-toggleButton.TextSize = 22
+toggleButton.TextSize = 14
 toggleButton.TextColor3 = Color3.new(1, 0, 0)
-toggleButton.Text = "Desync OFF"
+toggleButton.Text = "What Others See: OFF"
 toggleButton.Draggable = true
 toggleButton.Active = true
 toggleButton.Parent = gui
@@ -996,13 +996,13 @@ toggleButton.Parent = gui
 toggleButton.MouseButton1Click:Connect(function()
     if tracking then
         stopTracking()
-        toggleButton.Text = "Desync OFF"
+        toggleButton.Text = "What Others See: OFF"
     else
         if not character or not character.Parent then
             character = player.Character or player.CharacterAdded:Wait()
         end
         startTracking()
-        toggleButton.Text = "Desync ON"
+        toggleButton.Text = "What Others See: ON"
     end
 end)
 
