@@ -1577,7 +1577,7 @@ end)
 task.spawn(generatorLoop)
 
 --------------------------------------------------------------------------------------------------------------------
-wait(1)
+wait(0.5)
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
