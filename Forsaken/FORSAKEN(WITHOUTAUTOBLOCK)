@@ -46,6 +46,38 @@ pcall(function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
 end)
 --------------------------------------------------------------------------------------------------------------------
+wait(0.5)
+local CoreGui = game:GetService("CoreGui")
+
+local function repositionCamlock()
+    local camlock = CoreGui:FindFirstChild("Camlock")
+    if camlock then
+        local frame = camlock:FindFirstChild("Frame")
+        if frame then
+            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+        end
+    end
+end
+
+-- Try to reposition immediately if it exists
+repositionCamlock()
+
+-- Also listen for Camlock being added later
+CoreGui.ChildAdded:Connect(function(child)
+    if child.Name == "Camlock" then
+        child.ChildAdded:Connect(function(subChild)
+            if subChild.Name == "Frame" then
+                subChild.Position = UDim2.new(0.5, 168, 0.5, -203)
+            end
+        end)
+        -- In case Frame already exists
+        local frame = child:FindFirstChild("Frame")
+        if frame then
+            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+        end
+    end
+end)
+--------------------------------------------------------------------------------------------------------------------
 wait(2.5)
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
