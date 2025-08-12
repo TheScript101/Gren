@@ -580,32 +580,42 @@ local function enableFeatures()
 
     settings().Rendering.QualityLevel = 1
 
-    -- Remove Atmosphere and disable PostEffects
-    for _, v in pairs(Lighting:GetDescendants()) do
-        if v:IsA("Atmosphere") then
-            v:Destroy()
-        elseif v:IsA("PostEffect") then
-            v.Enabled = false
-        end
+-- Remove Atmosphere and disable PostEffects
+for _, v in pairs(Lighting:GetDescendants()) do
+    if v:IsA("Atmosphere") then
+        v:Destroy()
+    elseif v:IsA("PostEffect") then
+        v.Enabled = false
     end
+end
 
-    -- Optimize parts, decals, particles, and trails
-    for _, v in pairs(game:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.Plastic
-            v.Reflectance = 0
-            v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
-            v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
-            v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
-            v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
-            v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
-            v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
-        elseif v:IsA("Decal") then
-            v.Transparency = 1
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v.Lifetime = NumberRange.new(0)
-        end
+-- Loop No Fog
+task.spawn(function()
+    while true do
+        Lighting.FogStart = 9e9
+        Lighting.FogEnd = 9e9
+        wait(1)
     end
+end)
+
+-- Optimize parts, decals, particles, and trails
+for _, v in pairs(game:GetDescendants()) do
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.Plastic
+        v.Reflectance = 0
+        v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+    elseif v:IsA("Decal") then
+        v.Transparency = 1
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+        v.Lifetime = NumberRange.new(0)
+    end
+end
+
 
     -- Remove effects on spawn for antlag
     Workspace.DescendantAdded:Connect(function(child)
