@@ -126,10 +126,10 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 -- GUI Setup
-local gui = Instance.new("ScreenGui")
-gui.Name = "HurtAnim"
-gui.Parent = CoreGui
-gui.ResetOnSpawn = false
+local gui2 = Instance.new("ScreenGui")
+gui2.Name = "HurtAnim"
+gui2.Parent = CoreGui
+gui2.ResetOnSpawn = false
 
 local toggle = Instance.new("TextButton")
 toggle.Size = UDim2.new(0, 160, 0, 40)
@@ -143,7 +143,7 @@ toggle.TextColor3 = Color3.new(1, 0, 0)
 toggle.Draggable = true
 toggle.Active = true
 toggle.Text = "Movement Anim: OFF"
-toggle.Parent = gui
+toggle.Parent = gui2
 
 -- Create animation assets
 local function createAnim(id)
