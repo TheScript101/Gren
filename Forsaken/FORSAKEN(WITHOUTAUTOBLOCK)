@@ -197,7 +197,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 --------------------------------------------------------------------------------------------------------------------
-wait(1)
+wait(2.5)
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -808,6 +808,229 @@ label.Parent = bg
 label.Size = UDim2.new(1, 0, 0, 100)
 label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
 label.BackgroundTransparency = 1
+label.Text = "Loading Desync Juke..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 1 seconds, fade out and destroy the GUI
+task.delay(3, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(3)
+--------------------------------------------------------------------------------------------------------------------
+-- SETTINGS (from your code)
+local delay = 1.5
+local interval = 0.1
+local color = Color3.new(1, 0, 0)
+
+-- SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+
+-- "Made by Hecker" Notification (try/catch)
+pcall(function()
+	StarterGui:SetCore("SendNotification", {
+		Title = "Ghost Follower",
+		Text = "Made by Hecker",
+		Duration = 5
+	})
+end)
+
+-- VARIABLES
+local character = player.Character or player.CharacterAdded:Wait()
+local ghost = nil
+local history = {}
+local tracking = false
+local conn1, conn2
+
+-- GHOST CREATION
+local function makeGhost(char)
+	local ghostModel = Instance.new("Model")
+	ghostModel.Name = "GhostFollower"
+	for _, part in ipairs(char:GetChildren()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			local clone = Instance.new("Part")
+			clone.Name = "Ghost_" .. part.Name
+			clone.Size = part.Size
+			clone.Anchored = true
+			clone.CanCollide = false
+			clone.Transparency = 0.3
+			clone.Material = Enum.Material.ForceField
+			clone.Color = color
+			clone.CFrame = part.CFrame
+			clone.Parent = ghostModel
+		end
+	end
+	ghostModel.Parent = workspace
+	return ghostModel
+end
+
+-- TRACKING
+local function startTracking()
+	history = {}
+	ghost = makeGhost(character)
+	tracking = true
+
+	conn1 = RunService.Heartbeat:Connect(function()
+		local frame = {}
+		for _, part in ipairs(character:GetChildren()) do
+			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+				frame[part.Name] = part.CFrame
+			end
+		end
+		table.insert(history, frame)
+		if #history > delay / interval then
+			table.remove(history, 1)
+		end
+	end)
+
+	conn2 = RunService.Heartbeat:Connect(function()
+		if #history > 0 then
+			local data = history[1]
+			for _, ghostPart in ipairs(ghost:GetChildren()) do
+				if ghostPart:IsA("BasePart") then
+					local realName = ghostPart.Name:sub(7)
+					if data[realName] then
+						ghostPart.CFrame = data[realName]
+					end
+				end
+			end
+		end
+	end)
+end
+
+local function stopTracking()
+	if conn1 then conn1:Disconnect() end
+	if conn2 then conn2:Disconnect() end
+	if ghost then ghost:Destroy() end
+	tracking = false
+end
+
+-- RESPAWN HANDLER
+player.CharacterAdded:Connect(function(char)
+	character = char
+	repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
+	if tracking then
+		stopTracking()
+		startTracking()
+	end
+end)
+
+-- GUI CREATION
+local gui = Instance.new("ScreenGui")
+gui.Name = "GhostFollowerGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 160, 0, 40)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -20)
+mainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+mainFrame.BorderColor3 = Color3.new(1, 0, 0)
+mainFrame.BorderSizePixel = 2
+mainFrame.Active = true
+mainFrame.Parent = gui
+
+-- Make draggable
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	mainFrame.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end
+
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, -10, 1, -10)
+toggleButton.Position = UDim2.new(0, 5, 0, 5)
+toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
+toggleButton.BorderColor3 = Color3.new(1, 0, 0)
+toggleButton.BorderSizePixel = 1
+toggleButton.Font = Enum.Font.GothamBlack
+toggleButton.TextSize = 22
+toggleButton.TextColor3 = Color3.new(1, 0, 0)
+toggleButton.Text = "Desync OFF"
+toggleButton.Parent = mainFrame
+
+toggleButton.MouseButton1Click:Connect(function()
+	if tracking then
+		stopTracking()
+		toggleButton.Text = "Desync OFF"
+	else
+		if not character or not character.Parent then
+			character = player.Character or player.CharacterAdded:Wait()
+		end
+		startTracking()
+		toggleButton.Text = "Desync ON"
+	end
+end)
+
+--------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui5"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
 label.Text = "Loading ESP..."
 label.Font = Enum.Font.Roboto
 label.TextSize = 48
@@ -826,6 +1049,7 @@ task.delay(1, function()
     loadingGui:Destroy()
 end)
 wait(1)
+--------------------------------------------------------------------------------------------------------------------
 -- Forsaken ESP Fix
 pcall(function()
     loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Forsaken-esp-fix-29432"))()
