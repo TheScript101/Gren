@@ -1152,29 +1152,33 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 
-local function fireNearbyPrompt()
+local function getItems()
+    local items = {}
+    for _, v in pairs(workspace.Map.Ingame.Map:GetChildren()) do
+        if v.Name == "Medkit" or v.Name == "BloxyCola" then
+            table.insert(items, v)
+        end
+    end
+    return items
+end
+
+RunService.Heartbeat:Connect(function()
     local char = player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    local hrp = char.HumanoidRootPart
-    local mapFolder = workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
-
-    -- Loop through both Medkit and BloxyCola
-    for _, itemName in ipairs({"Medkit", "BloxyCola"}) do
-        for _, item in ipairs(mapFolder:GetChildren()) do
-            if item.Name == itemName and item:FindFirstChild("ItemRoot") and item.ItemRoot:FindFirstChild("ProximityPrompt") then
-                local prompt = item.ItemRoot.ProximityPrompt
-                local distance = (hrp.Position - item.ItemRoot.Position).Magnitude
-                if distance <= 10 then
-                    -- Fire the ProximityPrompt instantly
-                    fireproximityprompt(prompt)
-                end
+    for _, item in pairs(getItems()) do
+        local root = item:FindFirstChild("ItemRoot")
+        local prompt = root and root:FindFirstChildOfClass("ProximityPrompt")
+        if root and prompt then
+            local distance = (hrp.Position - root.Position).Magnitude
+            if distance <= 10 then
+                fireproximityprompt(prompt)
             end
         end
     end
-end
+end)
 
-RunService.Heartbeat:Connect(fireNearbyPrompt)
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
