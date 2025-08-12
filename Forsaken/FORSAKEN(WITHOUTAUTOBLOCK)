@@ -1017,6 +1017,118 @@ label.Parent = bg
 label.Size = UDim2.new(1, 0, 0, 100)
 label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
 label.BackgroundTransparency = 1
+label.Text = "Finalising..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 1 seconds, fade out and destroy the GUI
+task.delay(1, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(1)
+local CoreGui = game:GetService("CoreGui")
+
+local function reposition()
+    -- Camlock.Frame
+    local camlock = CoreGui:FindFirstChild("Camlock")
+    if camlock then
+        local frame = camlock:FindFirstChild("Frame")
+        if frame then
+            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+        end
+    end
+
+    -- GhostFollowerGui.TextButton
+    local ghostGui = CoreGui:FindFirstChild("GhostFollowerGui")
+    if ghostGui then
+        local btn = ghostGui:FindFirstChildWhichIsA("TextButton") or ghostGui:FindFirstChild("TextButton")
+        if btn then
+            btn.Position = UDim2.new(0, 708, 0, -55)
+        end
+    end
+
+    -- HurtAnim.TextButton
+    local hurtAnim = CoreGui:FindFirstChild("HurtAnim")
+    if hurtAnim then
+        local btn = hurtAnim:FindFirstChildWhichIsA("TextButton") or hurtAnim:FindFirstChild("TextButton")
+        if btn then
+            btn.Position = UDim2.new(0, 198, 0, -57)
+        end
+    end
+end
+
+-- Initial reposition if they already exist
+reposition()
+
+-- Listen for new children added to CoreGui, reposition when they appear
+CoreGui.ChildAdded:Connect(function(child)
+    if child.Name == "Camlock" then
+        child.ChildAdded:Connect(function(sub)
+            if sub.Name == "Frame" then
+                sub.Position = UDim2.new(0.5, 168, 0.5, -203)
+            end
+        end)
+        local frame = child:FindFirstChild("Frame")
+        if frame then
+            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+        end
+    elseif child.Name == "GhostFollowerGui" then
+        child.ChildAdded:Connect(function(sub)
+            if sub:IsA("TextButton") then
+                sub.Position = UDim2.new(0, 708, 0, -55)
+            end
+        end)
+        for _, v in pairs(child:GetChildren()) do
+            if v:IsA("TextButton") then
+                v.Position = UDim2.new(0, 708, 0, -55)
+            end
+        end
+    elseif child.Name == "HurtAnim" then
+        child.ChildAdded:Connect(function(sub)
+            if sub:IsA("TextButton") then
+                sub.Position = UDim2.new(0, 198, 0, -57)
+            end
+        end)
+        for _, v in pairs(child:GetChildren()) do
+            if v:IsA("TextButton") then
+                v.Position = UDim2.new(0, 198, 0, -57)
+            end
+        end
+    end
+end)
+--------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui5"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
 label.Text = "Loading ESP..."
 label.Font = Enum.Font.Roboto
 label.TextSize = 48
