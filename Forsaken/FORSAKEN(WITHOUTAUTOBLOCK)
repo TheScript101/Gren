@@ -1324,6 +1324,8 @@ end)
 wait(1)
 --------------------------------------------------------------------------------------------------------------------
 -- Forsaken ESP Fix
+-- generator esp + auto-repair with map presence detection (keeps your original logic intact)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -1335,7 +1337,9 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local workspacePlayers = Workspace:WaitForChild("Players")
 local killersFolder = workspacePlayers:WaitForChild("Killers")
 
-local ingameMapFolder = Workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
+-- NOTE: ingameMapFolder will be assigned dynamically when a map appears.
+-- This replaces a blocking WaitForChild so the script can detect map presence/absence.
+local ingameMapFolder = nil
 
 local REPEAT_DELAY = 2.5
 local CHECK_INTERVAL = 1
@@ -1353,7 +1357,10 @@ local function addGeneratorHighlight(gen, colorInside, colorOutline)
     hl.OutlineColor = colorOutline
     hl.FillTransparency = 0.85
     hl.OutlineTransparency = 0.6
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    -- DepthMode may not exist on some clients; protect with pcall
+    pcall(function()
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    end)
     hl.Parent = gen
 end
 
@@ -1412,6 +1419,7 @@ local function onGeneratorAdded(gen)
 end
 
 local function checkSpecialHighlight()
+    if not ingameMapFolder then return end
     local noli = killersFolder:FindFirstChild("Noli")
     local fakeGen = ingameMapFolder:FindFirstChild("FakeGenerator")
     if noli and fakeGen then
@@ -1427,11 +1435,12 @@ local function repairGenerator(gen)
     if repairingGenerators[gen] then return end
     repairingGenerators[gen] = true
 
-    while gen and gen.Parent and gen.Progress.Value < 100 do
+    while gen and gen.Parent and gen:FindFirstChild("Progress") and gen.Progress.Value < 100 do
         local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
         if humanoidRootPart and genPrimaryPart then
             local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
             if dist <= DISTANCE_THRESHOLD then
+                -- Fire the remote the same way your original script did
                 gen.Remotes.RE:FireServer()
                 wait(REPEAT_DELAY)
             else
@@ -1445,6 +1454,7 @@ local function repairGenerator(gen)
     repairingGenerators[gen] = nil
 end
 
+-- iterate through generators only when ingameMapFolder exists
 local function generatorLoop()
     while true do
         if not character or not character.Parent then
@@ -1452,29 +1462,56 @@ local function generatorLoop()
             humanoidRootPart = character:WaitForChild("HumanoidRootPart")
         end
 
-        for _, gen in ipairs(ingameMapFolder:GetChildren()) do
-            if (gen.Name == "Generator") and gen:FindFirstChild("Progress") and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
-                updateGeneratorHighlight(gen)
-                local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
-                if humanoidRootPart and genPrimaryPart then
-                    local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
-                    if dist <= DISTANCE_THRESHOLD and gen.Progress.Value < 100 then
-                        -- Start repair loop async for this generator
-                        task.spawn(function() repairGenerator(gen) end)
+        if ingameMapFolder and ingameMapFolder.Parent then
+            for _, gen in ipairs(ingameMapFolder:GetChildren()) do
+                if (gen.Name == "Generator") and gen:FindFirstChild("Progress") and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
+                    updateGeneratorHighlight(gen)
+                    local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
+                    if humanoidRootPart and genPrimaryPart then
+                        local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
+                        if dist <= DISTANCE_THRESHOLD and gen.Progress.Value < 100 then
+                            -- Start repair loop async for this generator
+                            task.spawn(function() repairGenerator(gen) end)
+                        end
                     end
+                elseif gen.Name == "FakeGenerator" then
+                    updateGeneratorHighlight(gen)
                 end
-            elseif gen.Name == "FakeGenerator" then
-                updateGeneratorHighlight(gen)
             end
-        end
 
-        checkSpecialHighlight()
+            checkSpecialHighlight()
+        end
 
         wait(CHECK_INTERVAL)
     end
 end
 
+-- Keeps track of the current childadded connection so we can disconnect on map removal
+local mapChildConn = nil
+
+-- Remove highlights from all known generators when map ends
+local function clearAllGeneratorHighlights()
+    -- if we have a map folder, iterate its children
+    if ingameMapFolder and ingameMapFolder.Parent then
+        for _, g in ipairs(ingameMapFolder:GetChildren()) do
+            removeHighlight(g)
+        end
+    end
+
+    -- Also attempt a broader cleanup in case some generators got left elsewhere
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "Generator" or obj.Name == "FakeGenerator" then
+            removeHighlight(obj)
+        end
+    end
+
+    -- reset repairing table so old references don't block future repairs
+    repairingGenerators = {}
+end
+
+-- Setup generators currently present in the ingameMapFolder
 setupAllGenerators = function()
+    if not ingameMapFolder then return end
     for _, gen in ipairs(ingameMapFolder:GetChildren()) do
         if gen.Name == "Generator" or gen.Name == "FakeGenerator" then
             setupGeneratorListeners(gen)
@@ -1482,10 +1519,63 @@ setupAllGenerators = function()
     end
 end
 
-setupAllGenerators()
-ingameMapFolder.ChildAdded:Connect(onGeneratorAdded)
+-- Map presence watcher: detects when Workspace.Map.Ingame.Map appears/disappears.
+task.spawn(function()
+    local hadMap = false
+    while true do
+        -- attempt to find the map folder without yielding
+        local mapRoot = Workspace:FindFirstChild("Map")
+        local foundMap = nil
+        if mapRoot then
+            local ingame = mapRoot:FindFirstChild("Ingame")
+            if ingame then
+                foundMap = ingame:FindFirstChild("Map")
+            end
+        end
 
+        if foundMap and not hadMap then
+            -- map just appeared
+            ingameMapFolder = foundMap
+            hadMap = true
+
+            -- wait 2 seconds as requested before applying ESP
+            wait(2)
+
+            -- initial setup and listeners
+            setupAllGenerators()
+
+            -- connect ChildAdded for new generators (store the connection to disconnect later)
+            if ingameMapFolder and ingameMapFolder.Parent then
+                mapChildConn = ingameMapFolder.ChildAdded:Connect(function(child)
+                    -- keep original behavior
+                    onGeneratorAdded(child)
+                end)
+            end
+        elseif not foundMap and hadMap then
+            -- map just disappeared (round ended)
+            hadMap = false
+
+            -- disconnect map child connection if exists
+            if mapChildConn then
+                pcall(function() mapChildConn:Disconnect() end)
+                mapChildConn = nil
+            end
+
+            -- clear highlights and reset states
+            clearAllGeneratorHighlights()
+            ingameMapFolder = nil
+        end
+
+        wait(CHECK_INTERVAL)
+    end
+end)
+
+-- Also make sure newly spawned generator objects while map exists are handled:
+-- (the mapChildConn above will handle it for the active map folder)
+
+-- Start the main generator loop (repairs + highlight upkeep)
 task.spawn(generatorLoop)
+
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = cloneref(game:GetService("Players"))
