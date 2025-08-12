@@ -1043,7 +1043,12 @@ local function reposition()
     if camlock then
         local frame = camlock:FindFirstChild("Frame")
         if frame then
-            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+            frame.Position = UDim2.new(0.5, 174, 0.5, -198)
+        end
+        local fovCircle = camlock:FindFirstChild("FOVCircle")
+        if fovCircle then
+            fovCircle.Size = UDim2.new(0, 25, 0, 25)
+            fovCircle.Position = UDim2.new(0.5, 0, 0.416998416, 0)
         end
     end
 
@@ -1052,7 +1057,7 @@ local function reposition()
     if ghostGui then
         local btn = ghostGui:FindFirstChildWhichIsA("TextButton") or ghostGui:FindFirstChild("TextButton")
         if btn then
-            btn.Position = UDim2.new(0, 708, 0, -55)
+            btn.Position = UDim2.new(0, 714, 0, -56)
         end
     end
 
@@ -1061,7 +1066,7 @@ local function reposition()
     if hurtAnim then
         local btn = hurtAnim:FindFirstChildWhichIsA("TextButton") or hurtAnim:FindFirstChild("TextButton")
         if btn then
-            btn.Position = UDim2.new(0, 198, 0, -57)
+            btn.Position = UDim2.new(0, 192, 0, -56)
         end
     end
 end
@@ -1074,37 +1079,46 @@ CoreGui.ChildAdded:Connect(function(child)
     if child.Name == "Camlock" then
         child.ChildAdded:Connect(function(sub)
             if sub.Name == "Frame" then
-                sub.Position = UDim2.new(0.5, 168, 0.5, -203)
+                sub.Position = UDim2.new(0.5, 174, 0.5, -198)
+            elseif sub.Name == "FOVCircle" then
+                sub.Size = UDim2.new(0, 25, 0, 25)
+                sub.Position = UDim2.new(0.5, 0, 0.416998416, 0)
             end
         end)
         local frame = child:FindFirstChild("Frame")
         if frame then
-            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+            frame.Position = UDim2.new(0.5, 174, 0.5, -198)
+        end
+        local fovCircle = child:FindFirstChild("FOVCircle")
+        if fovCircle then
+            fovCircle.Size = UDim2.new(0, 25, 0, 25)
+            fovCircle.Position = UDim2.new(0.5, 0, 0.416998416, 0)
         end
     elseif child.Name == "GhostFollowerGui" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
-                sub.Position = UDim2.new(0, 708, 0, -55)
+                sub.Position = UDim2.new(0, 714, 0, -56)
             end
         end)
         for _, v in pairs(child:GetChildren()) do
             if v:IsA("TextButton") then
-                v.Position = UDim2.new(0, 708, 0, -55)
+                v.Position = UDim2.new(0, 714, 0, -56)
             end
         end
     elseif child.Name == "HurtAnim" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
-                sub.Position = UDim2.new(0, 198, 0, -57)
+                sub.Position = UDim2.new(0, 192, 0, -56)
             end
         end)
         for _, v in pairs(child:GetChildren()) do
             if v:IsA("TextButton") then
-                v.Position = UDim2.new(0, 198, 0, -57)
+                v.Position = UDim2.new(0, 192, 0, -56)
             end
         end
     end
 end)
+
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
