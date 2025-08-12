@@ -1316,23 +1316,22 @@ wait(1)
 -- Forsaken ESP Fix
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local workspacePlayers = workspace:WaitForChild("Players")
+local workspacePlayers = Workspace:WaitForChild("Players")
 local killersFolder = workspacePlayers:WaitForChild("Killers")
 
-local ingameMapFolder = workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
+local ingameMapFolder = Workspace:WaitForChild("Map"):WaitForChild("Ingame"):WaitForChild("Map")
 
 local REPEAT_DELAY = 2.5
-local CHECK_INTERVAL = 0.5
+local CHECK_INTERVAL = 1
 local DISTANCE_THRESHOLD = 5
 
--- Helper function to add highlight to a generator
 local function addGeneratorHighlight(gen, colorInside, colorOutline)
-    -- Remove old highlight if any
     for _, child in ipairs(gen:GetChildren()) do
         if child:IsA("Highlight") then
             child:Destroy()
@@ -1342,28 +1341,101 @@ local function addGeneratorHighlight(gen, colorInside, colorOutline)
     local hl = Instance.new("Highlight")
     hl.FillColor = colorInside
     hl.OutlineColor = colorOutline
-    hl.FillTransparency = 0.85 -- very very light inside color
-    hl.OutlineTransparency = 0.6 -- thin outline, slightly transparent
+    hl.FillTransparency = 0.85
+    hl.OutlineTransparency = 0.6
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Parent = gen
 end
 
--- Detect if both killers.Noli and ingameMapFolder exist (FakeGenerator highlighting)
+game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Esp"; Text = "Loaded!"; Duration = 2})
+
+local function removeHighlight(gen)
+    local hl = gen:FindFirstChildWhichIsA("Highlight")
+    if hl then hl:Destroy() end
+end
+
+local function updateGeneratorHighlight(gen)
+    if not gen or not gen.Parent then return end
+    if gen.Name == "Generator" then
+        local progressValue = gen:FindFirstChild("Progress")
+        if progressValue then
+            if progressValue.Value < 100 then
+                addGeneratorHighlight(gen, Color3.fromRGB(255, 255, 200), Color3.fromRGB(255, 255, 100))
+            else
+                addGeneratorHighlight(gen, Color3.fromRGB(180, 255, 180), Color3.fromRGB(100, 255, 100))
+            end
+        else
+            addGeneratorHighlight(gen, Color3.fromRGB(255, 255, 200), Color3.fromRGB(255, 255, 100))
+        end
+    elseif gen.Name == "FakeGenerator" then
+        local noli = killersFolder:FindFirstChild("Noli")
+        if noli then
+            addGeneratorHighlight(gen, Color3.fromRGB(255, 180, 180), Color3.fromRGB(255, 0, 0))
+        else
+            removeHighlight(gen)
+        end
+    else
+        removeHighlight(gen)
+    end
+end
+
+local function setupGeneratorListeners(gen)
+    if gen.Name == "Generator" then
+        local progressValue = gen:FindFirstChild("Progress")
+        if progressValue then
+            updateGeneratorHighlight(gen)
+            progressValue:GetPropertyChangedSignal("Value"):Connect(function()
+                updateGeneratorHighlight(gen)
+            end)
+        else
+            updateGeneratorHighlight(gen)
+        end
+    elseif gen.Name == "FakeGenerator" then
+        updateGeneratorHighlight(gen)
+    end
+end
+
+local function onGeneratorAdded(gen)
+    if gen.Name == "Generator" or gen.Name == "FakeGenerator" then
+        setupGeneratorListeners(gen)
+    end
+end
+
 local function checkSpecialHighlight()
     local noli = killersFolder:FindFirstChild("Noli")
     local fakeGen = ingameMapFolder:FindFirstChild("FakeGenerator")
     if noli and fakeGen then
-        -- Add very light red highlight & red outline to FakeGenerator
         addGeneratorHighlight(fakeGen, Color3.fromRGB(255, 180, 180), Color3.fromRGB(255, 0, 0))
-    else
-        -- Remove highlight from FakeGenerator if exists and conditions no longer met
-        local existingHL = fakeGen and fakeGen:FindFirstChildWhichIsA("Highlight")
-        if existingHL then existingHL:Destroy() end
+    elseif fakeGen then
+        removeHighlight(fakeGen)
     end
 end
 
--- Main loop to check proximity and repair generators
-local function generatorRepairLoop()
+local repairingGenerators = {}
+
+local function repairGenerator(gen)
+    if repairingGenerators[gen] then return end
+    repairingGenerators[gen] = true
+
+    while gen and gen.Parent and gen.Progress.Value < 100 do
+        local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
+        if humanoidRootPart and genPrimaryPart then
+            local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
+            if dist <= DISTANCE_THRESHOLD then
+                gen.Remotes.RE:FireServer()
+                wait(REPEAT_DELAY)
+            else
+                break -- Too far, stop repairing this gen
+            end
+        else
+            break
+        end
+    end
+
+    repairingGenerators[gen] = nil
+end
+
+local function generatorLoop()
     while true do
         if not character or not character.Parent then
             character = player.Character or player.CharacterAdded:Wait()
@@ -1371,37 +1443,19 @@ local function generatorRepairLoop()
         end
 
         for _, gen in ipairs(ingameMapFolder:GetChildren()) do
-            if gen.Name == "Generator" and gen:FindFirstChild("Progress") and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
-                local genProgress = gen.Progress.Value
+            if (gen.Name == "Generator") and gen:FindFirstChild("Progress") and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
+                updateGeneratorHighlight(gen)
                 local genPrimaryPart = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart")
-                if not genPrimaryPart or not humanoidRootPart then
-                    -- Skip if no PrimaryPart or HumanoidRootPart
-                    goto continue
-                end
-                local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
-
-                if dist <= DISTANCE_THRESHOLD then
-                    if genProgress < 100 then
-                        -- Highlight generator yellow (incomplete)
-                        addGeneratorHighlight(gen, Color3.fromRGB(255, 255, 200), Color3.fromRGB(255, 255, 100))
-                        -- Fire repair event repeatedly until 100
-                        while gen.Progress.Value < 100 do
-                            gen.Remotes.RE:FireServer()
-                            wait(REPEAT_DELAY)
-                        end
-                        -- After repair completed, update highlight to green
-                        addGeneratorHighlight(gen, Color3.fromRGB(180, 255, 180), Color3.fromRGB(100, 255, 100))
-                    else
-                        -- Generator complete - light green highlight
-                        addGeneratorHighlight(gen, Color3.fromRGB(180, 255, 180), Color3.fromRGB(100, 255, 100))
+                if humanoidRootPart and genPrimaryPart then
+                    local dist = (genPrimaryPart.Position - humanoidRootPart.Position).Magnitude
+                    if dist <= DISTANCE_THRESHOLD and gen.Progress.Value < 100 then
+                        -- Start repair loop async for this generator
+                        task.spawn(function() repairGenerator(gen) end)
                     end
-                else
-                    -- Too far: remove highlight
-                    local hl = gen:FindFirstChildWhichIsA("Highlight")
-                    if hl then hl:Destroy() end
                 end
+            elseif gen.Name == "FakeGenerator" then
+                updateGeneratorHighlight(gen)
             end
-            ::continue::
         end
 
         checkSpecialHighlight()
@@ -1410,9 +1464,20 @@ local function generatorRepairLoop()
     end
 end
 
-task.spawn(generatorRepairLoop)
+setupAllGenerators = function()
+    for _, gen in ipairs(ingameMapFolder:GetChildren()) do
+        if gen.Name == "Generator" or gen.Name == "FakeGenerator" then
+            setupGeneratorListeners(gen)
+        end
+    end
+end
 
+setupAllGenerators()
+ingameMapFolder.ChildAdded:Connect(onGeneratorAdded)
+
+task.spawn(generatorLoop)
 --------------------------------------------------------------------------------------------------------------------
+wait(1)
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
@@ -1563,6 +1628,6 @@ local function updateESP()
     end
 end
 
-game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Esp"; Text = "Loaded!"; Duration = 20})
+game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Esp"; Text = "Loaded!"; Duration = 5})
 task.spawn(updateESP)
 
