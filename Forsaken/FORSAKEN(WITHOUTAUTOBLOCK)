@@ -1147,38 +1147,71 @@ task.delay(2, function()
     loadingGui:Destroy()
 end)
 wait(2)
-
+--------------------------------------------------------------------------------------------------------------------
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 
+-- Function to find all medkits and bloxycolas
 local function getItems()
     local items = {}
-    for _, v in pairs(workspace.Map.Ingame.Map:GetChildren()) do
-        if v.Name == "Medkit" or v.Name == "BloxyCola" then
-            table.insert(items, v)
+    local map = workspace:FindFirstChild("Map")
+    if map and map:FindFirstChild("Ingame") and map.Ingame:FindFirstChild("Map") then
+        for _, v in pairs(map.Ingame.Map:GetChildren()) do
+            if v.Name == "Medkit" or v.Name == "BloxyCola" then
+                table.insert(items, v)
+            end
         end
     end
     return items
 end
 
-RunService.Heartbeat:Connect(function()
-    local char = player.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    for _, item in pairs(getItems()) do
-        local root = item:FindFirstChild("ItemRoot")
-        local prompt = root and root:FindFirstChildOfClass("ProximityPrompt")
-        if root and prompt then
-            local distance = (hrp.Position - root.Position).Magnitude
-            if distance <= 10 then
-                fireproximityprompt(prompt)
+-- Function to check if the player already has one of the tools
+local function hasTool()
+    local backpack = player:FindFirstChild("Backpack")
+    local character = player.Character
+    for _, container in ipairs({backpack, character}) do
+        if container then
+            for _, tool in ipairs(container:GetChildren()) do
+                if tool:IsA("Tool") and (tool.Name == "BloxyCola" or tool.Name == "Medkit") then
+                    return true
+                end
             end
         end
     end
+    return false
+end
+
+-- Main collection loop
+local function startCollector()
+    RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        if hasTool() then return end -- Skip if we already have one
+
+        for _, item in pairs(getItems()) do
+            local root = item:FindFirstChild("ItemRoot")
+            local prompt = root and root:FindFirstChildOfClass("ProximityPrompt")
+            if root and prompt then
+                local distance = (hrp.Position - root.Position).Magnitude
+                if distance <= 10 then
+                    fireproximityprompt(prompt) -- Keep retrying every frame until collected
+                end
+            end
+        end
+    end)
+end
+
+-- Restart collection when respawned or round resets
+player.CharacterAdded:Connect(function()
+    task.wait(1) -- Give time for character to load
+    startCollector()
 end)
 
+-- First start
+startCollector()
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
