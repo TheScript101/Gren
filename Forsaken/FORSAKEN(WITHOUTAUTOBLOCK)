@@ -860,8 +860,7 @@ task.delay(3, function()
 end)
 wait(3)
 --------------------------------------------------------------------------------------------------------------------
--- SETTINGS (from your code)
-local delay = 2.25
+-- SETTINGS
 local interval = 0.1
 local color = Color3.new(1, 0, 0)
 
@@ -869,15 +868,18 @@ local color = Color3.new(1, 0, 0)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local Stats = game:GetService("Stats")
+local CoreGui = game:GetService("CoreGui")
+
 local player = Players.LocalPlayer
 
--- "Made by Hecker" Notification (try/catch)
+-- NOTIFICATION
 pcall(function()
-	StarterGui:SetCore("SendNotification", {
-		Title = "Ghost Follower",
-		Text = "Made by Hecker",
-		Duration = 1
-	})
+    StarterGui:SetCore("SendNotification", {
+        Title = "Ghost Follower",
+        Text = "Made by Hecker (Ping-Based)",
+        Duration = 2
+    })
 end)
 
 -- VARIABLES
@@ -887,77 +889,88 @@ local history = {}
 local tracking = false
 local conn1, conn2
 
+-- GET PING DELAY
+local function getPingDelay()
+    local pingStat = Stats:FindFirstChild("PerformanceStats") and Stats.PerformanceStats:FindFirstChild("Ping")
+    if pingStat then
+        local pingMs = pingStat:GetValue()
+        return pingMs / 1000 + 0.1 -- Convert ms to seconds + buffer
+    end
+    return 0.2 -- fallback default
+end
+
 -- GHOST CREATION
 local function makeGhost(char)
-	local ghostModel = Instance.new("Model")
-	ghostModel.Name = "GhostFollower"
-	for _, part in ipairs(char:GetChildren()) do
-		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			local clone = Instance.new("Part")
-			clone.Name = "Ghost_" .. part.Name
-			clone.Size = part.Size
-			clone.Anchored = true
-			clone.CanCollide = false
-			clone.Transparency = 0.3
-			clone.Material = Enum.Material.ForceField
-			clone.Color = color
-			clone.CFrame = part.CFrame
-			clone.Parent = ghostModel
-		end
-	end
-	ghostModel.Parent = workspace
-	return ghostModel
+    local ghostModel = Instance.new("Model")
+    ghostModel.Name = "GhostFollower"
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            local clone = Instance.new("Part")
+            clone.Name = "Ghost_" .. part.Name
+            clone.Size = part.Size
+            clone.Anchored = true
+            clone.CanCollide = false
+            clone.Transparency = 0.3
+            clone.Material = Enum.Material.ForceField
+            clone.Color = color
+            clone.CFrame = part.CFrame
+            clone.Parent = ghostModel
+        end
+    end
+    ghostModel.Parent = workspace
+    return ghostModel
 end
 
 -- TRACKING
 local function startTracking()
-	history = {}
-	ghost = makeGhost(character)
-	tracking = true
+    history = {}
+    ghost = makeGhost(character)
+    tracking = true
 
-	conn1 = RunService.Heartbeat:Connect(function()
-		local frame = {}
-		for _, part in ipairs(character:GetChildren()) do
-			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-				frame[part.Name] = part.CFrame
-			end
-		end
-		table.insert(history, frame)
-		if #history > delay / interval then
-			table.remove(history, 1)
-		end
-	end)
+    conn1 = RunService.Heartbeat:Connect(function()
+        local frame = {}
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                frame[part.Name] = part.CFrame
+            end
+        end
+        table.insert(history, frame)
+        local delay = getPingDelay()
+        if #history > delay / interval then
+            table.remove(history, 1)
+        end
+    end)
 
-	conn2 = RunService.Heartbeat:Connect(function()
-		if #history > 0 then
-			local data = history[1]
-			for _, ghostPart in ipairs(ghost:GetChildren()) do
-				if ghostPart:IsA("BasePart") then
-					local realName = ghostPart.Name:sub(7)
-					if data[realName] then
-						ghostPart.CFrame = data[realName]
-					end
-				end
-			end
-		end
-	end)
+    conn2 = RunService.Heartbeat:Connect(function()
+        if #history > 0 then
+            local data = history[1]
+            for _, ghostPart in ipairs(ghost:GetChildren()) do
+                if ghostPart:IsA("BasePart") then
+                    local realName = ghostPart.Name:sub(7)
+                    if data[realName] then
+                        ghostPart.CFrame = data[realName]
+                    end
+                end
+            end
+        end
+    end)
 end
 
 local function stopTracking()
-	if conn1 then conn1:Disconnect() end
-	if conn2 then conn2:Disconnect() end
-	if ghost then ghost:Destroy() end
-	tracking = false
+    if conn1 then conn1:Disconnect() end
+    if conn2 then conn2:Disconnect() end
+    if ghost then ghost:Destroy() end
+    tracking = false
 end
 
 -- RESPAWN HANDLER
 player.CharacterAdded:Connect(function(char)
-	character = char
-	repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
-	if tracking then
-		stopTracking()
-		startTracking()
-	end
+    character = char
+    repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
+    if tracking then
+        stopTracking()
+        startTracking()
+    end
 end)
 
 -- GUI CREATION
@@ -968,7 +981,7 @@ gui.Parent = CoreGui
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 160, 0, 40)
-toggle.Position = UDim2.new(0, 708, 0, -55)
+toggleButton.Position = UDim2.new(0, 20, 0, 20)
 toggleButton.BackgroundColor3 = Color3.new(0, 0, 0)
 toggleButton.BorderColor3 = Color3.new(1, 0, 0)
 toggleButton.BorderSizePixel = 1
@@ -981,16 +994,16 @@ toggleButton.Active = true
 toggleButton.Parent = gui
 
 toggleButton.MouseButton1Click:Connect(function()
-	if tracking then
-		stopTracking()
-		toggleButton.Text = "Desync OFF"
-	else
-		if not character or not character.Parent then
-			character = player.Character or player.CharacterAdded:Wait()
-		end
-		startTracking()
-		toggleButton.Text = "Desync ON"
-	end
+    if tracking then
+        stopTracking()
+        toggleButton.Text = "Desync OFF"
+    else
+        if not character or not character.Parent then
+            character = player.Character or player.CharacterAdded:Wait()
+        end
+        startTracking()
+        toggleButton.Text = "Desync ON"
+    end
 end)
 
 --------------------------------------------------------------------------------------------------------------------
