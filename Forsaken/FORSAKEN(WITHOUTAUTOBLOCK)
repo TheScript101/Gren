@@ -1059,6 +1059,8 @@ task.delay(1, function()
 end)
 wait(1)
 local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
 local function reposition()
     -- Camlock.Frame
@@ -1084,13 +1086,25 @@ local function reposition()
         end
     end
 
-    -- HurtAnim.TextButton
+    -- HurtAnim.TextButton (UPDATED POSITION)
     local hurtAnim = CoreGui:FindFirstChild("HurtAnim")
     if hurtAnim then
         local btn = hurtAnim:FindFirstChildWhichIsA("TextButton") or hurtAnim:FindFirstChild("TextButton")
         if btn then
-            btn.Position = UDim2.new(0, 192, 0, -56)
+            btn.Position = UDim2.new(0, 714, 0, -12)
         end
+    end
+
+    -- PlayerListHolder.Close
+    local closeBtn = player.PlayerGui:FindFirstChild("MainUI") and player.PlayerGui.MainUI:FindFirstChild("PlayerListHolder") and player.PlayerGui.MainUI.PlayerListHolder:FindFirstChild("Close")
+    if closeBtn then
+        closeBtn.Position = UDim2.new(0, 0, 0, 25)
+    end
+
+    -- Objectives
+    local objectives = player.PlayerGui:FindFirstChild("MainUI") and player.PlayerGui.MainUI:FindFirstChild("Objectives")
+    if objectives then
+        objectives.Position = UDim2.new(0.389999986, 0, 0, 35)
     end
 end
 
@@ -1108,37 +1122,34 @@ CoreGui.ChildAdded:Connect(function(child)
                 sub.Position = UDim2.new(0.5, 0, 0.416998416, 0)
             end
         end)
-        local frame = child:FindFirstChild("Frame")
-        if frame then
-            frame.Position = UDim2.new(0.5, 174, 0.5, -198)
-        end
-        local fovCircle = child:FindFirstChild("FOVCircle")
-        if fovCircle then
-            fovCircle.Size = UDim2.new(0, 25, 0, 25)
-            fovCircle.Position = UDim2.new(0.5, 0, 0.416998416, 0)
-        end
     elseif child.Name == "GhostFollowerGui" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
                 sub.Position = UDim2.new(0, 714, 0, -56)
             end
         end)
-        for _, v in pairs(child:GetChildren()) do
-            if v:IsA("TextButton") then
-                v.Position = UDim2.new(0, 714, 0, -56)
-            end
-        end
     elseif child.Name == "HurtAnim" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
-                sub.Position = UDim2.new(0, 192, 0, -56)
+                sub.Position = UDim2.new(0, 714, 0, -12) -- updated
             end
         end)
-        for _, v in pairs(child:GetChildren()) do
-            if v:IsA("TextButton") then
-                v.Position = UDim2.new(0, 192, 0, -56)
+    end
+end)
+
+-- Listen for MainUI elements being added
+player.PlayerGui.ChildAdded:Connect(function(guiChild)
+    if guiChild.Name == "MainUI" then
+        guiChild.ChildAdded:Connect(function(mainChild)
+            if mainChild.Name == "PlayerListHolder" then
+                local closeBtn = mainChild:FindFirstChild("Close")
+                if closeBtn then
+                    closeBtn.Position = UDim2.new(0, 0, 0, 25)
+                end
+            elseif mainChild.Name == "Objectives" then
+                mainChild.Position = UDim2.new(0.389999986, 0, 0, 35)
             end
-        end
+        end)
     end
 end)
 
