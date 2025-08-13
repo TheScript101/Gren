@@ -1359,10 +1359,24 @@ local REPEAT_DELAY = 6.5
 local CHECK_INTERVAL = 1
 
 -- Create countdown TextLabel
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Wait for the LocalPlayer to exist if this runs very early
+while not player do
+    wait()
+    player = Players.LocalPlayer
+end
+
+-- Wait for PlayerGui to exist
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RepairTimerGui"
-screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Parent = playerGui
 
+-- Create TextLabel
 local timerLabel = Instance.new("TextLabel")
 timerLabel.Size = UDim2.new(0, 192, 0, 70)
 timerLabel.Position = UDim2.new(0.5, 5, 0.5, 135)
@@ -1371,10 +1385,10 @@ timerLabel.Text = tostring(REPEAT_DELAY)
 timerLabel.Font = Enum.Font.GothamBlack
 timerLabel.TextSize = 48
 timerLabel.TextColor3 = Color3.new(1,1,1)
-timerLabel.TextStrokeTransparency = 0 -- black outline
+timerLabel.TextStrokeTransparency = 0
 timerLabel.TextStrokeColor3 = Color3.new(0,0,0)
 timerLabel.BackgroundTransparency = 1
-timerLabel.Visible = false -- hidden by default
+timerLabel.Visible = true
 timerLabel.Parent = screenGui
 
 local function updateTimerLabel(count)
