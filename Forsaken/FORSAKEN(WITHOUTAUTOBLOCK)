@@ -1082,7 +1082,7 @@ local function reposition()
     if ghostGui then
         local btn = ghostGui:FindFirstChildWhichIsA("TextButton") or ghostGui:FindFirstChild("TextButton")
         if btn then
-            btn.Position = UDim2.new({0, 710}, {0, -55})
+            btn.Position = UDim2.new(0, 710, 0, -55)
         end
     end
 
@@ -1091,7 +1091,7 @@ local function reposition()
     if hurtAnim then
         local btn = hurtAnim:FindFirstChildWhichIsA("TextButton") or hurtAnim:FindFirstChild("TextButton")
         if btn then
-            btn.Position = UDim2.new({0, 710}, {0, -11})
+            btn.Position = UDim2.new(0, 710, 0, -11)
         end
     end
 
@@ -1125,13 +1125,13 @@ CoreGui.ChildAdded:Connect(function(child)
     elseif child.Name == "GhostFollowerGui" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
-                sub.Position = UDim2.new({0, 710}, {0, -55})
+                sub.Position = UDim2.new(0, 710, 0, -55)
             end
         end)
     elseif child.Name == "HurtAnim" then
         child.ChildAdded:Connect(function(sub)
             if sub:IsA("TextButton") then
-                sub.Position = UDim2.new({0, 710}, {0, -11}) -- updated
+                sub.Position = UDim2.new(0, 710, 0, -11) -- updated
             end
         end)
     end
