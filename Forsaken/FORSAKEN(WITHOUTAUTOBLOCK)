@@ -1365,7 +1365,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local timerLabel = Instance.new("TextLabel")
 timerLabel.Size = UDim2.new(0, 192, 0, 70)
-timerLabel.Position = UDim2.new(0.5, 5, 0.5, 131)
+timerLabel.Position = UDim2.new(0.5, 5, 0.5, 140)
 timerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 timerLabel.Text = tostring(REPEAT_DELAY)
 timerLabel.Font = Enum.Font.GothamBlack
