@@ -1374,6 +1374,7 @@ timerLabel.TextColor3 = Color3.new(1,1,1)
 timerLabel.TextStrokeTransparency = 0 -- black outline
 timerLabel.TextStrokeColor3 = Color3.new(0,0,0)
 timerLabel.BackgroundTransparency = 1
+timerLabel.Visible = false -- hidden by default
 timerLabel.Parent = screenGui
 
 local function updateTimerLabel(count)
@@ -1474,6 +1475,7 @@ local function startRepairLoop(gen)
 
     task.spawn(function()
         timerActive = true
+        timerLabel.Visible = true -- show label when timer starts
         currentTimer = REPEAT_DELAY
         while repairingGenerators[gen] and gen.Parent and gen:FindFirstChild("Progress") and gen.Progress.Value < 100 do
             local startTime = tick()
@@ -1488,6 +1490,7 @@ local function startRepairLoop(gen)
             end
         end
         timerActive = false
+        timerLabel.Visible = false -- hide label when timer ends
         updateTimerLabel(REPEAT_DELAY)
         repairingGenerators[gen] = nil
     end)
@@ -1497,6 +1500,7 @@ local function stopRepairLoop(gen)
     repairingGenerators[gen] = nil
     if not next(repairingGenerators) then
         timerActive = false
+        timerLabel.Visible = false -- hide label if no active timers
         updateTimerLabel(REPEAT_DELAY)
     end
 end
