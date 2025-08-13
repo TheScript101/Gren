@@ -851,7 +851,7 @@ label.Parent = bg
 label.Size = UDim2.new(1, 0, 0, 100)
 label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
 label.BackgroundTransparency = 1
-label.Text = "Loading Desync Juke..."
+label.Text = "Loading Ping Based Ghost..."
 label.Font = Enum.Font.Roboto
 label.TextSize = 48
 label.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1190,7 +1190,7 @@ local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
-local MAX_DISTANCE = 10
+local MAX_DISTANCE = 15
 
 -- Simple toggle variable to control auto collecting
 local autoCollectEnabled = false
@@ -1341,9 +1341,9 @@ local killersFolder = workspacePlayers:WaitForChild("Killers")
 -- This replaces a blocking WaitForChild so the script can detect map presence/absence.
 local ingameMapFolder = nil
 
-local REPEAT_DELAY = 2.5
+local REPEAT_DELAY = 7.5
 local CHECK_INTERVAL = 1
-local DISTANCE_THRESHOLD = 5
+local DISTANCE_THRESHOLD = 10
 
 local function addGeneratorHighlight(gen, colorInside, colorOutline)
     for _, child in ipairs(gen:GetChildren()) do
