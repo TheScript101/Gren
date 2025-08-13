@@ -1358,6 +1358,28 @@ local ingameMapFolder = nil
 local REPEAT_DELAY = 6.5
 local CHECK_INTERVAL = 1
 
+-- Create countdown TextLabel
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RepairTimerGui"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Size = UDim2.new(0, 192, 0, 70)
+timerLabel.Position = UDim2.new(0.5, 5, 0.5, 131)
+timerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+timerLabel.Text = tostring(REPEAT_DELAY)
+timerLabel.Font = Enum.Font.GothamBlack
+timerLabel.TextSize = 48
+timerLabel.TextColor3 = Color3.new(1,1,1)
+timerLabel.TextStrokeTransparency = 0 -- black outline
+timerLabel.TextStrokeColor3 = Color3.new(0,0,0)
+timerLabel.BackgroundTransparency = 1
+timerLabel.Parent = screenGui
+
+local function updateTimerLabel(count)
+    timerLabel.Text = string.format("%.1f", count)
+end
+
 local function addGeneratorHighlight(gen, colorInside, colorOutline)
     for _, child in ipairs(gen:GetChildren()) do
         if child:IsA("Highlight") then
@@ -1443,22 +1465,40 @@ end
 
 -- repair logic based on animation instead of distance
 local repairingGenerators = {}
+local timerActive = false
+local currentTimer = REPEAT_DELAY
 
 local function startRepairLoop(gen)
     if repairingGenerators[gen] then return end
     repairingGenerators[gen] = true
+
     task.spawn(function()
-        wait(REPEAT_DELAY) -- initial delay when animation starts
+        timerActive = true
+        currentTimer = REPEAT_DELAY
         while repairingGenerators[gen] and gen.Parent and gen:FindFirstChild("Progress") and gen.Progress.Value < 100 do
-            gen.Remotes.RE:FireServer()
-            wait(REPEAT_DELAY)
+            local startTime = tick()
+            while tick() - startTime < REPEAT_DELAY do
+                if not repairingGenerators[gen] then break end
+                currentTimer = REPEAT_DELAY - (tick() - startTime)
+                updateTimerLabel(currentTimer)
+                wait(0.1)
+            end
+            if repairingGenerators[gen] then
+                gen.Remotes.RE:FireServer()
+            end
         end
+        timerActive = false
+        updateTimerLabel(REPEAT_DELAY)
         repairingGenerators[gen] = nil
     end)
 end
 
 local function stopRepairLoop(gen)
     repairingGenerators[gen] = nil
+    if not next(repairingGenerators) then
+        timerActive = false
+        updateTimerLabel(REPEAT_DELAY)
+    end
 end
 
 -- monitor animation to trigger repair loop
@@ -1466,7 +1506,6 @@ local function monitorAnimations()
     humanoid.AnimationPlayed:Connect(function(track)
         local id = track.Animation and track.Animation.AnimationId
         if id == TARGET_ANIMATION_ID then
-            -- start repair for all generators below 100%
             if ingameMapFolder then
                 for _, gen in ipairs(ingameMapFolder:GetChildren()) do
                     if gen.Name == "Generator" and gen:FindFirstChild("Progress") and gen.Progress.Value < 100 and gen:FindFirstChild("Remotes") and gen.Remotes:FindFirstChild("RE") then
@@ -1475,7 +1514,6 @@ local function monitorAnimations()
                 end
             end
 
-            -- stop loop when animation ends
             track.Stopped:Connect(function()
                 for gen in pairs(repairingGenerators) do
                     stopRepairLoop(gen)
