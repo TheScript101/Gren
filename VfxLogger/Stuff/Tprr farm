@@ -1,0 +1,180 @@
+-- Orion Library
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local Window = OrionLib:MakeWindow({
+    Name = "tprr farm",
+    HidePremium = false,
+    SaveConfig = false
+})
+
+-- === Farms Tab ===
+local FarmsTab = Window:MakeTab({
+    Name = "Farms Tab",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- State
+local farming = false
+local farmConn
+local ticker = 0
+
+-- CONFIGURATION
+local targetObject = workspace:WaitForChild("Tape") -- <-- set your object here
+local displayName = "Tape"                          -- <-- friendly name
+
+-- Function: try to bring objects to player
+local function bringToPlayer(obj, root)
+    local targetPart
+    if obj:IsA("BasePart") then
+        targetPart = obj
+    elseif obj:IsA("Model") then
+        targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    else
+        targetPart = obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+
+    if targetPart then
+        pcall(function()
+            targetPart.CFrame = root.CFrame + Vector3.new(0, 2, 0)
+        end)
+    end
+
+    -- Backup: trigger TouchInterest
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("TouchTransmitter") and d.Parent and d.Parent:IsA("BasePart") then
+            pcall(function()
+                firetouchinterest(root, d.Parent, 0)
+                task.wait(0.1)
+                firetouchinterest(root, d.Parent, 1)
+            end)
+        end
+    end
+end
+
+-- Farming loop
+local function startFarm()
+    if farmConn then farmConn:Disconnect() end
+    ticker = 0
+    farmConn = RunService.Heartbeat:Connect(function(dt)
+        if not farming then return end
+        ticker += dt
+        if ticker < 0.5 then return end
+        ticker = 0
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        if targetObject then
+            bringToPlayer(targetObject, root)
+        else
+            warn("Target object not found: " .. displayName)
+        end
+    end)
+end
+
+local function stopFarm()
+    farming = false
+    if farmConn then farmConn:Disconnect() farmConn = nil end
+end
+
+-- Orion Toggle
+FarmsTab:AddToggle({
+    Name = displayName .. " farm",
+    Default = false,
+    Callback = function(Value)
+        farming = Value
+        if farming then
+            startFarm()
+        else
+            stopFarm()
+        end
+    end
+})
+
+------------------------------------------------
+
+-- CONFIGURATION
+local targetObject = workspace:WaitForChild("SmallPotGold") -- <-- set your object here
+local displayName = "Gold Pot"                          -- <-- friendly name
+
+-- Function: try to bring objects to player
+local function bringToPlayer(obj, root)
+    local targetPart
+    if obj:IsA("BasePart") then
+        targetPart = obj
+    elseif obj:IsA("Model") then
+        targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    else
+        targetPart = obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+
+    if targetPart then
+        pcall(function()
+            targetPart.CFrame = root.CFrame + Vector3.new(0, 2, 0)
+        end)
+    end
+
+    -- Backup: trigger TouchInterest
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("TouchTransmitter") and d.Parent and d.Parent:IsA("BasePart") then
+            pcall(function()
+                firetouchinterest(root, d.Parent, 0)
+                task.wait(0.1)
+                firetouchinterest(root, d.Parent, 1)
+            end)
+        end
+    end
+end
+
+-- Farming loop
+local function startFarm()
+    if farmConn then farmConn:Disconnect() end
+    ticker = 0
+    farmConn = RunService.Heartbeat:Connect(function(dt)
+        if not farming then return end
+        ticker += dt
+        if ticker < 0.5 then return end
+        ticker = 0
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        if targetObject then
+            bringToPlayer(targetObject, root)
+        else
+            warn("Target object not found: " .. displayName)
+        end
+    end)
+end
+
+local function stopFarm()
+    farming = false
+    if farmConn then farmConn:Disconnect() farmConn = nil end
+end
+
+-- Orion Toggle
+FarmsTab:AddToggle({
+    Name = displayName .. " farm",
+    Default = false,
+    Callback = function(Value)
+        farming = Value
+        if farming then
+            startFarm()
+        else
+            stopFarm()
+        end
+    end
+})
+
+------------------------------------------------
+
+
+OrionLib:Init()
