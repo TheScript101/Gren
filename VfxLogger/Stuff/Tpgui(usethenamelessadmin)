@@ -1,0 +1,102 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "PathTeleportGui"
+
+local frame = Instance.new("Frame", screenGui)
+frame.Position = UDim2.new(0.5, -200, 0.5, -50)
+frame.Size = UDim2.new(0, 400, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+
+local textBox = Instance.new("TextBox", frame)
+textBox.PlaceholderText = "Enter path (ex: workspace.Folder.Part)"
+textBox.Size = UDim2.new(1, -10, 0.5, -5)
+textBox.Position = UDim2.new(0, 5, 0, 5)
+textBox.ClearTextOnFocus = false
+textBox.Text = ""
+textBox.TextWrapped = true
+textBox.TextColor3 = Color3.new(1,1,1)
+textBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1, -10, 0.4, -5)
+button.Position = UDim2.new(0, 5, 0.6, 0)
+button.Text = "Teleport to Object"
+button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+button.TextColor3 = Color3.new(1,1,1)
+
+-- Function to resolve a path string into an Instance
+local function getObjectFromPath(path)
+	local segments = string.split(path, ".")
+	local first = segments[1]:lower()
+
+	-- Allow "workspace" and "game"
+	local current
+	if first == "workspace" then
+		current = workspace
+	elseif first == "game" then
+		current = game
+	else
+		current = game:FindFirstChild(segments[1])
+	end
+
+	if not current then return nil end
+
+	-- Walk down children
+	for i = 2, #segments do
+		local seg = segments[i]
+		if current:FindFirstChild(seg) then
+			current = current[seg]
+		else
+			return nil
+		end
+	end
+
+	return current
+end
+
+-- Teleport logic
+button.MouseButton1Click:Connect(function()
+	local input = textBox.Text
+	local target = getObjectFromPath(input)
+
+	if not target then
+		warn("Invalid path or object not found: " .. input)
+		return
+	end
+
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	if target:IsA("BasePart") then
+		root.CFrame = target.CFrame + Vector3.new(0, 5, 0)
+	elseif target:IsA("Model") then
+		local primary = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+		if primary then
+			root.CFrame = primary.CFrame + Vector3.new(0, 5, 0)
+		else
+			warn("Model has no valid BasePart to teleport to.")
+		end
+	else
+		warn("Target is not a teleportable object")
+	end
+end)
+
+-- Toggle GUI button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "Toggle GUI"
+toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 16
+toggleButton.Name = "ToggleButton"
+toggleButton.Parent = screenGui
+
+toggleButton.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)
