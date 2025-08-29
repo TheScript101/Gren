@@ -34,6 +34,7 @@ panel.Size = UDim2.new(0, 500, 0, 180) -- enlarged
 panel.Position = UDim2.new(0.02, 0, 0.15, 0)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
+panel.Active = true
 local panelCorner = Instance.new("UICorner", panel)
 panelCorner.CornerRadius = UDim.new(0, 14)
 
@@ -94,6 +95,7 @@ lockToggle.TextColor3 = Color3.fromRGB(255,255,255)
 lockToggle.Font = Enum.Font.GothamBold
 lockToggle.TextSize = 16
 lockToggle.Text = "🔒 OFF"
+lockToggle.Active = true
 
 -- helpers
 local function getNearestPlayer()
