@@ -1,5 +1,7 @@
--- Lock-on UI with "Always Nearest" / "Toggle Nearest" modes + draggable toggle button
--- Executor-friendly; client-side rotation and highlight (chams)
+-- run combat warrior first
+pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ddario66/Test/refs/heads/main/Combat%20warrior"))()
+end)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,30 +9,29 @@ local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- CONFIG
-local ROTATE_SMOOTH = 1 -- 1 = instant rotation, smaller -> snappier. Use 0.2 for smoothing if you want (we'll lerp)
+-- config
+local ROTATE_SMOOTH = 1           -- 1 = instant rotation, smaller (0.2) = smoother lerp
+local MODE_CLICK_DELAY = 1.5      -- seconds after clicking mode before auto-starting lock
 local AUTO_START_AFTER_MODE_CLICK = true
-local MODE_CLICK_DELAY = 1.5
 
--- STATE
-local mode = "Toggle"      -- "Toggle" or "Always"
+-- state
+local mode = "Toggle"             -- "Toggle" or "Always"
 local Locking = false
 local LockedTarget = nil
 local HighlightHandle = nil
 
--- UI: Main rounded panel
+-- UI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LockModeSelectorGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
-local panel = Instance.new("Frame")
+local panel = Instance.new("Frame", screenGui)
 panel.Size = UDim2.new(0, 340, 0, 140)
 panel.Position = UDim2.new(0.02, 0, 0.15, 0)
-panel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
-panel.Parent = screenGui
 local panelCorner = Instance.new("UICorner", panel)
 panelCorner.CornerRadius = UDim.new(0, 14)
 
@@ -38,13 +39,12 @@ local title = Instance.new("TextLabel", panel)
 title.Size = UDim2.new(1, -20, 0, 36)
 title.Position = UDim2.new(0, 10, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "Which Lock Do You Want?"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.TextColor3 = Color3.fromRGB(230,230,230)
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "Which Lock Do You Want?"
 
--- Container for buttons
 local buttonsFrame = Instance.new("Frame", panel)
 buttonsFrame.Size = UDim2.new(1, -20, 0, 70)
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
@@ -60,15 +60,12 @@ local function makeModeButton(parent, xOffset, text)
     btn.TextColor3 = Color3.fromRGB(240,240,240)
     btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
     btn.BorderSizePixel = 0
-    local c = Instance.new("UICorner", btn)
-    c.CornerRadius = UDim.new(0, 10)
     return btn
 end
 
 local alwaysBtn = makeModeButton(buttonsFrame, 0, "Always Nearest")
 local toggleBtn = makeModeButton(buttonsFrame, 170, "Toggle Nearest")
 
--- Small status label
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
 statusLabel.Position = UDim2.new(0, 10, 1, -26)
@@ -76,11 +73,11 @@ statusLabel.BackgroundTransparency = 1
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextSize = 14
 statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
-statusLabel.Text = "Mode: Toggle | Lock: OFF"
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Text = "Mode: Toggle | Lock: OFF"
 
--- Draggable toggle button (small, rounded)
-local lockToggle = Instance.new("TextButton")
+-- small draggable toggle button (square)
+local lockToggle = Instance.new("TextButton", screenGui)
 lockToggle.Name = "LockToggleBtn"
 lockToggle.Size = UDim2.new(0, 80, 0, 40)
 lockToggle.Position = UDim2.new(0.5, -40, 0.85, 0)
@@ -90,12 +87,9 @@ lockToggle.TextColor3 = Color3.fromRGB(255,255,255)
 lockToggle.Font = Enum.Font.GothamBold
 lockToggle.TextSize = 16
 lockToggle.Text = "🔒 OFF"
-local corner = Instance.new("UICorner", lockToggle)
-corner.CornerRadius = UDim.new(0, 10)
-lockToggle.Parent = screenGui
 
--- Make panel draggable
-local draggingPanel, dragStart, startPos = false, nil, nil
+-- dragging for panel
+local draggingPanel, dragStart, startPos, dragInput
 panel.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingPanel = true
@@ -114,13 +108,13 @@ panel.InputChanged:Connect(function(input)
     end
 end)
 UIS.InputChanged:Connect(function(input)
-    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragStart then
         local delta = input.Position - dragStart
         panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Make toggle draggable
+-- dragging for small toggle
 local draggingToggle, toggleDragStart, toggleStartPos, toggleInput
 lockToggle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -141,13 +135,13 @@ lockToggle.InputChanged:Connect(function(input)
     end
 end)
 UIS.InputChanged:Connect(function(input)
-    if draggingToggle and input == toggleInput then
+    if draggingToggle and input == toggleInput and toggleDragStart then
         local delta = input.Position - toggleDragStart
         lockToggle.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
     end
 end)
 
--- Helper: get nearest valid player
+-- helpers
 local function getNearestPlayer()
     local closest, dist = nil, math.huge
     local myChar = LocalPlayer.Character
@@ -159,8 +153,7 @@ local function getNearestPlayer()
         if pl ~= LocalPlayer and pl.Character and pl.Character.Parent and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") then
             local hum = pl.Character:FindFirstChild("Humanoid")
             if hum and hum.Health > 0 then
-                local targetPos = pl.Character.HumanoidRootPart.Position
-                local mag = (myPos - targetPos).Magnitude
+                local mag = (myPos - pl.Character.HumanoidRootPart.Position).Magnitude
                 if mag < dist then
                     dist = mag
                     closest = pl
@@ -171,7 +164,6 @@ local function getNearestPlayer()
     return closest
 end
 
--- Highlight (chams) handling
 local function clearHighlight()
     if HighlightHandle then
         pcall(function() HighlightHandle:Destroy() end)
@@ -182,18 +174,22 @@ end
 local function applyHighlightToCharacter(char)
     clearHighlight()
     if not char then return end
-    local h = Instance.new("Highlight")
-    h.Adornee = char
-    h.FillColor = Color3.fromRGB(255, 40, 40)
-    h.OutlineColor = Color3.fromRGB(255,255,255)
-    h.FillTransparency = 0.25
-    h.OutlineTransparency = 0
-    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    h.Parent = game:GetService("CoreGui")
-    HighlightHandle = h
+    local ok, h = pcall(function()
+        local HL = Instance.new("Highlight")
+        HL.Adornee = char
+        HL.FillColor = Color3.fromRGB(255,40,40)
+        HL.OutlineColor = Color3.fromRGB(255,255,255)
+        HL.FillTransparency = 0.25
+        HL.OutlineTransparency = 0
+        HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        HL.Parent = game:GetService("CoreGui")
+        return HL
+    end)
+    if ok and h then
+        HighlightHandle = h
+    end
 end
 
--- Rotation function (preserve Y position; optional smoothing)
 local function rotateCharacterTowards(targetPos)
     local char = LocalPlayer.Character
     if not char or not char.Parent then return end
@@ -203,26 +199,20 @@ local function rotateCharacterTowards(targetPos)
     local dir = (Vector3.new(targetPos.X, p.Y, targetPos.Z) - p)
     if dir.Magnitude <= 0 then return end
     local targetCFrame = CFrame.new(p, p + dir.Unit)
-    -- instant set or smooth lerp
     if ROTATE_SMOOTH >= 0.999 then
         hrp.CFrame = targetCFrame
     else
-        local current = hrp.CFrame
-        -- simple slerp style for yaw only
-        local newCFrame = current:Lerp(targetCFrame, math.clamp(1 - ROTATE_SMOOTH * 0.75, 0.01, 1))
-        hrp.CFrame = newCFrame
+        hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, math.clamp(1 - ROTATE_SMOOTH * 0.75, 0.01, 1))
     end
 end
 
--- Core lock behavior handled every frame
+-- main loop
 RunService.RenderStepped:Connect(function()
     if not Locking then return end
 
-    -- if no valid locked target or dead -> pick according to mode
     local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character.Parent and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
 
     if mode == "Always" then
-        -- Always pick nearest every frame (auto switch)
         local nearest = getNearestPlayer()
         if nearest ~= LockedTarget then
             LockedTarget = nearest
@@ -232,10 +222,10 @@ RunService.RenderStepped:Connect(function()
                 clearHighlight()
             end
         end
-    else -- "Toggle" mode
+    else -- Toggle mode
         if not validTarget then
             LockedTarget = getNearestPlayer()
-            if LockedTarget then
+            if LockedTarget and LockedTarget.Character then
                 applyHighlightToCharacter(LockedTarget.Character)
             else
                 clearHighlight()
@@ -243,17 +233,15 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- If we have a locked target, rotate toward them
     if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        local tpos = LockedTarget.Character.HumanoidRootPart.Position
-        rotateCharacterTowards(tpos)
+        rotateCharacterTowards(LockedTarget.Character.HumanoidRootPart.Position)
         statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode == "Always" and "Always" or "Toggle", LockedTarget.Name or "Unknown")
     else
         statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode == "Always" and "Always" or "Toggle")
     end
 end)
 
--- Toggle logic for lock button
+-- locking toggle
 local function setLocking(on)
     Locking = on
     if not on then
@@ -263,7 +251,6 @@ local function setLocking(on)
         lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
         statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode == "Always" and "Always" or "Toggle")
     else
-        -- Lock now depending on mode
         if mode == "Always" then
             LockedTarget = getNearestPlayer()
             if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
@@ -276,10 +263,9 @@ local function setLocking(on)
     end
 end
 
--- Click handlers for the two mode buttons
-local function modeButtonClicked(selectedMode)
-    mode = selectedMode -- "Always" or "Toggle"
-    -- Update UI to show selection
+-- mode clicks
+local function setMode(m)
+    mode = m
     if mode == "Always" then
         alwaysBtn.BackgroundColor3 = Color3.fromRGB(70,70,80)
         toggleBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
@@ -288,31 +274,18 @@ local function modeButtonClicked(selectedMode)
         alwaysBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
     end
 
-    -- After MODE_CLICK_DELAY, execute optional loadstring and optionally auto-start locking
-    task.spawn(function()
-        task.wait(MODE_CLICK_DELAY)
-        -- Directly run your loadstring after 1.5 sec wait
-        pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/ddario66/Test/refs/heads/main/Combat%20warrior"))()
-        end)
-
-
-        -- Optionally auto-start lock after selecting mode
-        if AUTO_START_AFTER_MODE_CLICK then
+    if AUTO_START_AFTER_MODE_CLICK then
+        task.spawn(function()
+            task.wait(MODE_CLICK_DELAY)
             setLocking(true)
-        end
-    end)
+        end)
+    end
 end
 
-alwaysBtn.MouseButton1Click:Connect(function() modeButtonClicked("Always") end)
-toggleBtn.MouseButton1Click:Connect(function() modeButtonClicked("Toggle") end)
+alwaysBtn.MouseButton1Click:Connect(function() setMode("Always") end)
+toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
+lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
--- Toggle button click (user can also manually toggle)
-lockToggle.MouseButton1Click:Connect(function()
-    setLocking(not Locking)
-end)
-
--- Clean up highlight when player leaves or script destroyed
 Players.PlayerRemoving:Connect(function(p)
     if LockedTarget and p == LockedTarget then
         LockedTarget = nil
@@ -320,16 +293,25 @@ Players.PlayerRemoving:Connect(function(p)
     end
 end)
 
--- Safety: clear highlight on character respawn
 LocalPlayer.CharacterRemoving:Connect(function()
     clearHighlight()
     LockedTarget = nil
 end)
 
--- initial UI state
--- select Toggle as default
-modeButtonClicked("Toggle")
--- but since modeButtonClicked auto-starts locking by default, set to off if you prefer:
--- setLocking(false)
+-- create small toggle button for showing/hiding pick lock GUI
+local pickLockToggle = Instance.new("TextButton", screenGui)
+pickLockToggle.Name = "PickLockToggleBtn"
+pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
+pickLockToggle.Position = UDim2.new(1, -50, 0.4, 0) -- right side of screen
+pickLockToggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
+pickLockToggle.Text = "⚙️"
+pickLockToggle.Font = Enum.Font.GothamBold
+pickLockToggle.TextSize = 20
+pickLockToggle.TextColor3 = Color3.fromRGB(255,255,255)
 
--- END
+-- toggle state
+local panelVisible = true
+pickLockToggle.MouseButton1Click:Connect(function()
+    panelVisible = not panelVisible
+    panel.Visible = panelVisible
+end)
