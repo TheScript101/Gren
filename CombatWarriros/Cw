@@ -31,7 +31,7 @@ screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
 panel.Size = UDim2.new(0, 500, 0, 180) -- enlarged
-panel.Position = UDim2.new(0.0199999996, 177, 0.150000006, 35)
+panel.Position = UDim2.new(0.0199999996, 169, 0.150000006, 92)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
 panel.Active = true
@@ -88,7 +88,7 @@ statusLabel.Text = "Mode: Toggle | Lock: OFF"
 local lockToggle = Instance.new("TextButton", screenGui)
 lockToggle.Name = "LockToggleBtn"
 lockToggle.Size = UDim2.new(0, 80, 0, 40)
-lockToggle.Position = UDim2.new(0.5, 6, 0.850000024, -295)
+lockToggle.Position = UDim2.new(0.5, 163, 0.850000024, -339)
 lockToggle.AnchorPoint = Vector2.new(0.5, 0)
 lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
 lockToggle.TextColor3 = Color3.fromRGB(255,255,255)
