@@ -8,17 +8,19 @@ local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
 
 -- config
-local ROTATE_SMOOTH = 1           -- 1 = instant rotation, smaller (0.2) = smoother lerp
-local MODE_CLICK_DELAY = 1.5      -- seconds after clicking mode before auto-starting lock
+local ROTATE_SMOOTH = 1           
+local MODE_CLICK_DELAY = 1.5      
 local AUTO_START_AFTER_MODE_CLICK = true
 
 -- state
-local mode = "Toggle"             -- "Toggle" or "Always"
+local mode = "Toggle"             
 local Locking = false
 local LockedTarget = nil
 local HighlightHandle = nil
+local camLockEnabled = false -- new flag
 
 -- UI
 local screenGui = Instance.new("ScreenGui")
@@ -28,7 +30,7 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
-panel.Size = UDim2.new(0, 340, 0, 140)
+panel.Size = UDim2.new(0, 500, 0, 180) -- enlarged
 panel.Position = UDim2.new(0.02, 0, 0.15, 0)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
@@ -46,14 +48,14 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "Which Lock Do You Want?"
 
 local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 70)
+buttonsFrame.Size = UDim2.new(1, -20, 0, 100)
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
 buttonsFrame.BackgroundTransparency = 1
 
-local function makeModeButton(parent, xOffset, text)
+local function makeModeButton(parent, xOffset, yOffset, text)
     local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(0, 150, 0, 60)
-    btn.Position = UDim2.new(0, xOffset, 0, 0)
+    btn.Size = UDim2.new(0, 230, 0, 40)
+    btn.Position = UDim2.new(0, xOffset, 0, yOffset)
     btn.Text = text
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 16
@@ -63,8 +65,13 @@ local function makeModeButton(parent, xOffset, text)
     return btn
 end
 
-local alwaysBtn = makeModeButton(buttonsFrame, 0, "Always Nearest")
-local toggleBtn = makeModeButton(buttonsFrame, 170, "Toggle Nearest")
+-- original 2 buttons
+local alwaysBtn = makeModeButton(buttonsFrame, 0, 0, "Always Nearest")
+local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
+
+-- new camlock buttons
+local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
+local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
 
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -76,7 +83,7 @@ statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Text = "Mode: Toggle | Lock: OFF"
 
--- small draggable toggle button (square)
+-- toggle button (draggable)
 local lockToggle = Instance.new("TextButton", screenGui)
 lockToggle.Name = "LockToggleBtn"
 lockToggle.Size = UDim2.new(0, 80, 0, 40)
@@ -88,76 +95,19 @@ lockToggle.Font = Enum.Font.GothamBold
 lockToggle.TextSize = 16
 lockToggle.Text = "🔒 OFF"
 
--- dragging for panel
-local draggingPanel, dragStart, startPos, dragInput
-panel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingPanel = true
-        dragStart = input.Position
-        startPos = panel.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingPanel = false
-            end
-        end)
-    end
-end)
-panel.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragStart then
-        local delta = input.Position - dragStart
-        panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- dragging for small toggle
-local draggingToggle, toggleDragStart, toggleStartPos, toggleInput
-lockToggle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingToggle = true
-        toggleDragStart = input.Position
-        toggleStartPos = lockToggle.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingToggle = false
-                toggleInput = nil
-            end
-        end)
-    end
-end)
-lockToggle.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        toggleInput = input
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if draggingToggle and input == toggleInput and toggleDragStart then
-        local delta = input.Position - toggleDragStart
-        lockToggle.Position = UDim2.new(toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X, toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y)
-    end
-end)
-
 -- helpers
 local function getNearestPlayer()
     local closest, dist = nil, math.huge
     local myChar = LocalPlayer.Character
-    if not myChar or not myChar.Parent then return nil end
+    if not myChar then return nil end
     local myHRP = myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return nil end
-    local myPos = myHRP.Position
     for _, pl in ipairs(Players:GetPlayers()) do
-        if pl ~= LocalPlayer and pl.Character and pl.Character.Parent and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") then
-            local hum = pl.Character:FindFirstChild("Humanoid")
-            if hum and hum.Health > 0 then
-                local mag = (myPos - pl.Character.HumanoidRootPart.Position).Magnitude
-                if mag < dist then
-                    dist = mag
-                    closest = pl
-                end
+        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
+            local mag = (myHRP.Position - pl.Character.HumanoidRootPart.Position).Magnitude
+            if mag < dist then
+                dist = mag
+                closest = pl
             end
         end
     end
@@ -174,35 +124,25 @@ end
 local function applyHighlightToCharacter(char)
     clearHighlight()
     if not char then return end
-    local ok, h = pcall(function()
-        local HL = Instance.new("Highlight")
-        HL.Adornee = char
-        HL.FillColor = Color3.fromRGB(255,40,40)
-        HL.OutlineColor = Color3.fromRGB(255,255,255)
-        HL.FillTransparency = 0.25
-        HL.OutlineTransparency = 0
-        HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        HL.Parent = game:GetService("CoreGui")
-        return HL
-    end)
-    if ok and h then
-        HighlightHandle = h
-    end
+    local HL = Instance.new("Highlight")
+    HL.Adornee = char
+    HL.FillColor = Color3.fromRGB(255,40,40)
+    HL.OutlineColor = Color3.fromRGB(255,255,255)
+    HL.FillTransparency = 0.25
+    HL.OutlineTransparency = 0
+    HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    HL.Parent = game:GetService("CoreGui")
+    HighlightHandle = HL
 end
 
-local function rotateCharacterTowards(targetPos)
+local function rotateTowards(pos)
     local char = LocalPlayer.Character
-    if not char or not char.Parent then return end
+    if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local p = hrp.Position
-    local dir = (Vector3.new(targetPos.X, p.Y, targetPos.Z) - p)
-    if dir.Magnitude <= 0 then return end
-    local targetCFrame = CFrame.new(p, p + dir.Unit)
-    if ROTATE_SMOOTH >= 0.999 then
-        hrp.CFrame = targetCFrame
-    else
-        hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, math.clamp(1 - ROTATE_SMOOTH * 0.75, 0.01, 1))
+    local dir = (Vector3.new(pos.X, hrp.Position.Y, pos.Z) - hrp.Position)
+    if dir.Magnitude > 0 then
+        hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + dir.Unit)
     end
 end
 
@@ -210,38 +150,34 @@ end
 RunService.RenderStepped:Connect(function()
     if not Locking then return end
 
-    local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character.Parent and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
+    local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
 
-    if mode == "Always" then
+    if mode == "Always" or mode == "AlwaysCam" then
         local nearest = getNearestPlayer()
         if nearest ~= LockedTarget then
             LockedTarget = nearest
-            if LockedTarget and LockedTarget.Character then
-                applyHighlightToCharacter(LockedTarget.Character)
-            else
-                clearHighlight()
-            end
+            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
         end
-    else -- Toggle mode
+    elseif mode == "Toggle" or mode == "ToggleCam" then
         if not validTarget then
             LockedTarget = getNearestPlayer()
-            if LockedTarget and LockedTarget.Character then
-                applyHighlightToCharacter(LockedTarget.Character)
-            else
-                clearHighlight()
-            end
+            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
         end
     end
 
     if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        rotateCharacterTowards(LockedTarget.Character.HumanoidRootPart.Position)
-        statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode == "Always" and "Always" or "Toggle", LockedTarget.Name or "Unknown")
+        local hrpPos = LockedTarget.Character.HumanoidRootPart.Position
+        rotateTowards(hrpPos)
+        if camLockEnabled then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, hrpPos)
+        end
+        statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name or "Unknown")
     else
-        statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode == "Always" and "Always" or "Toggle")
+        statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode)
     end
 end)
 
--- locking toggle
+-- lock toggle
 local function setLocking(on)
     Locking = on
     if not on then
@@ -249,67 +185,62 @@ local function setLocking(on)
         clearHighlight()
         lockToggle.Text = "🔒 OFF"
         lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
-        statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode == "Always" and "Always" or "Toggle")
-    else
-        if mode == "Always" then
-            LockedTarget = getNearestPlayer()
-            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
-        else
-            LockedTarget = getNearestPlayer()
-            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
+        statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode)
+
+        -- reset camera when unlocking
+        local cam = workspace.CurrentCamera
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            cam.CameraSubject = hum
+            cam.CameraType = Enum.CameraType.Custom
         end
+    else
+        LockedTarget = getNearestPlayer()
+        if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
         lockToggle.Text = "🔒 ON"
         lockToggle.BackgroundColor3 = Color3.fromRGB(160,30,30)
     end
 end
 
--- mode clicks
+-- mode handlers
 local function setMode(m)
     mode = m
-    if mode == "Always" then
-        alwaysBtn.BackgroundColor3 = Color3.fromRGB(70,70,80)
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(70,70,80)
-        alwaysBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    end
+    camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam")
+
+    alwaysBtn.BackgroundColor3 = (m == "Always") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleBtn.BackgroundColor3 = (m == "Toggle") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    alwaysCamBtn.BackgroundColor3 = (m == "AlwaysCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleCamBtn.BackgroundColor3 = (m == "ToggleCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
 
     if AUTO_START_AFTER_MODE_CLICK then
-        task.spawn(function()
-            task.wait(MODE_CLICK_DELAY)
+        task.delay(MODE_CLICK_DELAY, function()
             setLocking(true)
         end)
     end
 end
 
+-- connect buttons
 alwaysBtn.MouseButton1Click:Connect(function() setMode("Always") end)
 toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
+alwaysCamBtn.MouseButton1Click:Connect(function() setMode("AlwaysCam") end)
+toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
 lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
-Players.PlayerRemoving:Connect(function(p)
-    if LockedTarget and p == LockedTarget then
-        LockedTarget = nil
-        clearHighlight()
-    end
-end)
+-- cleanup
+Players.PlayerRemoving:Connect(function(p) if LockedTarget == p then LockedTarget = nil clearHighlight() end end)
+LocalPlayer.CharacterRemoving:Connect(function() clearHighlight() LockedTarget = nil end)
 
-LocalPlayer.CharacterRemoving:Connect(function()
-    clearHighlight()
-    LockedTarget = nil
-end)
-
--- create small toggle button for showing/hiding pick lock GUI
+-- toggle show/hide panel
 local pickLockToggle = Instance.new("TextButton", screenGui)
 pickLockToggle.Name = "PickLockToggleBtn"
 pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
-pickLockToggle.Position = UDim2.new(1, -50, 0.4, 0) -- right side of screen
+pickLockToggle.Position = UDim2.new(1, -50, 0.4, 0)
 pickLockToggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
 pickLockToggle.Text = "⚙️"
 pickLockToggle.Font = Enum.Font.GothamBold
 pickLockToggle.TextSize = 20
 pickLockToggle.TextColor3 = Color3.fromRGB(255,255,255)
 
--- toggle state
 local panelVisible = true
 pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
