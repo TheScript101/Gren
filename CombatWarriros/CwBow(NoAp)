@@ -538,7 +538,7 @@ end)
 
 
 wait(6.7)
-_G.HeadSize = Vector3.new(2.3, 4, 2.5) -- Adjust this value as needed
+_G.HeadSize = Vector3.new(1.53, 4, 1.69) -- Adjust this value as needed
 _G.HumanoidRootPartSize = Vector3.new(5, 5, 5) -- Adjust this value as needed
 _G.Disabled = false
 
