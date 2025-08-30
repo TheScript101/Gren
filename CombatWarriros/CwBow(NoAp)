@@ -20,7 +20,7 @@ local LockedTarget = nil
 local HighlightHandle = nil
 local camLockEnabled = false -- existing: instant camera snap
 local camSmoothMode = false  -- NEW: smooth camera orientation mode
-local wallCheckEnabled = false -- NEW: wall check toggle
+local aimHeadEnabled = false -- REPLACED: was wallCheckEnabled
 
 -- UI
 local screenGui = Instance.new("ScreenGui")
@@ -30,7 +30,7 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
-panel.Size = UDim2.new(0, 500, 0, 230) -- enlarged height to fit WallCheck button
+panel.Size = UDim2.new(0, 500, 0, 230) -- same as before
 panel.Position = UDim2.new(0.0199999996, 169, 0.150000006, 92)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
@@ -49,7 +49,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "Which Lock Do You Want?"
 
 local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 200) -- increased height again
+buttonsFrame.Size = UDim2.new(1, -20, 0, 200) -- same as before
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
 buttonsFrame.BackgroundTransparency = 1
 
@@ -77,8 +77,8 @@ local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
 -- NEW: Always Smooth button
 local alwaysSmoothBtn = makeModeButton(buttonsFrame, 0, 100, "Always Smooth")
 
--- NEW: WallCheck toggle button
-local wallCheckBtn = makeModeButton(buttonsFrame, 240, 100, "WallCheck: OFF")
+-- NEW: AimHead toggle button (replaces WallCheck button)
+local aimHeadBtn = makeModeButton(buttonsFrame, 240, 100, "AimHead: OFF")
 
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -103,22 +103,7 @@ lockToggle.TextSize = 16
 lockToggle.Text = "🔒 OFF"
 lockToggle.Active = true
 
--- helpers
-local function isVisible(targetHRP)
-    local myChar = LocalPlayer.Character
-    if not myChar then return false end
-    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return false end
-
-    local origin = myHRP.Position
-    local direction = (targetHRP.Position - origin)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    params.FilterDescendantsInstances = {myChar, targetHRP.Parent}
-
-    local result = workspace:Raycast(origin, direction, params)
-    return result == nil
-end
+-- helpers (wall-check removed entirely)
 
 local function getNearestPlayer()
     local closest, dist = nil, math.huge
@@ -130,15 +115,8 @@ local function getNearestPlayer()
         if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
             local mag = (myHRP.Position - pl.Character.HumanoidRootPart.Position).Magnitude
             if mag < dist then
-                if wallCheckEnabled then
-                    if isVisible(pl.Character.HumanoidRootPart) then
-                        dist = mag
-                        closest = pl
-                    end
-                else
-                    dist = mag
-                    closest = pl
-                end
+                dist = mag
+                closest = pl
             end
         end
     end
@@ -196,21 +174,29 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
 
-    if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        local hrpPos = LockedTarget.Character.HumanoidRootPart.Position
-        rotateTowards(hrpPos)
-
-        -- SMOOTH CAMERA BEHAVIOR:
-        if camSmoothMode then
-            local camPos = Camera.CFrame.Position
-            local desired = CFrame.new(camPos, hrpPos)
-            local alpha = math.clamp(CAM_SMOOTHNESS * dt, 0, 1)
-            Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
-        elseif camLockEnabled then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, hrpPos)
+    if LockedTarget and LockedTarget.Character then
+        -- choose target part based on AimHead toggle
+        local targetPart = LockedTarget.Character:FindFirstChild("HumanoidRootPart")
+        if aimHeadEnabled and LockedTarget.Character:FindFirstChild("Head") then
+            targetPart = LockedTarget.Character:FindFirstChild("Head")
         end
 
-        statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name or "Unknown")
+        if targetPart then
+            local targetPos = targetPart.Position
+            rotateTowards(targetPos)
+
+            -- SMOOTH CAMERA BEHAVIOR:
+            if camSmoothMode then
+                local camPos = Camera.CFrame.Position
+                local desired = CFrame.new(camPos, targetPos)
+                local alpha = math.clamp(CAM_SMOOTHNESS * dt, 0, 1)
+                Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
+            elseif camLockEnabled then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+            end
+
+            statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name or "Unknown")
+        end
     else
         statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode)
     end
@@ -267,11 +253,11 @@ toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
 alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end)
 lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
--- NEW: WallCheck button toggle
-wallCheckBtn.MouseButton1Click:Connect(function()
-    wallCheckEnabled = not wallCheckEnabled
-    wallCheckBtn.Text = "WallCheck: " .. (wallCheckEnabled and "ON" or "OFF")
-    wallCheckBtn.BackgroundColor3 = wallCheckEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+-- NEW: AimHead button toggle (replaces WallCheck)
+aimHeadBtn.MouseButton1Click:Connect(function()
+    aimHeadEnabled = not aimHeadEnabled
+    aimHeadBtn.Text = "AimHead: " .. (aimHeadEnabled and "ON" or "OFF")
+    aimHeadBtn.BackgroundColor3 = aimHeadEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
 end)
 
 -- cleanup
@@ -294,6 +280,13 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
 end)
+
+
+
+
+
+
+
 
 
 
@@ -545,85 +538,119 @@ end)
 
 
 wait(6.7)
--- CONFIG
-_G.TorsoSize = Vector3.new(2.3, 4.3, 2.9) -- adjust as needed
-_G.HumanoidRootPartSize = Vector3.new(2.3, 4.3, 2.9) -- adjust as needed
+_G.HeadSize = Vector3.new(2.3, 4, 2.5) -- Adjust this value as needed
+_G.HumanoidRootPartSize = Vector3.new(5, 5, 5) -- Adjust this value as needed
 _G.Disabled = false
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local localPlayer = Players.LocalPlayer
+local localPlayer = game:GetService('Players').LocalPlayer
 
--- Scale Torso + Root
 local function scaleHitbox(character)
     if character then
-        local torso = character:FindFirstChild("Torso")
+        local head = character:FindFirstChild("Head")
         local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 
-        if torso then
-            torso.Size = _G.TorsoSize
-            torso.CanCollide = false
-            torso.Transparency = 0.5
-            torso.BrickColor = BrickColor.new("Really red")
-            torso.Material = "Neon"
+        if head then
+            local mesh = head:FindFirstChildOfClass("SpecialMesh")
+            if mesh then
+                mesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
+            else
+                -- If the head doesn't have a SpecialMesh, create one
+                local newMesh = Instance.new("SpecialMesh", head)
+                newMesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
+            end
+            head.Size = _G.HeadSize
+            head.CanCollide = false -- Disable collision for the head
         end
 
         if humanoidRootPart then
             humanoidRootPart.Size = _G.HumanoidRootPartSize
-            humanoidRootPart.CanCollide = false
             humanoidRootPart.Transparency = 0.7
             humanoidRootPart.BrickColor = BrickColor.new("Really blue")
             humanoidRootPart.Material = "Neon"
+            humanoidRootPart.CanCollide = false
         end
     end
 end
 
--- Ensure parts are resized when character loads
 local function resizeParts(character)
-    local torso = character:FindFirstChild("Torso")
+    local head = character:FindFirstChild("Head")
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 
-    if torso then
-        torso.Size = _G.TorsoSize
-        torso.CanCollide = false
+    if not head then
+        -- Create a new head if it doesn't exist
+        local newHead = Instance.new("Part")
+        newHead.Name = "Head"
+        newHead.Size = _G.HeadSize
+        newHead.Parent = character
+    else
+        head.Size = _G.HeadSize
+        head.CanCollide = false -- Disable collision for the head
     end
 
     if humanoidRootPart then
         humanoidRootPart.Size = _G.HumanoidRootPartSize
-        humanoidRootPart.CanCollide = false
     end
 end
 
--- Hook when new character spawns
 local function onCharacterAdded(character)
+    -- Wait for the character to load completely
     character:WaitForChild("Humanoid")
+
+    -- Resize parts
     resizeParts(character)
+
+    -- Connect to Humanoid's Died event to handle respawn
+    character:WaitForChild("Humanoid").Died:Connect(function()
+        -- Wait for the character to respawn
+        character:WaitForChild("Humanoid").Died:Wait()
+
+        -- Resize parts again after respawn
+        resizeParts(character)
+    end)
 end
 
 local function onPlayerAdded(player)
+    -- Check if the player is not the local player
     if player ~= localPlayer then
+        -- Connect to the CharacterAdded event
         player.CharacterAdded:Connect(onCharacterAdded)
+
+        -- Apply resizing if the character already exists
         if player.Character then
             onCharacterAdded(player.Character)
         end
     end
 end
 
--- Connect existing + future players
-Players.PlayerAdded:Connect(onPlayerAdded)
-for _, plr in ipairs(Players:GetPlayers()) do
-    onPlayerAdded(plr)
+-- Connect to the PlayerAdded event to handle players joining the game
+game:GetService('Players').PlayerAdded:Connect(onPlayerAdded)
+
+-- Apply resizing to all current players
+for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+    onPlayerAdded(player)
 end
 
--- Keep resizing continuously
-RunService.RenderStepped:Connect(function()
+-- Continuous loop to ensure hitboxes remain scaled
+game:GetService('RunService').RenderStepped:Connect(function()
     if not _G.Disabled then
-        for _, player in pairs(Players:GetPlayers()) do
+        for _, player in pairs(game:GetService('Players'):GetPlayers()) do
             if player ~= localPlayer then
-                pcall(function()
+                pcall(function() 
                     scaleHitbox(player.Character)
+                    -- Ensure head size is maintained
+                    if player.Character and player.Character:FindFirstChild("Head") then
+                        player.Character.Head.Size = _G.HeadSize
+                        player.Character.Head.CanCollide = false -- Disable collision for the head
+                    end
                 end)
             end
         end
     end
 end)
+
+-- Disable collision with the local player's character
+localPlayer.CharacterAdded:Connect(disableCollision)
+
+if localPlayer.Character then
+    disableCollision(localPlayer.Character)
+end
