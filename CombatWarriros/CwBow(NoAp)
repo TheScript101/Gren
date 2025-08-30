@@ -1,0 +1,495 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+-- config
+local ROTATE_SMOOTH = 1           
+local MODE_CLICK_DELAY = 1.5      
+local AUTO_START_AFTER_MODE_CLICK = true
+
+-- smoothing config for camera lerp (higher = faster response)
+local CAM_SMOOTHNESS = 3.5-- you can tweak this (6 is "a bit fast" feel)
+
+-- state
+local mode = "Toggle"             
+local Locking = false
+local LockedTarget = nil
+local HighlightHandle = nil
+local camLockEnabled = false -- existing: instant camera snap
+local camSmoothMode = false  -- NEW: smooth camera orientation mode
+
+-- UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LockModeSelectorGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = PlayerGui
+
+local panel = Instance.new("Frame", screenGui)
+panel.Size = UDim2.new(0, 500, 0, 230) -- enlarged to fit extra button
+panel.Position = UDim2.new(0.0199999996, 169, 0.150000006, 92)
+panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
+panel.BorderSizePixel = 0
+panel.Active = true
+local panelCorner = Instance.new("UICorner", panel)
+panelCorner.CornerRadius = UDim.new(0, 14)
+
+local title = Instance.new("TextLabel", panel)
+title.Size = UDim2.new(1, -20, 0, 36)
+title.Position = UDim2.new(0, 10, 0, 10)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(230,230,230)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "Which Lock Do You Want?"
+
+local buttonsFrame = Instance.new("Frame", panel)
+buttonsFrame.Size = UDim2.new(1, -20, 0, 150) -- increased height
+buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
+buttonsFrame.BackgroundTransparency = 1
+
+local function makeModeButton(parent, xOffset, yOffset, text)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0, 230, 0, 40)
+    btn.Position = UDim2.new(0, xOffset, 0, yOffset)
+    btn.Text = text
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 16
+    btn.TextColor3 = Color3.fromRGB(240,240,240)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+    btn.BorderSizePixel = 0
+    return btn
+end
+
+-- original 2 buttons
+local alwaysBtn = makeModeButton(buttonsFrame, 0, 0, "Always Nearest")
+local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
+
+-- new camlock buttons
+local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
+local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
+
+-- NEW: Always Smooth button (placed below left column)
+local alwaysSmoothBtn = makeModeButton(buttonsFrame, 0, 100, "Always Smooth")
+
+local statusLabel = Instance.new("TextLabel", panel)
+statusLabel.Size = UDim2.new(1, -20, 0, 18)
+statusLabel.Position = UDim2.new(0, 10, 1, -26)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Text = "Mode: Toggle | Lock: OFF"
+
+-- toggle button (draggable)
+local lockToggle = Instance.new("TextButton", screenGui)
+lockToggle.Name = "LockToggleBtn"
+lockToggle.Size = UDim2.new(0, 80, 0, 40)
+lockToggle.Position = UDim2.new(0.5, 163, 0.850000024, -339)
+lockToggle.AnchorPoint = Vector2.new(0.5, 0)
+lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+lockToggle.TextColor3 = Color3.fromRGB(255,255,255)
+lockToggle.Font = Enum.Font.GothamBold
+lockToggle.TextSize = 16
+lockToggle.Text = "🔒 OFF"
+lockToggle.Active = true
+
+-- helpers
+local function getNearestPlayer()
+    local closest, dist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    if not myChar then return nil end
+    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
+            local mag = (myHRP.Position - pl.Character.HumanoidRootPart.Position).Magnitude
+            if mag < dist then
+                dist = mag
+                closest = pl
+            end
+        end
+    end
+    return closest
+end
+
+local function clearHighlight()
+    if HighlightHandle then
+        pcall(function() HighlightHandle:Destroy() end)
+        HighlightHandle = nil
+    end
+end
+
+local function applyHighlightToCharacter(char)
+    clearHighlight()
+    if not char then return end
+    local HL = Instance.new("Highlight")
+    HL.Adornee = char
+    HL.FillColor = Color3.fromRGB(255,40,40)
+    HL.OutlineColor = Color3.fromRGB(255,255,255)
+    HL.FillTransparency = 0.25
+    HL.OutlineTransparency = 0
+    HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    HL.Parent = game:GetService("CoreGui")
+    HighlightHandle = HL
+end
+
+local function rotateTowards(pos)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local dir = (Vector3.new(pos.X, hrp.Position.Y, pos.Z) - hrp.Position)
+    if dir.Magnitude > 0 then
+        hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + dir.Unit)
+    end
+end
+
+-- main loop (dt used for smoothing)
+RunService.RenderStepped:Connect(function(dt)
+    if not Locking then return end
+
+    local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
+
+    if mode == "Always" or mode == "AlwaysCam" or mode == "AlwaysSmooth" then
+        local nearest = getNearestPlayer()
+        if nearest ~= LockedTarget then
+            LockedTarget = nearest
+            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
+        end
+    elseif mode == "Toggle" or mode == "ToggleCam" then
+        if not validTarget then
+            LockedTarget = getNearestPlayer()
+            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
+        end
+    end
+
+    if LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("HumanoidRootPart") then
+        local hrpPos = LockedTarget.Character.HumanoidRootPart.Position
+        rotateTowards(hrpPos)
+
+        -- SMOOTH CAMERA BEHAVIOR:
+        if camSmoothMode then
+            -- keep camera position, smoothly rotate to look at target
+            local camPos = Camera.CFrame.Position
+            local desired = CFrame.new(camPos, hrpPos)
+            local alpha = math.clamp(CAM_SMOOTHNESS * dt, 0, 1)
+            Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
+        elseif camLockEnabled then
+            -- instant snap (existing behavior)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, hrpPos)
+        end
+
+        statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name or "Unknown")
+    else
+        statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode)
+    end
+end)
+
+-- lock toggle
+local function setLocking(on)
+    Locking = on
+    if not on then
+        LockedTarget = nil
+        clearHighlight()
+        lockToggle.Text = "🔒 OFF"
+        lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode)
+
+        -- reset camera when unlocking
+        local cam = workspace.CurrentCamera
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            cam.CameraSubject = hum
+            cam.CameraType = Enum.CameraType.Custom
+        end
+    else
+        LockedTarget = getNearestPlayer()
+        if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
+        lockToggle.Text = "🔒 ON"
+        lockToggle.BackgroundColor3 = Color3.fromRGB(160,30,30)
+    end
+end
+
+-- mode handlers
+local function setMode(m)
+    mode = m
+    camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam")
+    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth") -- supports ToggleSmooth if you add it later
+
+    alwaysBtn.BackgroundColor3 = (m == "Always") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleBtn.BackgroundColor3 = (m == "Toggle") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    alwaysCamBtn.BackgroundColor3 = (m == "AlwaysCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleCamBtn.BackgroundColor3 = (m == "ToggleCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    alwaysSmoothBtn.BackgroundColor3 = (m == "AlwaysSmooth") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+
+    if AUTO_START_AFTER_MODE_CLICK then
+        task.delay(MODE_CLICK_DELAY, function()
+            setLocking(true)
+        end)
+    end
+end
+
+-- connect buttons
+alwaysBtn.MouseButton1Click:Connect(function() setMode("Always") end)
+toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
+alwaysCamBtn.MouseButton1Click:Connect(function() setMode("AlwaysCam") end)
+toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
+alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end)
+lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
+
+-- cleanup
+Players.PlayerRemoving:Connect(function(p) if LockedTarget == p then LockedTarget = nil clearHighlight() end end)
+LocalPlayer.CharacterRemoving:Connect(function() clearHighlight() LockedTarget = nil end)
+
+-- toggle show/hide panel
+local pickLockToggle = Instance.new("TextButton", screenGui)
+pickLockToggle.Name = "PickLockToggleBtn"
+pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
+pickLockToggle.Position = UDim2.new(1, -60, 0.358799934, 0)
+pickLockToggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
+pickLockToggle.Text = "⚙️"
+pickLockToggle.Font = Enum.Font.GothamBold
+pickLockToggle.TextSize = 20
+pickLockToggle.TextColor3 = Color3.fromRGB(255,255,255)
+
+local panelVisible = true
+pickLockToggle.MouseButton1Click:Connect(function()
+    panelVisible = not panelVisible
+    panel.Visible = panelVisible
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+wait(10.67)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Function to create UI elements quickly
+local function create(className, props)
+    local obj = Instance.new(className)
+    for k,v in pairs(props or {}) do
+        obj[k] = v
+    end
+    return obj
+end
+
+-- Create the main ScreenGui
+local screenGui = create("ScreenGui", {
+    Name = "FeatureToggleGui",
+    Parent = PlayerGui,
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Global
+})
+
+-- Create a semi-transparent dark background
+local background = create("Frame", {
+    Parent = screenGui,
+    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+    BackgroundTransparency = 0.15,
+    Size = UDim2.new(1, 0, 1, 0),
+})
+
+-- Center frame for the popup window
+local popup = create("Frame", {
+    Parent = background,
+    Size = UDim2.new(0, 350, 0, 250),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    ClipsDescendants = true,
+})
+-- Rounded corners
+local corner = create("UICorner", {
+    Parent = popup,
+    CornerRadius = UDim.new(0, 15)
+})
+
+-- Title text
+local title = create("TextLabel", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "Do you want to enable the following features?",
+    Font = Enum.Font.Roboto,
+    TextSize = 20,
+    TextColor3 = Color3.fromRGB(230, 230, 230),
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+})
+
+-- Feature list container
+local featuresFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 110),
+    Position = UDim2.new(0, 20, 0, 80),
+    BackgroundTransparency = 1,
+})
+
+local features = {"Anti Lag", "Full Bright", "No Fog", "No Global Shadows"}
+
+for i, feature in ipairs(features) do
+    local featureText = create("TextLabel", {
+        Parent = featuresFrame,
+        Size = UDim2.new(1, 0, 0, 1),
+        Position = UDim2.new(0, 0, 0, (i-1)*28),
+        BackgroundTransparency = 1,
+        Text = "• "..feature,
+        Font = Enum.Font.Roboto,
+        TextSize = 16,
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+    })
+end
+
+-- Buttons container
+local buttonsFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 1, -70),
+    BackgroundTransparency = 1,
+})
+
+-- Helper to create buttons
+local function createButton(text, position)
+    local btn = create("TextButton", {
+        Parent = buttonsFrame,
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+        Text = text,
+        Font = Enum.Font.Roboto,
+        TextSize = 20,
+        TextColor3 = Color3.fromRGB(230, 230, 230),
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+    })
+    create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 12)})
+    return btn
+end
+
+local yesButton = createButton("Yes", UDim2.new(0, 0, 0, 0))
+local noButton = createButton("No", UDim2.new(0.55, 0, 0, 0))
+
+-- Hover effects for buttons
+for _, btn in pairs({yesButton, noButton}) do
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    end)
+end
+
+-- The function to enable all features (the combined script from before)
+local function enableFeatures()
+    -- Terrain water setup
+    local Terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if Terrain then
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterReflectance = 0
+        Terrain.WaterTransparency = 1
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogStart = 9e9
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+
+    settings().Rendering.QualityLevel = 1
+
+-- Remove Atmosphere and disable PostEffects
+for _, v in pairs(Lighting:GetDescendants()) do
+    if v:IsA("Atmosphere") then
+        v:Destroy()
+    elseif v:IsA("PostEffect") then
+        v.Enabled = false
+    end
+end
+
+-- Loop No Fog
+task.spawn(function()
+    while true do
+        Lighting.FogStart = 9e9
+        Lighting.FogEnd = 9e9
+        wait(1)
+    end
+end)
+
+-- Optimize parts, decals, particles, and trails
+for _, v in pairs(game:GetDescendants()) do
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.Plastic
+        v.Reflectance = 0
+        v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+    elseif v:IsA("Decal") then
+        v.Transparency = 1
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+        v.Lifetime = NumberRange.new(0)
+    end
+end
+
+
+    -- Remove effects on spawn for antlag
+    Workspace.DescendantAdded:Connect(function(child)
+        if child:IsA("ForceField") or child:IsA("Sparkles") or child:IsA("Smoke") or child:IsA("Fire") or child:IsA("Beam") then
+            RunService.Heartbeat:Wait()
+            if child and child.Parent then
+                child:Destroy()
+            end
+        end
+    end)
+
+    -- Keep lighting bright every frame
+    local brightLoop
+    if brightLoop then brightLoop:Disconnect() end
+    brightLoop = RunService.RenderStepped:Connect(function()
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 9e9
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    end)
+end
+
+-- Yes button click
+yesButton.MouseButton1Click:Connect(function()
+    enableFeatures()
+    screenGui:Destroy()
+end)
+
+-- No button click
+noButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
