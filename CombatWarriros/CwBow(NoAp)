@@ -11,7 +11,7 @@ local MODE_CLICK_DELAY = 1.5
 local AUTO_START_AFTER_MODE_CLICK = true
 
 -- smoothing config for camera lerp (higher = faster response)
-local CAM_SMOOTHNESS = 3.5-- you can tweak this (6 is "a bit fast" feel)
+local CAM_SMOOTHNESS = 6 -- you can tweak this (6 is "a bit fast" feel)
 
 -- state
 local mode = "Toggle"             
@@ -20,6 +20,7 @@ local LockedTarget = nil
 local HighlightHandle = nil
 local camLockEnabled = false -- existing: instant camera snap
 local camSmoothMode = false  -- NEW: smooth camera orientation mode
+local wallCheckEnabled = false -- NEW: wall check toggle
 
 -- UI
 local screenGui = Instance.new("ScreenGui")
@@ -29,7 +30,7 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
-panel.Size = UDim2.new(0, 500, 0, 230) -- enlarged to fit extra button
+panel.Size = UDim2.new(0, 500, 0, 230) -- enlarged height to fit WallCheck button
 panel.Position = UDim2.new(0.0199999996, 169, 0.150000006, 92)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
@@ -48,7 +49,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "Which Lock Do You Want?"
 
 local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 150) -- increased height
+buttonsFrame.Size = UDim2.new(1, -20, 0, 200) -- increased height again
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
 buttonsFrame.BackgroundTransparency = 1
 
@@ -73,8 +74,11 @@ local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
 local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
 local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
 
--- NEW: Always Smooth button (placed below left column)
+-- NEW: Always Smooth button
 local alwaysSmoothBtn = makeModeButton(buttonsFrame, 0, 100, "Always Smooth")
+
+-- NEW: WallCheck toggle button
+local wallCheckBtn = makeModeButton(buttonsFrame, 240, 100, "WallCheck: OFF")
 
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -100,6 +104,22 @@ lockToggle.Text = "🔒 OFF"
 lockToggle.Active = true
 
 -- helpers
+local function isVisible(targetHRP)
+    local myChar = LocalPlayer.Character
+    if not myChar then return false end
+    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+
+    local origin = myHRP.Position
+    local direction = (targetHRP.Position - origin)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {myChar, targetHRP.Parent}
+
+    local result = workspace:Raycast(origin, direction, params)
+    return result == nil
+end
+
 local function getNearestPlayer()
     local closest, dist = nil, math.huge
     local myChar = LocalPlayer.Character
@@ -110,8 +130,15 @@ local function getNearestPlayer()
         if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
             local mag = (myHRP.Position - pl.Character.HumanoidRootPart.Position).Magnitude
             if mag < dist then
-                dist = mag
-                closest = pl
+                if wallCheckEnabled then
+                    if isVisible(pl.Character.HumanoidRootPart) then
+                        dist = mag
+                        closest = pl
+                    end
+                else
+                    dist = mag
+                    closest = pl
+                end
             end
         end
     end
@@ -175,13 +202,11 @@ RunService.RenderStepped:Connect(function(dt)
 
         -- SMOOTH CAMERA BEHAVIOR:
         if camSmoothMode then
-            -- keep camera position, smoothly rotate to look at target
             local camPos = Camera.CFrame.Position
             local desired = CFrame.new(camPos, hrpPos)
             local alpha = math.clamp(CAM_SMOOTHNESS * dt, 0, 1)
             Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
         elseif camLockEnabled then
-            -- instant snap (existing behavior)
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, hrpPos)
         end
 
@@ -201,7 +226,6 @@ local function setLocking(on)
         lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
         statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode)
 
-        -- reset camera when unlocking
         local cam = workspace.CurrentCamera
         local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then
@@ -220,7 +244,7 @@ end
 local function setMode(m)
     mode = m
     camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam")
-    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth") -- supports ToggleSmooth if you add it later
+    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth")
 
     alwaysBtn.BackgroundColor3 = (m == "Always") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
     toggleBtn.BackgroundColor3 = (m == "Toggle") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
@@ -243,6 +267,13 @@ toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
 alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end)
 lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
+-- NEW: WallCheck button toggle
+wallCheckBtn.MouseButton1Click:Connect(function()
+    wallCheckEnabled = not wallCheckEnabled
+    wallCheckBtn.Text = "WallCheck: " .. (wallCheckEnabled and "ON" or "OFF")
+    wallCheckBtn.BackgroundColor3 = wallCheckEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+end)
+
 -- cleanup
 Players.PlayerRemoving:Connect(function(p) if LockedTarget == p then LockedTarget = nil clearHighlight() end end)
 LocalPlayer.CharacterRemoving:Connect(function() clearHighlight() LockedTarget = nil end)
@@ -263,6 +294,7 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
 end)
+
 
 
 
