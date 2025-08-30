@@ -673,3 +673,379 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
 end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+wait(10.67)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Function to create UI elements quickly
+local function create(className, props)
+    local obj = Instance.new(className)
+    for k,v in pairs(props or {}) do
+        obj[k] = v
+    end
+    return obj
+end
+
+-- Create the main ScreenGui
+local screenGui = create("ScreenGui", {
+    Name = "FeatureToggleGui",
+    Parent = PlayerGui,
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Global
+})
+
+-- Create a semi-transparent dark background
+local background = create("Frame", {
+    Parent = screenGui,
+    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+    BackgroundTransparency = 0.15,
+    Size = UDim2.new(1, 0, 1, 0),
+})
+
+-- Center frame for the popup window
+local popup = create("Frame", {
+    Parent = background,
+    Size = UDim2.new(0, 350, 0, 250),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    ClipsDescendants = true,
+})
+-- Rounded corners
+local corner = create("UICorner", {
+    Parent = popup,
+    CornerRadius = UDim.new(0, 15)
+})
+
+-- Title text
+local title = create("TextLabel", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "Do you want to enable the following features?",
+    Font = Enum.Font.Roboto,
+    TextSize = 20,
+    TextColor3 = Color3.fromRGB(230, 230, 230),
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+})
+
+-- Feature list container
+local featuresFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 110),
+    Position = UDim2.new(0, 20, 0, 80),
+    BackgroundTransparency = 1,
+})
+
+local features = {"Anti Lag", "Full Bright", "No Fog", "No Global Shadows"}
+
+for i, feature in ipairs(features) do
+    local featureText = create("TextLabel", {
+        Parent = featuresFrame,
+        Size = UDim2.new(1, 0, 0, 1),
+        Position = UDim2.new(0, 0, 0, (i-1)*28),
+        BackgroundTransparency = 1,
+        Text = "â€¢ "..feature,
+        Font = Enum.Font.Roboto,
+        TextSize = 16,
+        TextColor3 = Color3.fromRGB(200, 200, 200),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+    })
+end
+
+-- Buttons container
+local buttonsFrame = create("Frame", {
+    Parent = popup,
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 1, -70),
+    BackgroundTransparency = 1,
+})
+
+-- Helper to create buttons
+local function createButton(text, position)
+    local btn = create("TextButton", {
+        Parent = buttonsFrame,
+        Size = UDim2.new(0.45, 0, 1, 0),
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
+        Text = text,
+        Font = Enum.Font.Roboto,
+        TextSize = 20,
+        TextColor3 = Color3.fromRGB(230, 230, 230),
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+    })
+    create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 12)})
+    return btn
+end
+
+local yesButton = createButton("Yes", UDim2.new(0, 0, 0, 0))
+local noButton = createButton("No", UDim2.new(0.55, 0, 0, 0))
+
+-- Hover effects for buttons
+for _, btn in pairs({yesButton, noButton}) do
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    end)
+end
+
+-- The function to enable all features (the combined script from before)
+local function enableFeatures()
+    -- Terrain water setup
+    local Terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if Terrain then
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterReflectance = 0
+        Terrain.WaterTransparency = 1
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogStart = 9e9
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+
+    settings().Rendering.QualityLevel = 1
+
+-- Remove Atmosphere and disable PostEffects
+for _, v in pairs(Lighting:GetDescendants()) do
+    if v:IsA("Atmosphere") then
+        v:Destroy()
+    elseif v:IsA("PostEffect") then
+        v.Enabled = false
+    end
+end
+
+-- Loop No Fog
+task.spawn(function()
+    while true do
+        Lighting.FogStart = 9e9
+        Lighting.FogEnd = 9e9
+        wait(1)
+    end
+end)
+
+-- Optimize parts, decals, particles, and trails
+for _, v in pairs(game:GetDescendants()) do
+    if v:IsA("BasePart") then
+        v.Material = Enum.Material.Plastic
+        v.Reflectance = 0
+        v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
+        v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+    elseif v:IsA("Decal") then
+        v.Transparency = 1
+    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+        v.Lifetime = NumberRange.new(0)
+    end
+end
+
+
+    -- Remove effects on spawn for antlag
+    Workspace.DescendantAdded:Connect(function(child)
+        if child:IsA("ForceField") or child:IsA("Sparkles") or child:IsA("Smoke") or child:IsA("Fire") or child:IsA("Beam") then
+            RunService.Heartbeat:Wait()
+            if child and child.Parent then
+                child:Destroy()
+            end
+        end
+    end)
+
+    -- Keep lighting bright every frame
+    local brightLoop
+    if brightLoop then brightLoop:Disconnect() end
+    brightLoop = RunService.RenderStepped:Connect(function()
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 9e9
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    end)
+end
+
+-- Yes button click
+yesButton.MouseButton1Click:Connect(function()
+    enableFeatures()
+    screenGui:Destroy()
+end)
+
+-- No button click
+noButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+wait(6.7)
+_G.HeadSize = Vector3.new(2, 4, 2) -- Adjust this value as needed
+_G.HumanoidRootPartSize = Vector3.new(0.5, 2.5, 1) -- Adjust this value as needed
+_G.Disabled = false
+
+local localPlayer = game:GetService('Players').LocalPlayer
+
+local function scaleHitbox(character)
+    if character then
+        local head = character:FindFirstChild("Head")
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+
+        if head then
+            local mesh = head:FindFirstChildOfClass("SpecialMesh")
+            if mesh then
+                mesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
+            else
+                -- If the head doesn't have a SpecialMesh, create one
+                local newMesh = Instance.new("SpecialMesh", head)
+                newMesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
+            end
+            head.Size = _G.HeadSize
+            head.CanCollide = false -- Disable collision for the head
+        end
+
+        if humanoidRootPart then
+            humanoidRootPart.Size = _G.HumanoidRootPartSize
+            humanoidRootPart.Transparency = 0.7
+            humanoidRootPart.BrickColor = BrickColor.new("Really blue")
+            humanoidRootPart.Material = "Neon"
+            humanoidRootPart.CanCollide = false
+        end
+    end
+end
+
+local function resizeParts(character)
+    local head = character:FindFirstChild("Head")
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+
+    if not head then
+        -- Create a new head if it doesn't exist
+        local newHead = Instance.new("Part")
+        newHead.Name = "Head"
+        newHead.Size = _G.HeadSize
+        newHead.Parent = character
+    else
+        head.Size = _G.HeadSize
+        head.CanCollide = false -- Disable collision for the head
+    end
+
+    if humanoidRootPart then
+        humanoidRootPart.Size = _G.HumanoidRootPartSize
+    end
+end
+
+local function onCharacterAdded(character)
+    -- Wait for the character to load completely
+    character:WaitForChild("Humanoid")
+
+    -- Resize parts
+    resizeParts(character)
+
+    -- Connect to Humanoid's Died event to handle respawn
+    character:WaitForChild("Humanoid").Died:Connect(function()
+        -- Wait for the character to respawn
+        character:WaitForChild("Humanoid").Died:Wait()
+
+        -- Resize parts again after respawn
+        resizeParts(character)
+    end)
+end
+
+local function onPlayerAdded(player)
+    -- Check if the player is not the local player
+    if player ~= localPlayer then
+        -- Connect to the CharacterAdded event
+        player.CharacterAdded:Connect(onCharacterAdded)
+
+        -- Apply resizing if the character already exists
+        if player.Character then
+            onCharacterAdded(player.Character)
+        end
+    end
+end
+
+-- Connect to the PlayerAdded event to handle players joining the game
+game:GetService('Players').PlayerAdded:Connect(onPlayerAdded)
+
+-- Apply resizing to all current players
+for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+    onPlayerAdded(player)
+end
+
+-- Continuous loop to ensure hitboxes remain scaled
+game:GetService('RunService').RenderStepped:Connect(function()
+    if not _G.Disabled then
+        for _, player in pairs(game:GetService('Players'):GetPlayers()) do
+            if player ~= localPlayer then
+                pcall(function() 
+                    scaleHitbox(player.Character)
+                    -- Ensure head size is maintained
+                    if player.Character and player.Character:FindFirstChild("Head") then
+                        player.Character.Head.Size = _G.HeadSize
+                        player.Character.Head.CanCollide = false -- Disable collision for the head
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- Disable collision with the local player's character
+localPlayer.CharacterAdded:Connect(disableCollision)
+
+if localPlayer.Character then
+    disableCollision(localPlayer.Character)
+end
