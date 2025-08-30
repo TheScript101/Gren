@@ -11,7 +11,7 @@ local MODE_CLICK_DELAY = 1.5
 local AUTO_START_AFTER_MODE_CLICK = true
 
 -- smoothing config for camera lerp (higher = faster response)
-local CAM_SMOOTHNESS = 6 -- you can tweak this (6 is "a bit fast" feel)
+local CAM_SMOOTHNESS = 3.5 -- you can tweak this (6 is "a bit fast" feel)
 
 -- state
 local mode = "Toggle"             
