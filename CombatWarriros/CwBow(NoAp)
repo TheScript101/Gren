@@ -19,8 +19,9 @@ local Locking = false
 local LockedTarget = nil
 local HighlightHandle = nil
 local camLockEnabled = false -- existing: instant camera snap
-local camSmoothMode = false  -- NEW: smooth camera orientation mode
-local aimHeadEnabled = false -- REPLACED: was wallCheckEnabled
+local camSmoothMode = false  -- existing: smooth camera orientation mode
+local aimHeadEnabled = false -- existing: aim head toggle (replaced old wall-check)
+local smoothSwitching = false -- NEW: active while Smooth CamLock is transitioning
 
 -- UI
 local screenGui = Instance.new("ScreenGui")
@@ -30,8 +31,8 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
-panel.Size = UDim2.new(0, 500, 0, 230) -- same as before
-panel.Position = UDim2.new(0.0199999996, 169, 0.150000006, 92)
+panel.Size = UDim2.new(0, 500, 0, 280) -- ENLARGED slightly to fit new button
+panel.Position = UDim2.new(0.0199999996, 169, 0.050000006, 92)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
 panel.Active = true
@@ -49,7 +50,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "Which Lock Do You Want?"
 
 local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 200) -- same as before
+buttonsFrame.Size = UDim2.new(1, -20, 0, 250) -- ENLARGED height to allow one more row
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
 buttonsFrame.BackgroundTransparency = 1
 
@@ -70,15 +71,18 @@ end
 local alwaysBtn = makeModeButton(buttonsFrame, 0, 0, "Always Nearest")
 local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
 
--- new camlock buttons
+-- camlock buttons
 local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
 local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
 
--- NEW: Always Smooth button
+-- Always Smooth button
 local alwaysSmoothBtn = makeModeButton(buttonsFrame, 0, 100, "Always Smooth")
 
--- NEW: AimHead toggle button (replaces WallCheck button)
+-- AimHead toggle button
 local aimHeadBtn = makeModeButton(buttonsFrame, 240, 100, "AimHead: OFF")
+
+-- NEW: Smooth CamLock button (new 4th row)
+local smoothCamBtn = makeModeButton(buttonsFrame, 0, 150, "Smooth CamLock")
 
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -103,7 +107,7 @@ lockToggle.TextSize = 16
 lockToggle.Text = "🔒 OFF"
 lockToggle.Active = true
 
--- helpers (wall-check removed entirely)
+-- helpers (no wall-check anywhere)
 
 local function getNearestPlayer()
     local closest, dist = nil, math.huge
@@ -155,17 +159,79 @@ local function rotateTowards(pos)
     end
 end
 
+-- NEW: smooth switch (used only by Smooth CamLock)
+local function smoothSwitchTo(player)
+    if not player or not player.Character then return end
+    local targetPart = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
+    if not targetPart then return end
+
+    smoothSwitching = true
+    local duration = 0.85
+    local elapsed = 0
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    -- temporarily disable snap so we control the transition
+    local prevCamLock = camLockEnabled
+    camLockEnabled = false
+
+    while elapsed < duration do
+        if LockedTarget ~= player then break end
+        local dt = RunService.RenderStepped:Wait()
+        elapsed += dt
+
+        if not hrp or not hrp.Parent then
+            char = LocalPlayer.Character
+            hrp = char and char:FindFirstChild("HumanoidRootPart")
+        end
+
+        local tpos = targetPart.Position
+        -- smooth character turn
+        if hrp then
+            local lookDir = (Vector3.new(tpos.X, hrp.Position.Y, tpos.Z) - hrp.Position).Unit
+            local desired = CFrame.new(hrp.Position, hrp.Position + lookDir)
+            hrp.CFrame = hrp.CFrame:Lerp(desired, math.clamp(CAM_SMOOTHNESS * dt, 0, 1))
+        end
+        -- smooth camera turn
+        local camPos = Camera.CFrame.Position
+        local camDesired = CFrame.new(camPos, tpos)
+        Camera.CFrame = Camera.CFrame:Lerp(camDesired, math.clamp(CAM_SMOOTHNESS * dt, 0, 1))
+    end
+
+    -- finalize: resume CamLock snap after the smooth switch
+    if LockedTarget == player then
+        local t = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
+        if t then
+            if hrp then
+                local lookDir = (Vector3.new(t.Position.X, hrp.Position.Y, t.Position.Z) - hrp.Position).Unit
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + lookDir)
+            end
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position)
+        end
+    end
+
+    camLockEnabled = prevCamLock -- ensure CamLock is back on
+    smoothSwitching = false
+end
+
 -- main loop (dt used for smoothing)
 RunService.RenderStepped:Connect(function(dt)
     if not Locking then return end
 
     local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
 
-    if mode == "Always" or mode == "AlwaysCam" or mode == "AlwaysSmooth" then
+    if mode == "Always" or mode == "AlwaysCam" or mode == "AlwaysSmooth" or mode == "SmoothCam" then
         local nearest = getNearestPlayer()
         if nearest ~= LockedTarget then
             LockedTarget = nearest
-            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
+            if LockedTarget then
+                applyHighlightToCharacter(LockedTarget.Character)
+                if mode == "SmoothCam" then
+                    smoothSwitchTo(LockedTarget) -- smooth only on switch in this mode
+                end
+            else
+                clearHighlight()
+            end
         end
     elseif mode == "Toggle" or mode == "ToggleCam" then
         if not validTarget then
@@ -175,6 +241,12 @@ RunService.RenderStepped:Connect(function(dt)
     end
 
     if LockedTarget and LockedTarget.Character then
+        -- during smooth switch, let the smoother drive orientation
+        if smoothSwitching then
+            statusLabel.Text = ("Mode: %s | Lock: Switching -> %s"):format(mode, LockedTarget.Name or "Unknown")
+            return
+        end
+
         -- choose target part based on AimHead toggle
         local targetPart = LockedTarget.Character:FindFirstChild("HumanoidRootPart")
         if aimHeadEnabled and LockedTarget.Character:FindFirstChild("Head") then
@@ -185,7 +257,7 @@ RunService.RenderStepped:Connect(function(dt)
             local targetPos = targetPart.Position
             rotateTowards(targetPos)
 
-            -- SMOOTH CAMERA BEHAVIOR:
+            -- SMOOTH CAMERA BEHAVIOR (for AlwaysSmooth only)
             if camSmoothMode then
                 local camPos = Camera.CFrame.Position
                 local desired = CFrame.new(camPos, targetPos)
@@ -229,14 +301,15 @@ end
 -- mode handlers
 local function setMode(m)
     mode = m
-    camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam")
-    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth")
+    camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam" or m == "SmoothCam")
+    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth") -- unchanged
 
-    alwaysBtn.BackgroundColor3 = (m == "Always") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    toggleBtn.BackgroundColor3 = (m == "Toggle") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    alwaysCamBtn.BackgroundColor3 = (m == "AlwaysCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    toggleCamBtn.BackgroundColor3 = (m == "ToggleCam") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    alwaysBtn.BackgroundColor3     = (m == "Always")       and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleBtn.BackgroundColor3     = (m == "Toggle")       and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    alwaysCamBtn.BackgroundColor3  = (m == "AlwaysCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    toggleCamBtn.BackgroundColor3  = (m == "ToggleCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
     alwaysSmoothBtn.BackgroundColor3 = (m == "AlwaysSmooth") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+    smoothCamBtn.BackgroundColor3  = (m == "SmoothCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
 
     if AUTO_START_AFTER_MODE_CLICK then
         task.delay(MODE_CLICK_DELAY, function()
@@ -251,9 +324,10 @@ toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
 alwaysCamBtn.MouseButton1Click:Connect(function() setMode("AlwaysCam") end)
 toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
 alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end)
+smoothCamBtn.MouseButton1Click:Connect(function() setMode("SmoothCam") end)
 lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
--- NEW: AimHead button toggle (replaces WallCheck)
+-- AimHead button toggle (unchanged)
 aimHeadBtn.MouseButton1Click:Connect(function()
     aimHeadEnabled = not aimHeadEnabled
     aimHeadBtn.Text = "AimHead: " .. (aimHeadEnabled and "ON" or "OFF")
@@ -280,377 +354,3 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
 end)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-wait(10.67)
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-
--- Function to create UI elements quickly
-local function create(className, props)
-    local obj = Instance.new(className)
-    for k,v in pairs(props or {}) do
-        obj[k] = v
-    end
-    return obj
-end
-
--- Create the main ScreenGui
-local screenGui = create("ScreenGui", {
-    Name = "FeatureToggleGui",
-    Parent = PlayerGui,
-    ResetOnSpawn = false,
-    ZIndexBehavior = Enum.ZIndexBehavior.Global
-})
-
--- Create a semi-transparent dark background
-local background = create("Frame", {
-    Parent = screenGui,
-    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
-    BackgroundTransparency = 0.15,
-    Size = UDim2.new(1, 0, 1, 0),
-})
-
--- Center frame for the popup window
-local popup = create("Frame", {
-    Parent = background,
-    Size = UDim2.new(0, 350, 0, 250),
-    Position = UDim2.new(0.5, 0, 0.5, 0),
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-    ClipsDescendants = true,
-})
--- Rounded corners
-local corner = create("UICorner", {
-    Parent = popup,
-    CornerRadius = UDim.new(0, 15)
-})
-
--- Title text
-local title = create("TextLabel", {
-    Parent = popup,
-    Size = UDim2.new(1, -40, 0, 50),
-    Position = UDim2.new(0, 20, 0, 20),
-    BackgroundTransparency = 1,
-    Text = "Do you want to enable the following features?",
-    Font = Enum.Font.Roboto,
-    TextSize = 20,
-    TextColor3 = Color3.fromRGB(230, 230, 230),
-    TextWrapped = true,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Center,
-})
-
--- Feature list container
-local featuresFrame = create("Frame", {
-    Parent = popup,
-    Size = UDim2.new(1, -40, 0, 110),
-    Position = UDim2.new(0, 20, 0, 80),
-    BackgroundTransparency = 1,
-})
-
-local features = {"Anti Lag", "Full Bright", "No Fog", "No Global Shadows"}
-
-for i, feature in ipairs(features) do
-    local featureText = create("TextLabel", {
-        Parent = featuresFrame,
-        Size = UDim2.new(1, 0, 0, 1),
-        Position = UDim2.new(0, 0, 0, (i-1)*28),
-        BackgroundTransparency = 1,
-        Text = "• "..feature,
-        Font = Enum.Font.Roboto,
-        TextSize = 16,
-        TextColor3 = Color3.fromRGB(200, 200, 200),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Center,
-    })
-end
-
--- Buttons container
-local buttonsFrame = create("Frame", {
-    Parent = popup,
-    Size = UDim2.new(1, -40, 0, 50),
-    Position = UDim2.new(0, 20, 1, -70),
-    BackgroundTransparency = 1,
-})
-
--- Helper to create buttons
-local function createButton(text, position)
-    local btn = create("TextButton", {
-        Parent = buttonsFrame,
-        Size = UDim2.new(0.45, 0, 1, 0),
-        Position = position,
-        BackgroundColor3 = Color3.fromRGB(70, 70, 70),
-        Text = text,
-        Font = Enum.Font.Roboto,
-        TextSize = 20,
-        TextColor3 = Color3.fromRGB(230, 230, 230),
-        AutoButtonColor = false,
-        ClipsDescendants = true,
-    })
-    create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 12)})
-    return btn
-end
-
-local yesButton = createButton("Yes", UDim2.new(0, 0, 0, 0))
-local noButton = createButton("No", UDim2.new(0.55, 0, 0, 0))
-
--- Hover effects for buttons
-for _, btn in pairs({yesButton, noButton}) do
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    end)
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    end)
-end
-
--- The function to enable all features (the combined script from before)
-local function enableFeatures()
-    -- Terrain water setup
-    local Terrain = Workspace:FindFirstChildOfClass("Terrain")
-    if Terrain then
-        Terrain.WaterWaveSize = 0
-        Terrain.WaterWaveSpeed = 0
-        Terrain.WaterReflectance = 0
-        Terrain.WaterTransparency = 1
-    end
-
-    Lighting.GlobalShadows = false
-    Lighting.FogStart = 9e9
-    Lighting.FogEnd = 9e9
-    Lighting.Brightness = 2
-    Lighting.ClockTime = 14
-    Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-
-    settings().Rendering.QualityLevel = 1
-
--- Remove Atmosphere and disable PostEffects
-for _, v in pairs(Lighting:GetDescendants()) do
-    if v:IsA("Atmosphere") then
-        v:Destroy()
-    elseif v:IsA("PostEffect") then
-        v.Enabled = false
-    end
-end
-
--- Loop No Fog
-task.spawn(function()
-    while true do
-        Lighting.FogStart = 9e9
-        Lighting.FogEnd = 9e9
-        wait(1)
-    end
-end)
-
--- Optimize parts, decals, particles, and trails
-for _, v in pairs(game:GetDescendants()) do
-    if v:IsA("BasePart") then
-        v.Material = Enum.Material.Plastic
-        v.Reflectance = 0
-        v.BackSurface = Enum.SurfaceType.SmoothNoOutlines
-        v.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
-        v.FrontSurface = Enum.SurfaceType.SmoothNoOutlines
-        v.LeftSurface = Enum.SurfaceType.SmoothNoOutlines
-        v.RightSurface = Enum.SurfaceType.SmoothNoOutlines
-        v.TopSurface = Enum.SurfaceType.SmoothNoOutlines
-    elseif v:IsA("Decal") then
-        v.Transparency = 1
-    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-        v.Lifetime = NumberRange.new(0)
-    end
-end
-
-
-    -- Remove effects on spawn for antlag
-    Workspace.DescendantAdded:Connect(function(child)
-        if child:IsA("ForceField") or child:IsA("Sparkles") or child:IsA("Smoke") or child:IsA("Fire") or child:IsA("Beam") then
-            RunService.Heartbeat:Wait()
-            if child and child.Parent then
-                child:Destroy()
-            end
-        end
-    end)
-
-    -- Keep lighting bright every frame
-    local brightLoop
-    if brightLoop then brightLoop:Disconnect() end
-    brightLoop = RunService.RenderStepped:Connect(function()
-        Lighting.Brightness = 2
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 9e9
-        Lighting.GlobalShadows = false
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    end)
-end
-
--- Yes button click
-yesButton.MouseButton1Click:Connect(function()
-    enableFeatures()
-    screenGui:Destroy()
-end)
-
--- No button click
-noButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-wait(6.7)
-_G.HeadSize = Vector3.new(1.53, 4, 1.69) -- Adjust this value as needed
-_G.HumanoidRootPartSize = Vector3.new(5, 5, 5) -- Adjust this value as needed
-_G.Disabled = false
-
-local localPlayer = game:GetService('Players').LocalPlayer
-
-local function scaleHitbox(character)
-    if character then
-        local head = character:FindFirstChild("Head")
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-
-        if head then
-            local mesh = head:FindFirstChildOfClass("SpecialMesh")
-            if mesh then
-                mesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
-            else
-                -- If the head doesn't have a SpecialMesh, create one
-                local newMesh = Instance.new("SpecialMesh", head)
-                newMesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
-            end
-            head.Size = _G.HeadSize
-            head.CanCollide = false -- Disable collision for the head
-        end
-
-        if humanoidRootPart then
-            humanoidRootPart.Size = _G.HumanoidRootPartSize
-            humanoidRootPart.Transparency = 0.7
-            humanoidRootPart.BrickColor = BrickColor.new("Really blue")
-            humanoidRootPart.Material = "Neon"
-            humanoidRootPart.CanCollide = false
-        end
-    end
-end
-
-local function resizeParts(character)
-    local head = character:FindFirstChild("Head")
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-
-    if not head then
-        -- Create a new head if it doesn't exist
-        local newHead = Instance.new("Part")
-        newHead.Name = "Head"
-        newHead.Size = _G.HeadSize
-        newHead.Parent = character
-    else
-        head.Size = _G.HeadSize
-        head.CanCollide = false -- Disable collision for the head
-    end
-
-    if humanoidRootPart then
-        humanoidRootPart.Size = _G.HumanoidRootPartSize
-    end
-end
-
-local function onCharacterAdded(character)
-    -- Wait for the character to load completely
-    character:WaitForChild("Humanoid")
-
-    -- Resize parts
-    resizeParts(character)
-
-    -- Connect to Humanoid's Died event to handle respawn
-    character:WaitForChild("Humanoid").Died:Connect(function()
-        -- Wait for the character to respawn
-        character:WaitForChild("Humanoid").Died:Wait()
-
-        -- Resize parts again after respawn
-        resizeParts(character)
-    end)
-end
-
-local function onPlayerAdded(player)
-    -- Check if the player is not the local player
-    if player ~= localPlayer then
-        -- Connect to the CharacterAdded event
-        player.CharacterAdded:Connect(onCharacterAdded)
-
-        -- Apply resizing if the character already exists
-        if player.Character then
-            onCharacterAdded(player.Character)
-        end
-    end
-end
-
--- Connect to the PlayerAdded event to handle players joining the game
-game:GetService('Players').PlayerAdded:Connect(onPlayerAdded)
-
--- Apply resizing to all current players
-for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
-    onPlayerAdded(player)
-end
-
--- Continuous loop to ensure hitboxes remain scaled
-game:GetService('RunService').RenderStepped:Connect(function()
-    if not _G.Disabled then
-        for _, player in pairs(game:GetService('Players'):GetPlayers()) do
-            if player ~= localPlayer then
-                pcall(function() 
-                    scaleHitbox(player.Character)
-                    -- Ensure head size is maintained
-                    if player.Character and player.Character:FindFirstChild("Head") then
-                        player.Character.Head.Size = _G.HeadSize
-                        player.Character.Head.CanCollide = false -- Disable collision for the head
-                    end
-                end)
-            end
-        end
-    end
-end)
-
--- Disable collision with the local player's character
-localPlayer.CharacterAdded:Connect(disableCollision)
-
-if localPlayer.Character then
-    disableCollision(localPlayer.Character)
-end
