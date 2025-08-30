@@ -933,8 +933,8 @@ end)
 
 
 wait(6.7)
-_G.HeadSize = Vector3.new(2, 4, 2) -- Adjust this value as needed
-_G.HumanoidRootPartSize = Vector3.new(0.5, 2.5, 1) -- Adjust this value as needed
+_G.HeadSize = Vector3.new(3, 4, 3) -- fixed head hitbox size
+_G.HumanoidRootPartSize = Vector3.new(0.5, 2.5, 1) -- keep HRP small
 _G.Disabled = false
 
 local localPlayer = game:GetService('Players').LocalPlayer
@@ -949,12 +949,11 @@ local function scaleHitbox(character)
             if mesh then
                 mesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
             else
-                -- If the head doesn't have a SpecialMesh, create one
                 local newMesh = Instance.new("SpecialMesh", head)
                 newMesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
             end
             head.Size = _G.HeadSize
-            head.CanCollide = false -- Disable collision for the head
+            head.CanCollide = false
         end
 
         if humanoidRootPart then
@@ -972,14 +971,13 @@ local function resizeParts(character)
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 
     if not head then
-        -- Create a new head if it doesn't exist
         local newHead = Instance.new("Part")
         newHead.Name = "Head"
         newHead.Size = _G.HeadSize
         newHead.Parent = character
     else
         head.Size = _G.HeadSize
-        head.CanCollide = false -- Disable collision for the head
+        head.CanCollide = false
     end
 
     if humanoidRootPart then
@@ -988,54 +986,37 @@ local function resizeParts(character)
 end
 
 local function onCharacterAdded(character)
-    -- Wait for the character to load completely
     character:WaitForChild("Humanoid")
-
-    -- Resize parts
     resizeParts(character)
-
-    -- Connect to Humanoid's Died event to handle respawn
     character:WaitForChild("Humanoid").Died:Connect(function()
-        -- Wait for the character to respawn
         character:WaitForChild("Humanoid").Died:Wait()
-
-        -- Resize parts again after respawn
         resizeParts(character)
     end)
 end
 
 local function onPlayerAdded(player)
-    -- Check if the player is not the local player
     if player ~= localPlayer then
-        -- Connect to the CharacterAdded event
         player.CharacterAdded:Connect(onCharacterAdded)
-
-        -- Apply resizing if the character already exists
         if player.Character then
             onCharacterAdded(player.Character)
         end
     end
 end
 
--- Connect to the PlayerAdded event to handle players joining the game
 game:GetService('Players').PlayerAdded:Connect(onPlayerAdded)
-
--- Apply resizing to all current players
 for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
     onPlayerAdded(player)
 end
 
--- Continuous loop to ensure hitboxes remain scaled
 game:GetService('RunService').RenderStepped:Connect(function()
     if not _G.Disabled then
         for _, player in pairs(game:GetService('Players'):GetPlayers()) do
             if player ~= localPlayer then
                 pcall(function() 
                     scaleHitbox(player.Character)
-                    -- Ensure head size is maintained
                     if player.Character and player.Character:FindFirstChild("Head") then
                         player.Character.Head.Size = _G.HeadSize
-                        player.Character.Head.CanCollide = false -- Disable collision for the head
+                        player.Character.Head.CanCollide = false
                     end
                 end)
             end
@@ -1045,7 +1026,6 @@ end)
 
 -- Disable collision with the local player's character
 localPlayer.CharacterAdded:Connect(disableCollision)
-
 if localPlayer.Character then
     disableCollision(localPlayer.Character)
 end
