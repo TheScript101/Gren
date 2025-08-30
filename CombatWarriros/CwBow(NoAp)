@@ -934,98 +934,104 @@ end)
 
 wait(6.7)
 _G.HeadSize = Vector3.new(3, 4, 3) -- fixed head hitbox size
-_G.HumanoidRootPartSize = Vector3.new(0.5, 2.5, 1) -- keep HRP small
+_G.HumanoidRootPartSize = Vector3.new(0.5, 2.5, 1) -- HRP small
 _G.Disabled = false
 
-local localPlayer = game:GetService('Players').LocalPlayer
+local Players = game:GetService('Players')
+local RunService = game:GetService('RunService')
+local LocalPlayer = Players.LocalPlayer
 
+-- Force resize for a single character
 local function scaleHitbox(character)
-    if character then
-        local head = character:FindFirstChild("Head")
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-
-        if head then
-            local mesh = head:FindFirstChildOfClass("SpecialMesh")
-            if mesh then
-                mesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
-            else
-                local newMesh = Instance.new("SpecialMesh", head)
-                newMesh.Scale = Vector3.new(_G.HeadSize.X / head.Size.X, _G.HeadSize.Y / head.Size.Y, _G.HeadSize.Z / head.Size.Z)
-            end
-            head.Size = _G.HeadSize
-            head.CanCollide = false
-        end
-
-        if humanoidRootPart then
-            humanoidRootPart.Size = _G.HumanoidRootPartSize
-            humanoidRootPart.Transparency = 0.7
-            humanoidRootPart.BrickColor = BrickColor.new("Really blue")
-            humanoidRootPart.Material = "Neon"
-            humanoidRootPart.CanCollide = false
-        end
-    end
-end
-
-local function resizeParts(character)
+    if not character then return end
+    
     local head = character:FindFirstChild("Head")
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local hrp = character:FindFirstChild("HumanoidRootPart")
 
-    if not head then
-        local newHead = Instance.new("Part")
-        newHead.Name = "Head"
-        newHead.Size = _G.HeadSize
-        newHead.Parent = character
-    else
+    if head then
         head.Size = _G.HeadSize
         head.CanCollide = false
+        local mesh = head:FindFirstChildOfClass("SpecialMesh")
+        if mesh then
+            mesh.Scale = Vector3.new(
+                _G.HeadSize.X / head.Size.X,
+                _G.HeadSize.Y / head.Size.Y,
+                _G.HeadSize.Z / head.Size.Z
+            )
+        else
+            local newMesh = Instance.new("SpecialMesh")
+            newMesh.Scale = Vector3.new(
+                _G.HeadSize.X / head.Size.X,
+                _G.HeadSize.Y / head.Size.Y,
+                _G.HeadSize.Z / head.Size.Z
+            )
+            newMesh.Parent = head
+        end
     end
 
-    if humanoidRootPart then
-        humanoidRootPart.Size = _G.HumanoidRootPartSize
+    if hrp then
+        hrp.Size = _G.HumanoidRootPartSize
+        hrp.Transparency = 0.7
+        hrp.BrickColor = BrickColor.new("Really blue")
+        hrp.Material = "Neon"
+        hrp.CanCollide = false
     end
 end
 
-local function onCharacterAdded(character)
-    character:WaitForChild("Humanoid")
-    resizeParts(character)
-    character:WaitForChild("Humanoid").Died:Connect(function()
-        character:WaitForChild("Humanoid").Died:Wait()
-        resizeParts(character)
+-- Apply to character, and also whenever new parts get added
+local function setupCharacter(character)
+    if not character then return end
+    scaleHitbox(character)
+
+    -- Watch for new Head or HRP appearing (covers respawns & R15/R6 changes)
+    character.ChildAdded:Connect(function(child)
+        if child.Name == "Head" or child.Name == "HumanoidRootPart" then
+            scaleHitbox(character)
+        end
     end)
 end
 
+-- Handle respawns properly
 local function onPlayerAdded(player)
-    if player ~= localPlayer then
-        player.CharacterAdded:Connect(onCharacterAdded)
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function(char)
+            char:WaitForChild("Humanoid")
+            setupCharacter(char)
+        end)
+
         if player.Character then
-            onCharacterAdded(player.Character)
+            setupCharacter(player.Character)
         end
     end
 end
 
-game:GetService('Players').PlayerAdded:Connect(onPlayerAdded)
-for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+-- Apply for current players
+for _, player in ipairs(Players:GetPlayers()) do
     onPlayerAdded(player)
 end
+Players.PlayerAdded:Connect(onPlayerAdded)
 
-game:GetService('RunService').RenderStepped:Connect(function()
+-- Constantly enforce size so nobody "escapes" scaling
+RunService.RenderStepped:Connect(function()
     if not _G.Disabled then
-        for _, player in pairs(game:GetService('Players'):GetPlayers()) do
-            if player ~= localPlayer then
-                pcall(function() 
-                    scaleHitbox(player.Character)
-                    if player.Character and player.Character:FindFirstChild("Head") then
-                        player.Character.Head.Size = _G.HeadSize
-                        player.Character.Head.CanCollide = false
-                    end
-                end)
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                scaleHitbox(player.Character)
             end
         end
     end
 end)
 
--- Disable collision with the local player's character
-localPlayer.CharacterAdded:Connect(disableCollision)
-if localPlayer.Character then
-    disableCollision(localPlayer.Character)
+-- Disable collision for local player parts
+local function disableCollision(character)
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(disableCollision)
+if LocalPlayer.Character then
+    disableCollision(LocalPlayer.Character)
 end
