@@ -210,7 +210,7 @@ local function smoothSwitchTo(player)
         end
     end
 
-    camLockEnabled = prevCamLock -- ensure CamLock is back on
+    camLockEnabled = true -- force CamLock to stay ON after smooth switch
     smoothSwitching = false
 end
 
