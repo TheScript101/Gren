@@ -1,0 +1,235 @@
+-- Health ESP with LoopJumpPower + TPWalk (Multi-part chams)
+-- Excludes LocalPlayer
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- === ESP STORAGE === --
+local highlights = {}
+local tags = {}
+local connections = {}
+
+local function safeDestroy(obj)
+	if obj and obj.Destroy then
+		pcall(function() obj:Destroy() end)
+	end
+end
+
+-- Make highlights for all BaseParts in the character
+local function makeHighlightsForChar(player, char)
+	-- cleanup old
+	if highlights[player] then
+		for _, h in ipairs(highlights[player]) do
+			safeDestroy(h)
+		end
+	end
+	highlights[player] = {}
+
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local nh = Instance.new("Highlight")
+			nh.Name = "ChamHighlight"
+			nh.Adornee = part
+			nh.FillTransparency = 0.5
+			nh.OutlineTransparency = 0
+			nh.Parent = part
+			table.insert(highlights[player], nh)
+		end
+	end
+end
+
+-- Set highlight colors
+local function setHighlightColor(player, color3)
+	if highlights[player] then
+		for _, h in ipairs(highlights[player]) do
+			h.FillColor = color3
+			h.OutlineColor = Color3.fromRGB(255,255,255)
+		end
+	end
+end
+
+-- Create a billboard for downed player
+local function createDownTag(player, char)
+	if tags[player] and tags[player].Parent then return end
+	local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+	if not head then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "DownTag"
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 240, 0, 36)
+	billboard.AlwaysOnTop = true
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 1000 -- shorter distance
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextScaled = false
+	label.Font = Enum.Font.SourceSansBold
+	label.TextSize = 18
+	label.TextColor3 = Color3.fromRGB(255,0,0) -- red
+	label.TextStrokeTransparency = 0.5
+	label.Text = string.format("%s (%s)", player.DisplayName or player.Name, player.Name)
+	label.Parent = billboard
+
+	billboard.Parent = char
+	tags[player] = billboard
+end
+
+-- Cleanup functions
+local function removeDownTag(player)
+	local t = tags[player]
+	if t then
+		safeDestroy(t)
+		tags[player] = nil
+	end
+end
+
+local function removeHighlights(player)
+	if highlights[player] then
+		for _, h in ipairs(highlights[player]) do
+			safeDestroy(h)
+		end
+		highlights[player] = nil
+	end
+end
+
+local function cleanupPlayer(player)
+	if connections[player] then
+		for _, c in ipairs(connections[player]) do
+			pcall(function() c:Disconnect() end)
+		end
+		connections[player] = nil
+	end
+	removeDownTag(player)
+	removeHighlights(player)
+end
+
+-- Update ESP depending on HP
+local function updateESPForPlayer(player)
+	if not player or not player.Character then return end
+	local char = player.Character
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	makeHighlightsForChar(player, char)
+
+	if hum.Health <= 0 then
+		setHighlightColor(player, Color3.fromRGB(255,0,0)) -- red
+		createDownTag(player, char)
+	else
+		setHighlightColor(player, Color3.fromRGB(0,255,0)) -- green
+		removeDownTag(player)
+	end
+end
+
+-- When player respawns
+local function onCharacterAdded(player, char)
+	removeDownTag(player)
+	removeHighlights(player)
+
+	local hum = char:WaitForChild("Humanoid", 5)
+	if not hum then return end
+
+	updateESPForPlayer(player)
+
+	local con1 = hum.HealthChanged:Connect(function()
+		updateESPForPlayer(player)
+	end)
+
+	connections[player] = connections[player] or {}
+	table.insert(connections[player], con1)
+end
+
+-- Track new players
+local function trackPlayer(player)
+	if player == LocalPlayer then return end
+	cleanupPlayer(player)
+
+	if player.Character then
+		onCharacterAdded(player, player.Character)
+	end
+
+	local con = player.CharacterAdded:Connect(function(char)
+		onCharacterAdded(player, char)
+	end)
+	connections[player] = connections[player] or {}
+	table.insert(connections[player], con)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+	if p ~= LocalPlayer then
+		trackPlayer(p)
+	end
+end
+
+Players.PlayerAdded:Connect(function(p)
+	if p ~= LocalPlayer then
+		trackPlayer(p)
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+	cleanupPlayer(p)
+end)
+
+RunService.Heartbeat:Connect(function()
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			updateESPForPlayer(p)
+		end
+	end
+end)
+
+-- === LOOP JUMP POWER === --
+local function getHum()
+	local char = LocalPlayer.Character
+	if char then
+		return char:FindFirstChildOfClass("Humanoid")
+	end
+end
+
+local function applyJumpPower(val)
+	local hum = getHum()
+	if not hum then return end
+	if hum.UseJumpPower then
+		hum.JumpPower = val
+	else
+		hum.JumpHeight = val
+	end
+end
+
+-- loop jump power to 9.5
+RunService.Heartbeat:Connect(function()
+	applyJumpPower(9.5)
+end)
+
+-- === TP WALK === --
+local TPWalk = false
+
+local function getChar()
+	return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
+local function startTPWalk(speed)
+	if TPWalk then
+		TPWalk = false
+	end
+	TPWalk = true
+	RunService.Stepped:Connect(function(_, deltaTime)
+		if TPWalk then
+			local hum = getHum()
+			if hum and hum.MoveDirection.Magnitude > 0 then
+				local moveDirection = hum.MoveDirection
+				local translation = moveDirection * (speed or 1) * deltaTime * 10
+				getChar():TranslateBy(translation)
+			end
+		end
+	end)
+end
+
+-- start tpwalk with speed 1.79
+startTPWalk(1.79)
