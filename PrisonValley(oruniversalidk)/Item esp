@@ -29,13 +29,13 @@ local espData = {}    -- player -> {billboard, frame, toolFrames = {}, connectio
 local highlights = {} -- player -> {HighlightObjects...}
 
 -- visual sizing
-local SLOT_SIZE = 40           -- image slots (square)
-local TEXT_SLOT_WIDTH = 60     -- text slots width
-local SLOT_HEIGHT = 40
+local SLOT_SIZE = 20           -- image slots (square)
+local TEXT_SLOT_WIDTH = 40     -- text slots width
+local SLOT_HEIGHT = 20
 local SLOT_PADDING = 6
 local HORIZONTAL_MARGIN = 12   -- left + right margin
 local MAX_BILLBOARD_WIDTH = 700
-local MIN_BILLBOARD_WIDTH = 40
+local MIN_BILLBOARD_WIDTH = 20
 
 local function safeDestroy(obj)
     if obj and obj.Destroy then
@@ -126,8 +126,8 @@ local function makeHighlightsForChar(player, char)
                 local h = Instance.new("Highlight")
                 h.Name = "ItemESP_Highlight"
                 h.Adornee = part
-                h.FillTransparency = 0.6
-                h.OutlineTransparency = 0
+                h.FillTransparency = 0.35
+                h.OutlineTransparency = 0.2
                 h.Parent = part
                 return h
             end)
@@ -267,22 +267,35 @@ local function refreshItemsForPlayer(player)
             uiElem = Instance.new("ImageLabel")
             uiElem.Size = UDim2.new(0, SLOT_SIZE, 0, SLOT_HEIGHT)
             uiElem.BackgroundTransparency = 0.35
-            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
+            uiElem.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             uiElem.Image = "rbxassetid://" .. tostring(imgId)
             uiElem.ScaleType = Enum.ScaleType.Fit
             thisWidth = SLOT_SIZE
         else
             uiElem = Instance.new("TextLabel")
-            uiElem.Size = UDim2.new(0, TEXT_SLOT_WIDTH, 0, SLOT_HEIGHT)
             uiElem.BackgroundTransparency = 0.35
-            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
+            uiElem.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             uiElem.Font = Enum.Font.SourceSans
             uiElem.TextSize = 14
-            uiElem.TextColor3 = Color3.fromRGB(255,255,255)
+            uiElem.TextColor3 = Color3.fromRGB(255, 255, 255)
             uiElem.Text = tool.Name
-            uiElem.TextWrapped = true
-            thisWidth = TEXT_SLOT_WIDTH
+            uiElem.TextWrapped = false
+            uiElem.TextXAlignment = Enum.TextXAlignment.Center
+            uiElem.TextYAlignment = Enum.TextYAlignment.Center
+
+            -- auto-size adjustment
+            local textBounds = game:GetService("TextService"):GetTextSize(
+                tool.Name,
+                uiElem.TextSize,
+                uiElem.Font,
+                Vector2.new(math.huge, SLOT_HEIGHT)
+            )
+
+            local autoWidth = math.clamp(textBounds.X + 12, TEXT_SLOT_WIDTH, 200)
+            uiElem.Size = UDim2.new(0, autoWidth, 0, SLOT_HEIGHT)
+            thisWidth = autoWidth
         end
+
 
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0,6)
