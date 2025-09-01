@@ -1,0 +1,437 @@
+-- Item ESP + Team Chams (auto-resize billboard)
+-- Features:
+--  * Shows inventory-like item frames above players' heads (Backpack + equipped)
+--  * Frames only exist when player has >= 1 tool; auto-create/remove
+--  * Equipped tool(s) get a blue outline; updates live
+--  * Item slot size reduced (40x40), text slots 60x40
+--  * Billboard auto-resizes exactly to content (slots + padding + margin)
+--  * Chams colored by team rules
+--  * PlaceId special handling: place 15784744207 -> only track special teams; otherwise track everyone
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LocalPlayer = Players.LocalPlayer
+while not LocalPlayer do task.wait() end
+
+local PLACE_SPECIAL = 15784744207
+local placeId = game.PlaceId
+
+local SPECIAL_TEAMS = {
+    ["Minimum Security"] = true,
+    ["Maximum Security"] = true,
+    ["Medium Security"] = true,
+    ["Escapee"] = true
+}
+
+local espData = {}    -- player -> {billboard, frame, toolFrames = {}, connections = {}}
+local highlights = {} -- player -> {HighlightObjects...}
+
+-- visual sizing
+local SLOT_SIZE = 40           -- image slots (square)
+local TEXT_SLOT_WIDTH = 60     -- text slots width
+local SLOT_HEIGHT = 40
+local SLOT_PADDING = 6
+local HORIZONTAL_MARGIN = 12   -- left + right margin
+local MAX_BILLBOARD_WIDTH = 700
+local MIN_BILLBOARD_WIDTH = 40
+
+local function safeDestroy(obj)
+    if obj and obj.Destroy then
+        pcall(function() obj:Destroy() end)
+    end
+end
+
+-- gather tools from Backpack + Character
+local function gatherTools(player)
+    local tools = {}
+    local visited = {}
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, v in ipairs(backpack:GetChildren()) do
+            if v:IsA("Tool") and not visited[v] then
+                table.insert(tools, v); visited[v] = true
+            end
+        end
+    end
+    local char = player.Character
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") and not visited[v] then
+                table.insert(tools, v); visited[v] = true
+            end
+        end
+    end
+    return tools
+end
+
+-- determine if this player should be tracked (team filtering only applies on special place)
+local function shouldTrackPlayer(player)
+    if player == LocalPlayer then return false end
+    if placeId == PLACE_SPECIAL then
+        if player.Team and SPECIAL_TEAMS[player.Team.Name] then
+            return true
+        end
+        return false
+    end
+    return true
+end
+
+-- get color for chams (team color or white fallback)
+local function getTeamColor(player)
+    if player.Team and player.Team.TeamColor then
+        return player.Team.TeamColor.Color
+    end
+    return Color3.fromRGB(255,255,255) -- white fallback
+end
+
+-- Try to get image id for a tool. First check TextureId, then fallback to MarketplaceService if AssetId exists.
+local function tryGetToolImage(tool)
+    -- check TextureId field
+    if tool:FindFirstChild("TextureId") and tool.TextureId.Value then
+        local s = tostring(tool.TextureId.Value)
+        local id = tostring(s):match("(%d+)")
+        if id then return tonumber(id) end
+    end
+    if tool.TextureId and type(tool.TextureId) == "string" and tool.TextureId ~= "" then
+        local idFromTexture = tool.TextureId:match("rbxassetid://(%d+)")
+        if idFromTexture then return tonumber(idFromTexture) end
+    end
+
+    -- maybe Attribute AssetId or child NumberValue named AssetId
+    local aid = tonumber(tool:GetAttribute("AssetId") or (tool:FindFirstChild("AssetId") and tonumber(tool.AssetId.Value)))
+    if aid and aid > 0 then
+        local ok, info = pcall(function() return MarketplaceService:GetProductInfo(aid) end)
+        if ok and type(info) == "table" and info.IconImageAssetId and info.IconImageAssetId ~= 0 then
+            return info.IconImageAssetId
+        end
+    end
+
+    return nil
+end
+
+-- Create highlights (one per BasePart) and store them in highlights[player]
+local function makeHighlightsForChar(player, char)
+    -- cleanup old
+    if highlights[player] then
+        for _, h in ipairs(highlights[player]) do safeDestroy(h) end
+    end
+    highlights[player] = {}
+
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local ok, nh = pcall(function()
+                local h = Instance.new("Highlight")
+                h.Name = "ItemESP_Highlight"
+                h.Adornee = part
+                h.FillTransparency = 0.6
+                h.OutlineTransparency = 0
+                h.Parent = part
+                return h
+            end)
+            if ok and nh then
+                table.insert(highlights[player], nh)
+            end
+        end
+    end
+end
+
+local function setHighlightsColor(player, color3)
+    if not highlights[player] then return end
+    for _, h in ipairs(highlights[player]) do
+        pcall(function()
+            h.FillColor = color3
+            h.OutlineColor = Color3.fromRGB(255,255,255)
+        end)
+    end
+end
+
+local function removeHighlights(player)
+    if highlights[player] then
+        for _, h in ipairs(highlights[player]) do safeDestroy(h) end
+        highlights[player] = nil
+    end
+end
+
+-- Create the billboard/frame structure (but only create when player has tools)
+local function createBillboardForPlayer(player, char)
+    if not char then return end
+    if espData[player] and espData[player].billboard then return end
+
+    local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+    if not head then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ItemESP_Billboard"
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+    -- initial size; will be auto-resized later
+    billboard.Size = UDim2.new(0, 160, 0, SLOT_HEIGHT + 6)
+    billboard.LightInfluence = 0
+    billboard.StudsOffset = Vector3.new(0, 3.8, 0)
+    billboard.MaxDistance = math.huge
+
+    local frame = Instance.new("Frame")
+    frame.Name = "ItemESP_Frame"
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 0.45
+    frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    frame.BorderSizePixel = 0
+    frame.Parent = billboard
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 6)
+    uiCorner.Parent = frame
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Name = "ItemESP_List"
+    listLayout.FillDirection = Enum.FillDirection.Horizontal
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, SLOT_PADDING)
+    listLayout.Parent = frame
+
+    billboard.Parent = char
+
+    espData[player] = espData[player] or {}
+    espData[player].billboard = billboard
+    espData[player].frame = frame
+    espData[player].toolFrames = {}
+end
+
+local function removeBillboardForPlayer(player)
+    if espData[player] and espData[player].billboard then
+        safeDestroy(espData[player].billboard)
+        espData[player].billboard = nil
+        espData[player].frame = nil
+        espData[player].toolFrames = nil
+    end
+end
+
+-- Refresh the item frames list for a player. Handles create/remove billboard dynamically.
+local function refreshItemsForPlayer(player)
+    if not shouldTrackPlayer(player) then
+        removeBillboardForPlayer(player)
+        removeHighlights(player)
+        return
+    end
+
+    local char = player.Character
+    local tools = gatherTools(player)
+
+    -- maintain highlights regardless of tool count (color by team)
+    if char then
+        makeHighlightsForChar(player, char)
+        local col = getTeamColor(player)
+        setHighlightsColor(player, col)
+    else
+        removeHighlights(player)
+    end
+
+    if #tools == 0 then
+        -- remove billboard/frame when no tools
+        removeBillboardForPlayer(player)
+        return
+    end
+
+    -- ensure billboard exists
+    if not (espData[player] and espData[player].billboard and espData[player].frame) then
+        if not char then return end
+        createBillboardForPlayer(player, char)
+    end
+    if not espData[player] or not espData[player].frame then return end
+
+    local frame = espData[player].frame
+
+    -- clear existing UI entries but preserve layout objects
+    for _, child in ipairs(frame:GetChildren()) do
+        if child.Name ~= "ItemESP_List" and not child:IsA("UICorner") then
+            child:Destroy()
+        end
+    end
+    espData[player].toolFrames = {}
+
+    -- create UI entries and compute total width precisely
+    local totalWidth = HORIZONTAL_MARGIN * 2
+    local count = 0
+    for _, tool in ipairs(tools) do
+        count = count + 1
+        local imgId = tryGetToolImage(tool)
+        local uiElem
+        local thisWidth = 0
+
+        if imgId then
+            uiElem = Instance.new("ImageLabel")
+            uiElem.Size = UDim2.new(0, SLOT_SIZE, 0, SLOT_HEIGHT)
+            uiElem.BackgroundTransparency = 0.35
+            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
+            uiElem.Image = "rbxassetid://" .. tostring(imgId)
+            uiElem.ScaleType = Enum.ScaleType.Fit
+            thisWidth = SLOT_SIZE
+        else
+            uiElem = Instance.new("TextLabel")
+            uiElem.Size = UDim2.new(0, TEXT_SLOT_WIDTH, 0, SLOT_HEIGHT)
+            uiElem.BackgroundTransparency = 0.35
+            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
+            uiElem.Font = Enum.Font.SourceSans
+            uiElem.TextSize = 14
+            uiElem.TextColor3 = Color3.fromRGB(255,255,255)
+            uiElem.Text = tool.Name
+            uiElem.TextWrapped = true
+            thisWidth = TEXT_SLOT_WIDTH
+        end
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0,6)
+        corner.Parent = uiElem
+
+        uiElem.Parent = frame
+        espData[player].toolFrames[tool] = uiElem
+
+        totalWidth = totalWidth + thisWidth
+    end
+
+    -- add padding between slots (count - 1) * SLOT_PADDING
+    if count > 1 then
+        totalWidth = totalWidth + (count - 1) * SLOT_PADDING
+    end
+
+    -- clamp width
+    if totalWidth < MIN_BILLBOARD_WIDTH then totalWidth = MIN_BILLBOARD_WIDTH end
+    if totalWidth > MAX_BILLBOARD_WIDTH then totalWidth = MAX_BILLBOARD_WIDTH end
+
+    -- set billboard size now
+    espData[player].billboard.Size = UDim2.new(0, totalWidth, 0, SLOT_HEIGHT + 6)
+
+    -- ensure UIListLayout padding matches SLOT_PADDING (keeps spacing consistent)
+    local list = frame:FindFirstChild("ItemESP_List")
+    if list and list:IsA("UIListLayout") then
+        list.Padding = UDim.new(0, SLOT_PADDING)
+    end
+
+    -- blue outline for equipped tools (tools that reside in Character)
+    local equipped = {}
+    if char then
+        for _, c in ipairs(char:GetChildren()) do
+            if c:IsA("Tool") then equipped[c] = true end
+        end
+    end
+
+    for tool, ui in pairs(espData[player].toolFrames) do
+        -- remove old strokes
+        for _, ch in ipairs(ui:GetChildren()) do
+            if ch:IsA("UIStroke") then ch:Destroy() end
+        end
+        if equipped[tool] then
+            local outline = Instance.new("UIStroke")
+            outline.Thickness = 2
+            outline.Color = Color3.fromRGB(0,162,255)
+            outline.Parent = ui
+        end
+    end
+end
+
+-- Setup per-player connections
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+
+    -- monitor character spawn
+    player.CharacterAdded:Connect(function(char)
+        task.wait(0.12)
+        refreshItemsForPlayer(player)
+        -- track char tool add/remove for live equip/unequip
+        char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then
+                task.wait(0.06)
+                refreshItemsForPlayer(player)
+            end
+        end)
+        char.ChildRemoved:Connect(function(child)
+            if child:IsA("Tool") then
+                task.wait(0.06)
+                refreshItemsForPlayer(player)
+            end
+        end)
+    end)
+
+    -- backpack changes
+    local function bindBackpack(backpack)
+        if not backpack then return end
+        backpack.ChildAdded:Connect(function()
+            task.wait(0.08)
+            refreshItemsForPlayer(player)
+        end)
+        backpack.ChildRemoved:Connect(function()
+            task.wait(0.08)
+            refreshItemsForPlayer(player)
+        end)
+    end
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then bindBackpack(backpack) end
+    player.ChildAdded:Connect(function(c)
+        if c:IsA("Backpack") then bindBackpack(c) end
+    end)
+
+    -- react to team changes (for special-place filtering and color updates)
+    player:GetPropertyChangedSignal("Team"):Connect(function()
+        if placeId == PLACE_SPECIAL then
+            if shouldTrackPlayer(player) then
+                -- they entered a special team -> start tracking & refresh
+                refreshItemsForPlayer(player)
+            else
+                -- left special team -> remove billboard and highlights
+                removeBillboardForPlayer(player)
+                removeHighlights(player)
+            end
+        else
+            -- in other places, team color may have changed: update highlights
+            refreshItemsForPlayer(player)
+        end
+    end)
+
+    -- initial refresh (only if should be tracked OR we still need to watch Team to possibly start tracking)
+    if shouldTrackPlayer(player) then
+        refreshItemsForPlayer(player)
+    else
+        -- still call refresh to ensure highlights removed and to listen for future team changes
+        refreshItemsForPlayer(player)
+    end
+end
+
+-- Hook existing players
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        setupPlayer(p)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then
+        setupPlayer(p)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    removeBillboardForPlayer(p)
+    removeHighlights(p)
+    espData[p] = nil
+end)
+
+-- failsafe periodic refresh for all players we may track
+local tick = 0
+RunService.Heartbeat:Connect(function(dt)
+    tick = tick + dt
+    if tick < 0.8 then return end
+    tick = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if shouldTrackPlayer(p) then
+            refreshItemsForPlayer(p)
+        else
+            removeBillboardForPlayer(p)
+            removeHighlights(p)
+        end
+    end
+end)
