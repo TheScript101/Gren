@@ -521,7 +521,7 @@ local TeleportTab = Window:MakeTab({
 
 -- Teleport locations table
 local teleportLocations = {
-    ["Min/Med Upstairs Cell 1"] = Vector3.new(2.545670509338379, 24.150676727294922, -121.7835464477539),
+    ["Min/Med Upstairs Cell"] = Vector3.new(2.545670509338379, 24.150676727294922, -121.7835464477539),
     -- Add more locations here
 }
 
