@@ -643,7 +643,7 @@ toggleButton.MouseButton1Click:Connect(function()
         if orionGui then
             orionGui.Enabled = true
         end
-
+        wait(1)
         -- Fire RightShift keypress as backup
         keypress(0xA1)   -- RightShift down
         wait(0.05)
