@@ -511,6 +511,33 @@ if success and OrionLib then
         SaveConfig = false
     })
 
+------------------- Teleports Tab
+-- Make a new tab
+local TeleportTab = Window:MakeTab({
+    Name = "Teleport",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Teleport locations table
+local teleportLocations = {
+    ["Min/Med Upstairs Cell 1"] = Vector3.new(2.545670509338379, 24.150676727294922, -121.7835464477539),
+    -- Add more locations here
+}
+
+-- Generate buttons dynamically
+for name, position in pairs(teleportLocations) do
+    TeleportTab:AddButton({
+        Name = name,
+        Callback = function()
+            local character = game.Players.LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = CFrame.new(position)
+            end
+        end
+    })
+end
+
     local Tab = Window:MakeTab({
         Name = "ESP",
         Icon = "rbxassetid://4483345998",
