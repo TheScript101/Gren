@@ -615,7 +615,7 @@ end
 else
     warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
 end
-
+wait(5)
 -- Toggle Button For Orion UI
 local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 local toggleGui = Instance.new("ScreenGui")
