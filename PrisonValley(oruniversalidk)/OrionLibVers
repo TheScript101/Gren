@@ -556,9 +556,10 @@ toggleGui.Parent = playerGui
 local toggleButton = Instance.new("ImageButton", toggleGui)
 toggleButton.Name = "OrionToggleButton"
 toggleButton.AnchorPoint = Vector2.new(1, 0)
-toggleButton.Position = UDim2.new(1, -70, 0, -15)  -- moved left for larger size
+toggleButton.Position = UDim2.new(1, -804, 0, 9)  -- moved
 toggleButton.Size = UDim2.new(0, 50, 0, 50)        -- size increased from 30x30 to 45x45
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.Transparency = 0.5
 toggleButton.BorderSizePixel = 0
 toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
 
