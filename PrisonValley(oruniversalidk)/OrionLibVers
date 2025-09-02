@@ -1,410 +1,20 @@
--- Item ESP + Infinite-Yield-style Chams (Orion toggles) — FIXED UI
--- Inventory ESP unchanged; Chams extracted to separate toggle.
--- Orion now uses a Tab and Tab:AddToggle(), and calls OrionLib:Init().
-
--- ---------- Services ----------
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local TextService = game:GetService("TextService")
-
--- ---------- Basic config ----------
-local LocalPlayer = Players.LocalPlayer
-while not LocalPlayer do task.wait() end
-
-local PLACE_SPECIAL = 15784744207
-local placeId = game.PlaceId
-
-local SPECIAL_TEAMS = {
-    ["Minimum Security"] = true,
-    ["Maximum Security"] = true,
-    ["Medium Security"] = true,
-    ["Escapee"] = true
-}
-
--- ---------- State ----------
-local espData = {}    -- player -> {billboard, frame, toolFrames = {}}
-local chamsData = {}  -- player -> { {part = BasePart, box = BoxHandleAdornment / Highlight, outline = SelectionBox} ... }
-
--- visual sizing
-local SLOT_SIZE = 20
-local TEXT_SLOT_WIDTH = 40
-local SLOT_HEIGHT = 20
-local SLOT_PADDING = 6
-local HORIZONTAL_MARGIN = 12
-local MAX_BILLBOARD_WIDTH = 700
-local MIN_BILLBOARD_WIDTH = 20
-
--- toggles (start OFF so nothing is enabled until you toggle)
-local inventoryEnabled = false
-local chamsEnabled = false
-
--- ---------- Utilities ----------
-local function safeDestroy(obj)
-    if obj and obj.Destroy then
-        pcall(function() obj:Destroy() end)
-    end
-end
-
-local function gatherTools(player)
-    local tools, visited = {}, {}
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, v in ipairs(backpack:GetChildren()) do
-            if v:IsA("Tool") and not visited[v] then
-                table.insert(tools, v); visited[v] = true
-            end
-        end
-    end
-    local char = player.Character
-    if char then
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Tool") and not visited[v] then
-                table.insert(tools, v); visited[v] = true
-            end
-        end
-    end
-    return tools
-end
-
-local function shouldTrackPlayer(player)
-    if player == LocalPlayer then return false end
-    if placeId == PLACE_SPECIAL then
-        return player.Team and SPECIAL_TEAMS[player.Team.Name] or false
-    end
-    return true
-end
-
-local function getTeamColor(player)
-    if player.Team and player.Team.TeamColor then
-        return player.Team.TeamColor.Color
-    end
-    return Color3.fromRGB(255,255,255)
-end
-
-local function tryGetToolImage(tool)
-    if tool:FindFirstChild("TextureId") and tool.TextureId.Value then
-        local id = tostring(tool.TextureId.Value):match("(%d+)")
-        if id then return tonumber(id) end
-    end
-    if tool.TextureId and type(tool.TextureId) == "string" and tool.TextureId ~= "" then
-        local idFromTexture = tool.TextureId:match("rbxassetid://(%d+)")
-        if idFromTexture then return tonumber(idFromTexture) end
-    end
-    local aid = tonumber(tool:GetAttribute("AssetId") or (tool:FindFirstChild("AssetId") and tonumber(tool.AssetId.Value)))
-    if aid and aid > 0 then
-        local ok, info = pcall(function() return MarketplaceService:GetProductInfo(aid) end)
-        if ok and info and info.IconImageAssetId and info.IconImageAssetId ~= 0 then
-            return info.IconImageAssetId
-        end
-    end
-    return nil
-end
-
--- ---------- CHAMS (Infinite-Yield-like) ----------
-local function removeChamsForPlayer(player)
-    local dat = chamsData[player]
-    if not dat then return end
-    for _, entry in ipairs(dat) do
-        safeDestroy(entry.box)
-        safeDestroy(entry.outline)
-        safeDestroy(entry.fallbackHighlight)
-    end
-    chamsData[player] = nil
-end
-
-local function makeChamsForChar(player, char)
-    removeChamsForPlayer(player)
-    if not char then return end
-
-    local parts = {}
-    for _, p in ipairs(char:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(parts, p)
-        end
-    end
-    if #parts == 0 then return end
-
-    chamsData[player] = {}
-    local color = getTeamColor(player)
-    local outlineColor = Color3.fromRGB(255,255,255)
-
-    for _, part in ipairs(parts) do
-        local ok, box = pcall(function()
-            local b = Instance.new("BoxHandleAdornment")
-            b.Name = "IV_ChamBox"
-            b.Adornee = part
-            b.Size = part.Size
-            b.AlwaysOnTop = true
-            b.ZIndex = 10
-            b.Transparency = 0.6
-            b.Color3 = color
-            b.Parent = workspace
-            return b
-        end)
-
-        local ok2, sel = pcall(function()
-            local s = Instance.new("SelectionBox")
-            s.Name = "IV_ChamOutline"
-            s.Adornee = part
-            s.LineThickness = 0.02
-            s.Color3 = outlineColor
-            s.SurfaceTransparency = 1
-            s.Parent = workspace
-            return s
-        end)
-
-        if ok and box then
-            table.insert(chamsData[player], {part = part, box = box, outline = (ok2 and sel or nil)})
-        else
-            local okh, h = pcall(function()
-                local hh = Instance.new("Highlight")
-                hh.Name = "IV_Cham_Highlight"
-                hh.Adornee = part
-                hh.FillTransparency = 0.6
-                hh.OutlineTransparency = 0
-                hh.Parent = part
-                return hh
-            end)
-            local entry = {part = part, fallbackHighlight = okh and h or nil}
-            if ok2 and sel then entry.outline = sel end
-            table.insert(chamsData[player], entry)
-        end
-    end
-end
-
-local function updateChamsColorForPlayer(player, color3)
-    local dat = chamsData[player]
-    if not dat then return end
-    for _, entry in ipairs(dat) do
-        if entry.box then
-            pcall(function() entry.box.Color3 = color3 end)
-        elseif entry.fallbackHighlight then
-            pcall(function() entry.fallbackHighlight.FillColor = color3 end)
-        end
-        if entry.outline then
-            pcall(function() entry.outline.Color3 = Color3.fromRGB(255,255,255) end)
-        end
-    end
-end
-
--- ---------- INVENTORY BILLBOARD ----------
-local function createBillboardForPlayer(player, char)
-    if not char then return end
-    if not inventoryEnabled then return end
-    if espData[player] and espData[player].billboard then return end
-    local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-    if not head then return end
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ItemESP_Billboard"
-    billboard.Adornee = head
-    billboard.AlwaysOnTop = true
-    billboard.Size = UDim2.new(0, 160, 0, SLOT_HEIGHT + 6)
-    billboard.LightInfluence = 0
-    billboard.StudsOffset = Vector3.new(0, 3.8, 0)
-    billboard.MaxDistance = math.huge
-    local frame = Instance.new("Frame")
-    frame.Name = "ItemESP_Frame"
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundTransparency = 0.45
-    frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    frame.BorderSizePixel = 0
-    frame.Parent = billboard
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Name = "ItemESP_List"
-    listLayout.FillDirection = Enum.FillDirection.Horizontal
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, SLOT_PADDING)
-    listLayout.Parent = frame
-    billboard.Parent = char
-    espData[player] = {billboard = billboard, frame = frame, toolFrames = {}}
-end
-
-local function removeBillboardForPlayer(player)
-    if espData[player] and espData[player].billboard then
-        safeDestroy(espData[player].billboard)
-        espData[player] = nil
-    end
-end
-
--- ---------- Refresh logic ----------
-local function refreshItemsForPlayer(player)
-    if not shouldTrackPlayer(player) then
-        if inventoryEnabled then removeBillboardForPlayer(player) end
-        if chamsEnabled then removeChamsForPlayer(player) end
-        return
-    end
-
-    local char = player.Character
-    local tools = gatherTools(player)
-
-    -- CHAMS
-    if chamsEnabled and char then
-        makeChamsForChar(player, char)
-        updateChamsColorForPlayer(player, getTeamColor(player))
-    else
-        removeChamsForPlayer(player)
-    end
-
-    -- INVENTORY UI
-    if not inventoryEnabled then
-        removeBillboardForPlayer(player)
-        return
-    end
-    if #tools == 0 then
-        removeBillboardForPlayer(player)
-        return
-    end
-    if not (espData[player] and espData[player].billboard and espData[player].frame) then
-        if not char then return end
-        createBillboardForPlayer(player, char)
-    end
-
-    local frame = espData[player].frame
-    for _, child in ipairs(frame:GetChildren()) do
-        if child.Name ~= "ItemESP_List" and not child:IsA("UICorner") then
-            child:Destroy()
-        end
-    end
-    espData[player].toolFrames = {}
-
-    local totalWidth = HORIZONTAL_MARGIN * 2
-    local count = 0
-    for _, tool in ipairs(tools) do
-        count += 1
-        local imgId = tryGetToolImage(tool)
-        local uiElem, thisWidth
-        if imgId then
-            uiElem = Instance.new("ImageLabel")
-            uiElem.Size = UDim2.new(0, SLOT_SIZE, 0, SLOT_HEIGHT)
-            uiElem.BackgroundTransparency = 0.35
-            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
-            uiElem.Image = "rbxassetid://"..tostring(imgId)
-            uiElem.ScaleType = Enum.ScaleType.Fit
-            thisWidth = SLOT_SIZE
-        else
-            uiElem = Instance.new("TextLabel")
-            uiElem.BackgroundTransparency = 0.35
-            uiElem.BackgroundColor3 = Color3.fromRGB(0,0,0)
-            uiElem.Font = Enum.Font.SourceSans
-            uiElem.TextSize = 14
-            uiElem.TextColor3 = Color3.fromRGB(255,255,255)
-            uiElem.Text = tool.Name
-            local textBounds = TextService:GetTextSize(tool.Name, uiElem.TextSize, uiElem.Font, Vector2.new(math.huge, SLOT_HEIGHT))
-            local autoWidth = math.clamp(textBounds.X + 12, TEXT_SLOT_WIDTH, 200)
-            uiElem.Size = UDim2.new(0, autoWidth, 0, SLOT_HEIGHT)
-            thisWidth = autoWidth
-        end
-        Instance.new("UICorner", uiElem).CornerRadius = UDim.new(0,6)
-        uiElem.Parent = frame
-        espData[player].toolFrames[tool] = uiElem
-        totalWidth += thisWidth
-    end
-
-    if count > 1 then totalWidth += (count - 1) * SLOT_PADDING end
-    totalWidth = math.clamp(totalWidth, MIN_BILLBOARD_WIDTH, MAX_BILLBOARD_WIDTH)
-    espData[player].billboard.Size = UDim2.new(0, totalWidth, 0, SLOT_HEIGHT + 6)
-
-    local list = frame:FindFirstChild("ItemESP_List")
-    if list then list.Padding = UDim.new(0, SLOT_PADDING) end
-
-    local equipped = {}
-    if char then
-        for _, c in ipairs(char:GetChildren()) do
-            if c:IsA("Tool") then equipped[c] = true end
-        end
-    end
-    for tool, ui in pairs(espData[player].toolFrames) do
-        for _, ch in ipairs(ui:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end
-        if equipped[tool] then
-            local outline = Instance.new("UIStroke")
-            outline.Thickness = 2
-            outline.Color = Color3.fromRGB(0,162,255)
-            outline.Parent = ui
-        end
-    end
-end
-
--- ---------- Per-player setup ----------
-local function bindBackpack(player, backpack)
-    if not backpack then return end
-    backpack.ChildAdded:Connect(function() task.wait(0.08) refreshItemsForPlayer(player) end)
-    backpack.ChildRemoved:Connect(function() task.wait(0.08) refreshItemsForPlayer(player) end)
-end
-
-local function setupPlayer(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(char)
-        task.wait(0.12)
-        refreshItemsForPlayer(player)
-        char.ChildAdded:Connect(function(c) if c:IsA("Tool") then task.wait(0.06) refreshItemsForPlayer(player) end end)
-        char.ChildRemoved:Connect(function(c) if c:IsA("Tool") then task.wait(0.06) refreshItemsForPlayer(player) end end)
-    end)
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then bindBackpack(player, backpack) end
-    player.ChildAdded:Connect(function(c) if c:IsA("Backpack") then bindBackpack(player, c) end end)
-    player:GetPropertyChangedSignal("Team"):Connect(function() refreshItemsForPlayer(player) end)
-    refreshItemsForPlayer(player)
-end
-
-for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then setupPlayer(p) end end
-Players.PlayerAdded:Connect(function(p) if p ~= LocalPlayer then setupPlayer(p) end end)
-Players.PlayerRemoving:Connect(function(p)
-    removeBillboardForPlayer(p)
-    removeChamsForPlayer(p)
-    espData[p] = nil
-    chamsData[p] = nil
-end)
-
--- ---------- Periodic refresh + backup rebuild ----------
-local tick, backupTick = 0, 0
-RunService.Heartbeat:Connect(function(dt)
-    tick += dt; backupTick += dt
-    if tick >= 0.8 then
-        tick = 0
-        for _, p in ipairs(Players:GetPlayers()) do
-            if shouldTrackPlayer(p) then
-                refreshItemsForPlayer(p)
-            else
-                if inventoryEnabled then removeBillboardForPlayer(p) end
-                if chamsEnabled then removeChamsForPlayer(p) end
-            end
-        end
-    end
-    if backupTick >= 30 then
-        backupTick = 0
-        if inventoryEnabled then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if espData[p] and espData[p].billboard then
-                    local char = p.Character
-                    if char then
-                        safeDestroy(espData[p].billboard)
-                        espData[p] = nil
-                        createBillboardForPlayer(p, char)
-                        refreshItemsForPlayer(p)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ---------- Orion UI (two toggles, proper API) ----------
+-- -------------------------
+-- Orion UI (4 toggles: Inmate/Officer Inventory & Chams)
+-- -------------------------
 local success, OrionLib = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
 end)
 
--- helpers to apply toggles across all tracked players
-local function applyInventoryToggle(state)
-    inventoryEnabled = state
-    if not inventoryEnabled then
-        for _, p in ipairs(Players:GetPlayers()) do removeBillboardForPlayer(p) end
+-- helper apply functions
+local function applyInmateInventory(state)
+    inmateInventoryEnabled = state
+    if not state then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if isInmate(p) then removeBillboardForPlayer(p) end
+        end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if shouldTrackPlayer(p) and p.Character then
+            if isInmate(p) and p.Character then
                 createBillboardForPlayer(p, p.Character)
                 refreshItemsForPlayer(p)
             end
@@ -412,13 +22,47 @@ local function applyInventoryToggle(state)
     end
 end
 
-local function applyChamsToggle(state)
-    chamsEnabled = state
-    if not chamsEnabled then
-        for _, p in ipairs(Players:GetPlayers()) do removeChamsForPlayer(p) end
+local function applyInmateChams(state)
+    inmateChamsEnabled = state
+    if not state then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if isInmate(p) then removeChamsForPlayer(p) end
+        end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if shouldTrackPlayer(p) and p.Character then
+            if isInmate(p) and p.Character then
+                makeChamsForChar(p, p.Character)
+                updateChamsColorForPlayer(p, getTeamColor(p))
+            end
+        end
+    end
+end
+
+local function applyOfficerInventory(state)
+    officerInventoryEnabled = state
+    if not state then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not isInmate(p) and p ~= LocalPlayer then removeBillboardForPlayer(p) end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not isInmate(p) and p.Character and p ~= LocalPlayer then
+                createBillboardForPlayer(p, p.Character)
+                refreshItemsForPlayer(p)
+            end
+        end
+    end
+end
+
+local function applyOfficerChams(state)
+    officerChamsEnabled = state
+    if not state then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not isInmate(p) and p ~= LocalPlayer then removeChamsForPlayer(p) end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if not isInmate(p) and p.Character and p ~= LocalPlayer then
                 makeChamsForChar(p, p.Character)
                 updateChamsColorForPlayer(p, getTeamColor(p))
             end
@@ -439,23 +83,31 @@ if success and OrionLib then
         PremiumOnly = false
     })
 
+    -- Inmate toggles
     Tab:AddToggle({
-        Name = "Inventory ESP",
-        Default = inventoryEnabled,
-        Callback = function(val)
-            applyInventoryToggle(val)
-        end
+        Name = "Inmate Inventory ESP",
+        Default = inmateInventoryEnabled,
+        Callback = function(val) applyInmateInventory(val) end
+    })
+    Tab:AddToggle({
+        Name = "Inmate Chams",
+        Default = inmateChamsEnabled,
+        Callback = function(val) applyInmateChams(val) end
     })
 
+    -- Officer toggles
     Tab:AddToggle({
-        Name = "Chams",
-        Default = chamsEnabled,
-        Callback = function(val)
-            applyChamsToggle(val)
-        end
+        Name = "Officer Inventory ESP",
+        Default = officerInventoryEnabled,
+        Callback = function(val) applyOfficerInventory(val) end
+    })
+    Tab:AddToggle({
+        Name = "Officer Chams",
+        Default = officerChamsEnabled,
+        Callback = function(val) applyOfficerChams(val) end
     })
 
     OrionLib:Init()
 else
-    warn("Orion UI failed to load. Use script variables to enable features.")
+    warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
 end
