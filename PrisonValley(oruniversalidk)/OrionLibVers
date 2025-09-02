@@ -545,3 +545,29 @@ if success and OrionLib then
 else
     warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
 end
+
+-- Toggle Button For Orion UI
+local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "OrionToggleGui"
+toggleGui.ResetOnSpawn = false
+toggleGui.Parent = playerGui
+
+local toggleButton = Instance.new("ImageButton", toggleGui)
+toggleButton.Name = "OrionToggleButton"
+toggleButton.AnchorPoint = Vector2.new(1, 0)
+toggleButton.Position = UDim2.new(1, -70, 0, -15)  -- moved left for larger size
+toggleButton.Size = UDim2.new(0, 50, 0, 50)        -- size increased from 30x30 to 45x45
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.BorderSizePixel = 0
+toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
+
+toggleButton.MouseButton1Click:Connect(function()
+    local orionGui = game.CoreGui:FindFirstChild("Orion")
+    if not orionGui and gethui then
+        orionGui = gethui():FindFirstChild("Orion")
+    end
+    if orionGui then
+        orionGui.Enabled = not orionGui.Enabled
+    end
+end)
