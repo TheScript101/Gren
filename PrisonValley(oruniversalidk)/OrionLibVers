@@ -607,11 +607,9 @@ toggleButton.BorderSizePixel = 0
 toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
 
 toggleButton.MouseButton1Click:Connect(function()
-    local orionGui = game.CoreGui:FindFirstChild("Orion")
-    if not orionGui and gethui then
-        orionGui = gethui():FindFirstChild("Orion")
-    end
-    if orionGui then
-        orionGui.Enabled = not orionGui.Enabled
-    end
+    pcall(function()
+        keypress(0xA1) -- RightShift key down
+        task.wait()
+        keyrelease(0xA1) -- RightShift key up
+    end)
 end)
