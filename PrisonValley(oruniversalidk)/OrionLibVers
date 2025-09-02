@@ -542,34 +542,47 @@ if success and OrionLib then
     })
 
 -----others tab
--- Drop Tool Button GUI (under PlayerGui, same style as Orion toggle button)
-local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    -- 🟢 New "Others" tab
+    local OthersTab = Window:MakeTab({
+        Name = "Others",
+        Icon = "rbxassetid://4483345998",
+        PremiumOnly = false
+    })
 
--- Container GUI
-local dropToolGui = Instance.new("ScreenGui")
-dropToolGui.Name = "DropToolGui"
-dropToolGui.ResetOnSpawn = false
-dropToolGui.Parent = playerGui
+    -- Drop Tool Button setup (GUI created once, toggle controls visibility)
+    local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    local dropToolGui = Instance.new("ScreenGui")
+    dropToolGui.Name = "DropToolGui"
+    dropToolGui.ResetOnSpawn = false
+    dropToolGui.Parent = playerGui
+    dropToolGui.Enabled = false -- hidden by default
 
--- The actual button
-local dropToolButton = Instance.new("ImageButton", dropToolGui)
-dropToolButton.Name = "DropToolButton"
-dropToolButton.AnchorPoint = Vector2.new(1, 0)
-dropToolButton.Position = UDim2.new(1, -804, 0, 65) -- directly below OrionToggleButton
-dropToolButton.Size = UDim2.new(0, 50, 0, 50)
-dropToolButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-dropToolButton.BackgroundTransparency = 0.5
-dropToolButton.BorderSizePixel = 0
-dropToolButton.Image = "rbxthumb://type=Asset&id=8478993036&w=420&h=420" -- fixed format
+    local dropToolButton = Instance.new("ImageButton", dropToolGui)
+    dropToolButton.Name = "DropToolButton"
+    dropToolButton.AnchorPoint = Vector2.new(1, 0)
+    dropToolButton.Position = UDim2.new(1, -804, 0, 65)
+    dropToolButton.Size = UDim2.new(0, 50, 0, 50)
+    dropToolButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    dropToolButton.BackgroundTransparency = 0.5
+    dropToolButton.BorderSizePixel = 0
+    dropToolButton.Image = "rbxthumb://type=Asset&id=8478993036&w=420&h=420"
 
--- Functionality: simulate pressing Backspace (0x08)
-dropToolButton.MouseButton1Click:Connect(function()
-    pcall(function()
-        keypress(0x08)
-        task.wait()
-        keyrelease(0x08)
+    dropToolButton.MouseButton1Click:Connect(function()
+        pcall(function()
+            keypress(0x08)
+            task.wait()
+            keyrelease(0x08)
+        end)
     end)
-end)
+
+    -- Orion toggle to show/hide Drop Tool button
+    OthersTab:AddToggle({
+        Name = "Drop Tool Button",
+        Default = false,
+        Callback = function(val)
+            dropToolGui.Enabled = val
+        end
+})
 
     OrionLib:Init()
 else
