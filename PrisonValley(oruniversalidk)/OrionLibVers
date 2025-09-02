@@ -541,6 +541,36 @@ if success and OrionLib then
         Callback = function(val) applyOfficerChams(val) end
     })
 
+-----others tab
+-- Drop Tool Button GUI (under PlayerGui, same style as Orion toggle button)
+local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Container GUI
+local dropToolGui = Instance.new("ScreenGui")
+dropToolGui.Name = "DropToolGui"
+dropToolGui.ResetOnSpawn = false
+dropToolGui.Parent = playerGui
+
+-- The actual button
+local dropToolButton = Instance.new("ImageButton", dropToolGui)
+dropToolButton.Name = "DropToolButton"
+dropToolButton.AnchorPoint = Vector2.new(1, 0)
+dropToolButton.Position = UDim2.new(1, -804, 0, 65) -- directly below OrionToggleButton
+dropToolButton.Size = UDim2.new(0, 50, 0, 50)
+dropToolButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+dropToolButton.BackgroundTransparency = 0.5
+dropToolButton.BorderSizePixel = 0
+dropToolButton.Image = "rbxthumb://type=Asset&id=8478993036&w=420&h=420" -- fixed format
+
+-- Functionality: simulate pressing Backspace (0x08)
+dropToolButton.MouseButton1Click:Connect(function()
+    pcall(function()
+        keypress(0x08)
+        task.wait()
+        keyrelease(0x08)
+    end)
+end)
+
     OrionLib:Init()
 else
     warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
@@ -559,7 +589,7 @@ toggleButton.AnchorPoint = Vector2.new(1, 0)
 toggleButton.Position = UDim2.new(1, -804, 0, 9)  -- moved
 toggleButton.Size = UDim2.new(0, 50, 0, 50)        -- size increased from 30x30 to 45x45
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggleButton.Transparency = 0.5
+toggleButton.BackgroundTransparency = 0.5
 toggleButton.BorderSizePixel = 0
 toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
 
