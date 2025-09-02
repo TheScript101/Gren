@@ -615,7 +615,7 @@ end
 else
     warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
 end
-wait(5)
+
 -- Toggle Button For Orion UI
 local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 local toggleGui = Instance.new("ScreenGui")
@@ -634,19 +634,11 @@ toggleButton.BorderSizePixel = 0
 toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
 
 toggleButton.MouseButton1Click:Connect(function()
-    pcall(function()
-        local orionGui = game.CoreGui:FindFirstChild("Orion")
-        if not orionGui and gethui then
-            orionGui = gethui():FindFirstChild("Orion")
-        end
-
-        if orionGui then
-            -- Attempt to enable GUI manually
-            orionGui.Enabled = true
-        end
-
-        -- Always fire RightShift as backup
-        keypress(0xA1)   -- RightShift down
-        keyrelease(0xA1) -- RightShift up
-    end)
+    local orionGui = game.CoreGui:FindFirstChild("Orion")
+    if not orionGui and gethui then
+        orionGui = gethui():FindFirstChild("Orion")
+    end
+    if orionGui then
+        orionGui.Enabled = not orionGui.Enabled
+    end
 end)
