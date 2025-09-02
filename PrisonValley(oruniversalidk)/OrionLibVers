@@ -635,18 +635,18 @@ toggleButton.Image = "rbxthumb://type=Asset&id=7546367595&w=420&h=420"
 
 toggleButton.MouseButton1Click:Connect(function()
     pcall(function()
-        -- Enable Orion GUI
         local orionGui = game.CoreGui:FindFirstChild("Orion")
         if not orionGui and gethui then
             orionGui = gethui():FindFirstChild("Orion")
         end
+
         if orionGui then
+            -- Attempt to enable GUI manually
             orionGui.Enabled = true
         end
-        wait(1)
-        -- Fire RightShift keypress as backup
+
+        -- Always fire RightShift as backup
         keypress(0xA1)   -- RightShift down
-        wait(0.05)
         keyrelease(0xA1) -- RightShift up
     end)
 end)
