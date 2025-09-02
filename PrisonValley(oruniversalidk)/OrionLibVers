@@ -436,11 +436,13 @@ local function applyInmateInventory(state)
     inmateInventoryEnabled = state
     if not state then
         for _, p in ipairs(Players:GetPlayers()) do
-            if isInmate(p) then removeBillboardForPlayer(p) end
+            if p ~= LocalPlayer and isInmate(p) then
+                removeBillboardForPlayer(p)
+            end
         end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if isInmate(p) and p.Character then
+            if p ~= LocalPlayer and isInmate(p) and p.Character then
                 createBillboardForPlayer(p, p.Character)
                 refreshItemsForPlayer(p)
             end
@@ -452,11 +454,13 @@ local function applyInmateChams(state)
     inmateChamsEnabled = state
     if not state then
         for _, p in ipairs(Players:GetPlayers()) do
-            if isInmate(p) then removeChamsForPlayer(p) end
+            if p ~= LocalPlayer and isInmate(p) then
+                removeChamsForPlayer(p)
+            end
         end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if isInmate(p) and p.Character then
+            if p ~= LocalPlayer and isInmate(p) and p.Character then
                 makeChamsForChar(p, p.Character)
                 updateChamsColorForPlayer(p, getTeamColor(p))
             end
@@ -468,11 +472,13 @@ local function applyOfficerInventory(state)
     officerInventoryEnabled = state
     if not state then
         for _, p in ipairs(Players:GetPlayers()) do
-            if not isInmate(p) and p ~= LocalPlayer then removeBillboardForPlayer(p) end
+            if p ~= LocalPlayer and not isInmate(p) then
+                removeBillboardForPlayer(p)
+            end
         end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if not isInmate(p) and p.Character and p ~= LocalPlayer then
+            if p ~= LocalPlayer and not isInmate(p) and p.Character then
                 createBillboardForPlayer(p, p.Character)
                 refreshItemsForPlayer(p)
             end
@@ -484,11 +490,13 @@ local function applyOfficerChams(state)
     officerChamsEnabled = state
     if not state then
         for _, p in ipairs(Players:GetPlayers()) do
-            if not isInmate(p) and p ~= LocalPlayer then removeChamsForPlayer(p) end
+            if p ~= LocalPlayer and not isInmate(p) then
+                removeChamsForPlayer(p)
+            end
         end
     else
         for _, p in ipairs(Players:GetPlayers()) do
-            if not isInmate(p) and p.Character and p ~= LocalPlayer then
+            if p ~= LocalPlayer and not isInmate(p) and p.Character then
                 makeChamsForChar(p, p.Character)
                 updateChamsColorForPlayer(p, getTeamColor(p))
             end
