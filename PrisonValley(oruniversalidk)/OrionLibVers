@@ -117,7 +117,7 @@ local function makeChamsForChar(player, char)
     highlight.Name = "IV_ChamHighlight"
     highlight.Adornee = char
     highlight.FillColor = getTeamColor(player)
-    highlight.FillTransparency = 0.5
+    highlight.FillTransparency = 0.1
     highlight.OutlineTransparency = 0
     highlight.Parent = char
 
@@ -522,10 +522,84 @@ end
         Callback = function(val) applyOfficerChams(val) end
     })
 
+-- === ESP Tab Additions ===
+Tab:AddLabel("Part Esp")
+
+local metalEspEnabled = false
+local plasticEspEnabled = false
+local metalHighlights = {}
+local plasticHighlights = {}
+
+local function addHighlight(part, color)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "PartESP_Highlight"
+    highlight.Adornee = part
+    highlight.FillColor = color
+    highlight.FillTransparency = 0 -- fully visible
+    highlight.OutlineTransparency = 1 -- no outline
+    highlight.Parent = part
+    return highlight
+end
+
+local function updatePartEsp()
+    -- Clear invalid highlights
+    for part, hl in pairs(metalHighlights) do
+        if not part or not part.Parent or part.Transparency ~= 0 or not metalEspEnabled then
+            if hl then hl:Destroy() end
+            metalHighlights[part] = nil
+        end
+    end
+    for part, hl in pairs(plasticHighlights) do
+        if not part or not part.Parent or part.Transparency ~= 0 or not plasticEspEnabled then
+            if hl then hl:Destroy() end
+            plasticHighlights[part] = nil
+        end
+    end
+
+    -- Re-scan Crafting folder
+    local craftingFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Functional") and workspace.Map.Functional:FindFirstChild("Crafting")
+    if craftingFolder then
+        for _, obj in ipairs(craftingFolder:GetChildren()) do
+            if obj:IsA("BasePart") and obj.Transparency == 0 then
+                if obj.Name == "Metal" and metalEspEnabled and not metalHighlights[obj] then
+                    metalHighlights[obj] = addHighlight(obj, Color3.fromRGB(128, 128, 128)) -- Gray
+                elseif obj.Name == "Plastic" and plasticEspEnabled and not plasticHighlights[obj] then
+                    plasticHighlights[obj] = addHighlight(obj, Color3.fromRGB(255, 140, 0)) -- Orange
+                end
+            end
+        end
+    end
+end
+
+-- Run update every second
+task.spawn(function()
+    while task.wait(1) do
+        updatePartEsp()
+    end
+end)
+
+Tab:AddToggle({
+    Name = "Metal Esp",
+    Default = false,
+    Callback = function(val)
+        metalEspEnabled = val
+        updatePartEsp()
+    end
+})
+
+Tab:AddToggle({
+    Name = "Plastic Esp",
+    Default = false,
+    Callback = function(val)
+        plasticEspEnabled = val
+        updatePartEsp()
+    end
+})
+
 -----others tab
     -- 🟢 New "Others" tab
     local OthersTab = Window:MakeTab({
-        Name = "Others",
+        Name = "Other",
         Icon = "rbxassetid://4483345998",
         PremiumOnly = false
     })
