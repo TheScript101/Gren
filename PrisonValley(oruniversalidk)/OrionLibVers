@@ -545,6 +545,9 @@ end
         PremiumOnly = false
     })
 
+    -- Label at the top
+    Tab:AddLabel("Player ESP")
+
     -- Inmate toggles
     Tab:AddToggle({
         Name = "Inmate Inventory ESP",
