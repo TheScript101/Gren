@@ -627,8 +627,6 @@ OthersTab:AddButton({
     end
 })
 
-})
-
     OrionLib:Init()
 else
     warn("Orion failed to load. Toggles will remain variables — set them manually in the script if needed.")
