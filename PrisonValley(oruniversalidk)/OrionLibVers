@@ -103,10 +103,8 @@ end
 local function removeChamsForPlayer(player)
     local dat = chamsData[player]
     if not dat then return end
-    for _, entry in ipairs(dat) do
-        safeDestroy(entry.box)
-        safeDestroy(entry.outline)
-        safeDestroy(entry.fallbackHighlight)
+    for _, obj in ipairs(dat) do
+        safeDestroy(obj)
     end
     chamsData[player] = nil
 end
@@ -115,69 +113,24 @@ local function makeChamsForChar(player, char)
     removeChamsForPlayer(player)
     if not char then return end
 
-    local parts = {}
-    for _, p in ipairs(char:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(parts, p)
-        end
-    end
-    if #parts == 0 then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "IV_ChamHighlight"
+    highlight.Adornee = char
+    highlight.FillColor = getTeamColor(player)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = char
 
-    chamsData[player] = {}
-    local color = getTeamColor(player)
-    local outlineColor = Color3.fromRGB(255,255,255)
-
-    for _, part in ipairs(parts) do
-        -- try BoxHandleAdornment
-        local ok, box = pcall(function()
-            local b = Instance.new("BoxHandleAdornment")
-            b.Name = "IV_ChamBox"
-            b.Adornee = part
-            b.Size = part.Size
-            b.AlwaysOnTop = true
-            b.ZIndex = 10
-            b.Transparency = 0.6
-            b.Color3 = color
-            b.Parent = workspace
-            return b
-        end)
-
-        -- try SelectionBox for outline
-        -- no SelectionBox, only BoxHandleAdornment
-        local ok2, sel = false, nil
-
-
-        if ok and box then
-            table.insert(chamsData[player], {part = part, box = box, outline = (ok2 and sel or nil)})
-        else
-            -- fallback to Highlight
-            local okh, h = pcall(function()
-                local hh = Instance.new("Highlight")
-                hh.Name = "IV_Cham_Highlight"
-                hh.Adornee = part
-                hh.FillTransparency = 0.6
-                hh.OutlineTransparency = 0
-                hh.Parent = part
-                return hh
-            end)
-            local entry = {part = part, fallbackHighlight = okh and h or nil}
-            if ok2 and sel then entry.outline = sel end
-            table.insert(chamsData[player], entry)
-        end
-    end
+    chamsData[player] = { highlight }
 end
+
 
 local function updateChamsColorForPlayer(player, color3)
     local dat = chamsData[player]
     if not dat then return end
-    for _, entry in ipairs(dat) do
-        if entry.box then
-            pcall(function() entry.box.Color3 = color3 end)
-        elseif entry.fallbackHighlight then
-            pcall(function() entry.fallbackHighlight.FillColor = color3 end)
-        end
-        if entry.outline then
-            pcall(function() entry.outline.Color3 = Color3.fromRGB(255,255,255) end)
+    for _, obj in ipairs(dat) do
+        if obj:IsA("Highlight") then
+            obj.FillColor = color3
         end
     end
 end
