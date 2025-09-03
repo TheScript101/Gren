@@ -610,19 +610,22 @@ end
             dropToolGui.Enabled = val
         end
 
-    OthersTab:AddToggle({
-        Name = "Camlock",
-        Default = false,
-        Callback = function(val)
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/PrisonValley(oruniversalidk)/Scripts/Camlock"))()
-        end
+-- Camlock Button
+OthersTab:AddButton({
+    Name = "Camlock",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/PrisonValley(oruniversalidk)/Scripts/Camlock"))()
+    end
+})
 
-    OthersTab:AddToggle({
-        Name = "Shfitlock",
-        Default = false,
-        Callback = function(val)
-            loadstring(game:HttpGet(""))()
-        end
+-- Shiftlock Button
+OthersTab:AddButton({
+    Name = "Shiftlock",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/PrisonValley(oruniversalidk)/Scripts/shiftlock.txt"))()
+    end
+})
+
 })
 
     OrionLib:Init()
