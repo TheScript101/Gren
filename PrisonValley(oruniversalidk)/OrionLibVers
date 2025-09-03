@@ -117,8 +117,8 @@ local function makeChamsForChar(player, char)
     highlight.Name = "IV_ChamHighlight"
     highlight.Adornee = char
     highlight.FillColor = getTeamColor(player)
-    highlight.FillTransparency = 0.1
-    highlight.OutlineTransparency = 0
+    highlight.FillTransparency = 0
+    highlight.OutlineTransparency = 1
     highlight.Parent = char
 
     chamsData[player] = { highlight }
