@@ -523,6 +523,10 @@ local TeleportTab = Window:MakeTab({
 local teleportLocations = {
     ["Min/Med Upstairs Cell"] = Vector3.new(2.545670509338379, 24.150676727294922, -121.7835464477539),
     ["Min/Med Library"] = Vector3.new(-17.78934669494629, 11.332402229309082, 14.463046073913574),
+    ["Min/Med Cafeteria"] = Vector3.new(74.98039245605469, 11.225303649902344, 54.6698112487793),
+    ["Min/Med Laundry"] = Vector3.new(-7.047715663909912, 16.22312355041504, 7.602529048919678),
+    ["Min/Med Gym"] = Vector3.new(77.79547119140625, 22.099599838256836, 56.64850997924805),
+    ["Min/Med Storage"] = Vector3.new(31.814455032348633, 22.140748977661133, -8.378829002380371),
     -- Add more locations here
 }
 
