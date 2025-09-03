@@ -143,16 +143,9 @@ local function makeChamsForChar(player, char)
         end)
 
         -- try SelectionBox for outline
-        local ok2, sel = pcall(function()
-            local s = Instance.new("SelectionBox")
-            s.Name = "IV_ChamOutline"
-            s.Adornee = part
-            s.LineThickness = 0.02
-            s.Color3 = outlineColor
-            s.SurfaceTransparency = 1
-            s.Parent = workspace
-            return s
-        end)
+        -- no SelectionBox, only BoxHandleAdornment
+        local ok2, sel = false, nil
+
 
         if ok and box then
             table.insert(chamsData[player], {part = part, box = box, outline = (ok2 and sel or nil)})
