@@ -473,6 +473,9 @@ local teleportLocations = {
     ["Min/Med Laundry"] = Vector3.new(-7.047715663909912, 16.22312355041504, 7.602529048919678),
     ["Min/Med Storage"] = Vector3.new(77.79547119140625, 22.099599838256836, 56.64850997924805),
     ["Min/Med Gym"] = Vector3.new(31.814455032348633, 22.140748977661133, -8.378829002380371),
+    ["Max Solitary"] = Vector3.new(170, -9, -22),
+    ["Max Generator"] = Vector3.new(103, -9, -56),
+    ["Exit Door"] = Vector3.new(209, 11, -183),
     -- Add more locations here
 }
 
