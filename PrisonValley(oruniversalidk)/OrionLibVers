@@ -610,6 +610,7 @@ end
         Callback = function(val)
             dropToolGui.Enabled = val
         end
+})
 
 -- Camlock Button
 OthersTab:AddButton({
