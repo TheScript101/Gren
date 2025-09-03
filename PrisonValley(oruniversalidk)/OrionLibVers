@@ -530,25 +530,26 @@ local plasticEspEnabled = false
 local metalHighlights = {}
 local plasticHighlights = {}
 
-local function addHighlight(part, color)
+local function addHighlight(part, color, espType)
     local highlight = Instance.new("Highlight")
-    highlight.Name = "PartESP_Highlight"
+    highlight.Name = espType .. "_ESP_Highlight"
     highlight.Adornee = part
     highlight.FillColor = color
     highlight.FillTransparency = 0 -- fully visible
     highlight.OutlineTransparency = 1 -- no outline
-    highlight.Parent = part
+    highlight.Parent = game:GetService("CoreGui") -- parent outside part so no overwrite
     return highlight
 end
 
 local function updatePartEsp()
-    -- Clear invalid highlights
+    -- Clear invalid metal highlights
     for part, hl in pairs(metalHighlights) do
         if not part or not part.Parent or part.Transparency ~= 0 or not metalEspEnabled then
             if hl then hl:Destroy() end
             metalHighlights[part] = nil
         end
     end
+    -- Clear invalid plastic highlights
     for part, hl in pairs(plasticHighlights) do
         if not part or not part.Parent or part.Transparency ~= 0 or not plasticEspEnabled then
             if hl then hl:Destroy() end
@@ -562,9 +563,9 @@ local function updatePartEsp()
         for _, obj in ipairs(craftingFolder:GetChildren()) do
             if obj:IsA("BasePart") and obj.Transparency == 0 then
                 if obj.Name == "Metal" and metalEspEnabled and not metalHighlights[obj] then
-                    metalHighlights[obj] = addHighlight(obj, Color3.fromRGB(128, 128, 128)) -- Gray
+                    metalHighlights[obj] = addHighlight(obj, Color3.fromRGB(255, 255, 255), "Metal") -- White
                 elseif obj.Name == "Plastic" and plasticEspEnabled and not plasticHighlights[obj] then
-                    plasticHighlights[obj] = addHighlight(obj, Color3.fromRGB(255, 140, 0)) -- Orange
+                    plasticHighlights[obj] = addHighlight(obj, Color3.fromRGB(255, 140, 0), "Plastic") -- Orange
                 end
             end
         end
@@ -595,6 +596,7 @@ Tab:AddToggle({
         updatePartEsp()
     end
 })
+
 
 -----others tab
     -- 🟢 New "Others" tab
