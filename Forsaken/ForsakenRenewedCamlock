@@ -43,9 +43,14 @@ wait(2)
 
 -- Camlock/Aimlock
 pcall(function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Cam-Lock-23358"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/CombatWarriros/Camlock"))()
 end)
---------------------------------------------------------------------------------------------------------------------
+
+-- other thing
+pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/NyansakenHub/NyansakenHub/refs/heads/main/forsaken.lua"))()
+end)
+------------------------------------------------------------------------
 wait(0.5)
 local CoreGui = game:GetService("CoreGui")
 
