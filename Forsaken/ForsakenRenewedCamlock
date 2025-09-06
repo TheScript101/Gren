@@ -43,7 +43,7 @@ wait(2)
 
 -- Camlock/Aimlock
 pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/CombatWarriros/Camlock"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/CamlockRedid"))()
 end)
 
 -- other thing
