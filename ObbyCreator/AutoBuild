@@ -283,7 +283,7 @@ local function buildModelFromAsset(assetId)
         progLabel.Text = string.format("Sent %d/%d", spawned, total)
 
         -- wait 1 second before spawning the next part (game limit)
-        task.wait(1)
+        task.wait(1.80)
     end
 
     if cancelBuild then
