@@ -403,93 +403,48 @@ local function buildModelFromAsset(assetId)
     for idx, entry in ipairs(list) do
         if cancelBuild then break end
 
-        local args = { [1] = "Part", [2] = CFrame.new(entry.pos) }
-        local ok, err = safeFireAdd(args)
+        -- Compute the intended CFrame and Size from the entry
+        local targetSize = entry.sourceSize or BLOCK_SIZE
+        local targetCFrame
 
-        spawned = spawned + 1
-        if ok then succeeded = succeeded + 1 else failed = failed + 1 end
-        progLabel.Text = string.format("Sent %d/%d", spawned, total)
-
-        -- After spawn: robustly search and apply transforms (move/resize/rotate) and then paint/anchor using retries
-        local function tryTransformAndPaintWithRetries()
-            -- if no color/size info, nothing to do
-            local searchRadius = math.max(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z) * 0.8
-            local attempts = { 0.12, 0.18, 0.28, 0.45, 0.8, 1.25 }
-            for i = 1, #attempts do
-                if cancelBuild then return false end
-                local found = findNearestUnpaintedPart(entry.pos, searchRadius)
-                if found then
-                    -- NEW: apply move/resize/rotate if we have source size/CFrame and not already transformed
-                    if not transformedSet[found] and (entry.sourceSize or entry.sourceCFrame) then
-                        local targetSize = entry.sourceSize or found.Size
-                        local targetCFrame = nil
-                        -- compute rotation-only component from sourceCFrame if available
-                        if entry.sourceCFrame and entry.sourcePosition then
-                            -- rotationOnly = sourceCFrame * CFrame.new(-sourcePosition)
-                            local okRot, rotationOnly = pcall(function()
-                                return entry.sourceCFrame * CFrame.new(-entry.sourcePosition)
-                            end)
-                            if okRot and rotationOnly then
-                                targetCFrame = CFrame.new(entry.pos) * rotationOnly
-                            end
-                        end
-                        -- fallback: if no source rotation found just use position-only CFrame
-                        if not targetCFrame then targetCFrame = CFrame.new(entry.pos) end
-
-                        -- attempt move
-                        local mOk, mErr = safeMove(found, targetCFrame, targetSize)
-                        if mOk then
-                            transformedSet[found] = true
-                            -- try anchoring right away (safe)
-                            pcall(function() found.Anchored = true end)
-                        end
-                    end
-
-                    -- attempt anchor regardless (safe)
-                    pcall(function() found.Anchored = true end)
-
-                    -- painting: only if sourceColor exists and not already painted
-                    if entry.sourceColor and not paintedSet[found] then
-                        -- check if server already colored same color
-                        local okF, fcol = pcall(function() return found.Color end)
-                        if okF and fcol then
-                            local dr = math.abs(fcol.R - entry.sourceColor.R)
-                            local dg = math.abs(fcol.G - entry.sourceColor.G)
-                            local db = math.abs(fcol.B - entry.sourceColor.B)
-                            if dr <= 0.01 and dg <= 0.01 and db <= 0.01 then
-                                paintedSet[found] = true
-                                return true
-                            end
-                        end
-
-                        local pOk, pErr = safePaint(found, entry.sourceColor)
-                        if pOk then
-                            paintedSet[found] = true
-                            -- anchor after successful paint (safe)
-                            pcall(function() found.Anchored = true end)
-                            return true
-                        else
-                            -- even if paint failed, we may have transformed the part; anchor and continue trying
-                            pcall(function() found.Anchored = true end)
-                            -- continue retrying paint in later attempts
-                        end
-                    else
-                        -- either no source color or already painted: treat transform as success if transformed or anchored
-                        if transformedSet[found] then return true end
-                    end
-                end
-                task.wait(attempts[i]) -- progressively wait
-            end
-            return false
+        if entry.sourceCFrame then
+            -- Use exact CFrame if provided
+            targetCFrame = entry.sourceCFrame
+        else
+            -- fallback: just place at position
+            targetCFrame = CFrame.new(entry.pos)
         end
 
-        pcall(tryTransformAndPaintWithRetries)
+        -- Step 1: Add the part
+        local args = { [1] = "Part", [2] = CFrame.new(entry.pos) }
+        local okAdd, errAdd = safeFireAdd(args)
+
+        spawned = spawned + 1
+        if okAdd then
+            succeeded = succeeded + 1
+        else
+            failed = failed + 1
+        end
+        progLabel.Text = string.format("Sent %d/%d", spawned, total)
+
+        -- Step 2: If spawn succeeded, immediately move/resize/rotate
+        if okAdd then
+            -- MoveObject uses the target placement + size
+            local okMove, errMove = safeMove(nil, targetCFrame, targetSize)
+            if okMove then
+                -- anchor after move
+                -- paint if we have a sourceColor
+                if entry.sourceColor then
+                    safePaint(nil, entry.sourceColor)
+                end
+            end
+        end
 
         -- obey global spawn delay (rate-limit)
         task.wait(SPAWN_DELAY)
     end
 
-    -- cleanup saved clone & file (both on normal finish and on cancel path above)
+    -- cleanup saved clone & file
     if savedClone and savedClone.Parent then
         pcall(function() savedClone:Destroy() end)
     end
