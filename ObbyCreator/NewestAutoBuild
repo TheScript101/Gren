@@ -1,3 +1,5 @@
+-- (Full script — same as before, with a small bugfix for color comparison)
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -326,9 +328,16 @@ local function buildModelFromAsset(assetId)
         if found then
             -- check if it already has the target color (avoid repaint)
             local alreadySameColor = false
-            if found:IsA("BasePart") and found.Color then
-                if (found.Color - targetColor).Magnitude <= 0.01 then
-                    alreadySameColor = true
+            if found and found:IsA("BasePart") then
+                -- SAFE component-wise comparison (fixes arithmetic error from subtracting Color3s)
+                local okColor, fcol = pcall(function() return found.Color end)
+                if okColor and fcol then
+                    local dr = math.abs(fcol.R - targetColor.R)
+                    local dg = math.abs(fcol.G - targetColor.G)
+                    local db = math.abs(fcol.B - targetColor.B)
+                    if dr <= 0.01 and dg <= 0.01 and db <= 0.01 then
+                        alreadySameColor = true
+                    end
                 end
             end
 
