@@ -1,4 +1,4 @@
--- (Full script — same as before, with a small bugfix for color comparison)
+-- Full script with model-source color detection (copies source part color to spawned blocks)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +34,370 @@ frame.Visible = true
 local corner = Instance.new("UICorner", frame)
 corner.CornerRadius = UDim.new(0,8)
 
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -20, 0, 28)
+title.Position = UDim2.new(0, 10, 0, 8)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Text = "Fast Model Builder"
+
+local idBox = Instance.new("TextBox", frame)
+idBox.Size = UDim2.new(1, -20, 0, 30)
+idBox.Position = UDim2.new(0, 10, 0, 42)
+idBox.PlaceholderText = "Enter model ID (numbers only)"
+idBox.ClearTextOnFocus = false
+idBox.Text = ""
+
+local buildBtn = Instance.new("TextButton", frame)
+buildBtn.Size = UDim2.new(0.48, -10, 0, 34)
+buildBtn.Position = UDim2.new(0, 10, 0, 80)
+buildBtn.Text = "Build"
+buildBtn.Font = Enum.Font.GothamBold
+buildBtn.TextSize = 15
+buildBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
+buildBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local cancelBtn = Instance.new("TextButton", frame)
+cancelBtn.Size = UDim2.new(0.48, -10, 0, 34)
+cancelBtn.Position = UDim2.new(0.52, 0, 0, 80)
+cancelBtn.Text = "Cancel"
+cancelBtn.Font = Enum.Font.GothamBold
+cancelBtn.TextSize = 15
+cancelBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+cancelBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local progLabel = Instance.new("TextLabel", frame)
+progLabel.Size = UDim2.new(1, -20, 0, 20)
+progLabel.Position = UDim2.new(0, 10, 0, 124)
+progLabel.BackgroundTransparency = 1
+progLabel.Font = Enum.Font.Gotham
+progLabel.TextSize = 13
+progLabel.TextColor3 = Color3.fromRGB(200,200,200)
+progLabel.Text = "Idle"
+
+local toggleGuiBtn = Instance.new("TextButton", screenGui)
+toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
+toggleGuiBtn.Position = UDim2.new(1, -60, 0.35, 0)
+toggleGuiBtn.Text = "⚙️"
+toggleGuiBtn.Font = Enum.Font.Gotham
+toggleGuiBtn.TextSize = 20
+toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+toggleGuiBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleGuiBtn.Name = "ToggleBuilder"
+
+toggleGuiBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+cancelBtn.MouseButton1Click:Connect(function()
+    cancelBuild = true
+end)
+
+-- ---------- Helpers ----------
+local function snapToGrid(pos)
+    return Vector3.new(
+        math.floor(pos.X / BLOCK_SIZE.X + 0.5) * BLOCK_SIZE.X,
+        math.floor(pos.Y / BLOCK_SIZE.Y + 0.5) * BLOCK_SIZE.Y,
+        math.floor(pos.Z / BLOCK_SIZE.Z + 0.5) * BLOCK_SIZE.Z
+    )
+end
+
+local function makeKey(v)
+    -- string key for dedupe
+    return string.format("%.3f,%.3f,%.3f", v.X, v.Y, v.Z)
+end
+
+local function pointInsidePart(part, worldPoint)
+    local ok, localP = pcall(function() return part.CFrame:PointToObjectSpace(worldPoint) end)
+    if not ok or not localP then return false end
+    local sx, sy, sz = part.Size.X/2 + EPSILON, part.Size.Y/2 + EPSILON, part.Size.Z/2 + EPSILON
+    return math.abs(localP.X) <= sx and math.abs(localP.Y) <= sy and math.abs(localP.Z) <= sz
+end
+
+local function partWorldAABB(part)
+    local hx, hy, hz = part.Size.X/2, part.Size.Y/2, part.Size.Z/2
+    local corners = {
+        Vector3.new( hx,  hy,  hz),
+        Vector3.new( hx,  hy, -hz),
+        Vector3.new( hx, -hy,  hz),
+        Vector3.new( hx, -hy, -hz),
+        Vector3.new(-hx,  hy,  hz),
+        Vector3.new(-hx,  hy, -hz),
+        Vector3.new(-hx, -hy,  hz),
+        Vector3.new(-hx, -hy, -hz),
+    }
+    local minx, miny, minz = math.huge, math.huge, math.huge
+    local maxx, maxy, maxz = -math.huge, -math.huge, -math.huge
+    for _, c in ipairs(corners) do
+        local world = part.CFrame:PointToWorldSpace(c)
+        minx = math.min(minx, world.X); miny = math.min(miny, world.Y); minz = math.min(minz, world.Z)
+        maxx = math.max(maxx, world.X); maxy = math.max(maxy, world.Y); maxz = math.max(maxz, world.Z)
+    end
+    return Vector3.new(minx, miny, minz), Vector3.new(maxx, maxy, maxz)
+end
+
+-- AddObject wrapper
+local isRemoteEvent = AddObjectRemote.ClassName == "RemoteEvent"
+local function safeFireAdd(args)
+    if isRemoteEvent then
+        local ok, err = pcall(function() AddObjectRemote:FireServer(unpack(args)) end)
+        return ok, err
+    else
+        local co = coroutine.create(function()
+            pcall(function() AddObjectRemote:InvokeServer(unpack(args)) end)
+        end)
+        local ok, err = coroutine.resume(co)
+        return ok, err
+    end
+end
+
+-- PaintObject wrapper
+local isPaintEvent = PaintRemote.ClassName == "RemoteEvent"
+local function safePaint(partInstance, color3)
+    if not partInstance or not partInstance.Parent then return false, "no part" end
+    -- structure matches your example: first argument is a table containing the part reference
+    local args = {
+        [1] = { [1] = partInstance },
+        [2] = "Color",
+        [3] = color3
+    }
+    if isPaintEvent then
+        local ok, err = pcall(function() PaintRemote:FireServer(unpack(args)) end)
+        return ok, err
+    else
+        local ok, err = pcall(function() PaintRemote:InvokeServer(unpack(args)) end)
+        return ok, err
+    end
+end
+
+-- Find nearest unpainted part in the known folder (search radius tolerant)
+local function findNearestUnpaintedPart(targetPos, maxRadius)
+    maxRadius = maxRadius or math.max(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z) * 0.6
+    local ok
+    local partsFolder
+    ok, partsFolder = pcall(function()
+        return workspace:WaitForChild("Obbies"):WaitForChild("bogui_5"):WaitForChild("Items"):WaitForChild("Parts")
+    end)
+    if not ok or not partsFolder then return nil end
+
+    local best, bestDist
+    for _, c in ipairs(partsFolder:GetChildren()) do
+        if c:IsA("BasePart") and c.Name == "Part" then
+            if paintedSet[c] then
+                -- skip if we already painted on client-side
+            else
+                local dist = (c.Position - targetPos).Magnitude
+                if dist <= maxRadius then
+                    if not best or dist < bestDist then
+                        best = c
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- ---------- Voxelization & Build ----------
+local function buildModelFromAsset(assetId)
+    cancelBuild = false
+    progLabel.Text = "Loading asset..."
+    local success, arr = pcall(function()
+        return game:GetObjects("rbxassetid://" .. tostring(assetId))
+    end)
+    if not success or not arr or #arr == 0 then
+        progLabel.Text = "Failed to load asset."
+        return
+    end
+    local model = arr[1]
+
+    if not model.PrimaryPart then
+        for _, v in ipairs(model:GetDescendants()) do
+            if v:IsA("BasePart") then
+                model.PrimaryPart = v
+                break
+            end
+        end
+        if not model.PrimaryPart then
+            progLabel.Text = "Model has no parts."
+            model:Destroy()
+            return
+        end
+    end
+
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local origin = hrp.Position
+    local offset = origin - model.PrimaryPart.Position
+
+    progLabel.Text = "Voxelizing..."
+    local voxelSet = {}
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local aabbMin, aabbMax = partWorldAABB(part)
+            aabbMin = aabbMin - Vector3.new(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z)
+            aabbMax = aabbMax + Vector3.new(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z)
+
+            local ixMin = math.floor(aabbMin.X / BLOCK_SIZE.X) - 1
+            local iyMin = math.floor(aabbMin.Y / BLOCK_SIZE.Y) - 1
+            local izMin = math.floor(aabbMin.Z / BLOCK_SIZE.Z) - 1
+            local ixMax = math.ceil(aabbMax.X / BLOCK_SIZE.X) + 1
+            local iyMax = math.ceil(aabbMax.Y / BLOCK_SIZE.Y) + 1
+            local izMax = math.ceil(aabbMax.Z / BLOCK_SIZE.Z) + 1
+
+            for ix = ixMin, ixMax do
+                if cancelBuild then break end
+                local x = ix * BLOCK_SIZE.X
+                for iy = iyMin, iyMax do
+                    local y = iy * BLOCK_SIZE.Y
+                    for iz = izMin, izMax do
+                        local z = iz * BLOCK_SIZE.Z
+                        local center = Vector3.new(x, y, z)
+                        if center.X >= aabbMin.X - 0.001 and center.X <= aabbMax.X + 0.001
+                        and center.Y >= aabbMin.Y - 0.001 and center.Y <= aabbMax.Y + 0.001
+                        and center.Z >= aabbMin.Z - 0.001 and center.Z <= aabbMax.Z + 0.001 then
+                            if pointInsidePart(part, center) then
+                                local key = makeKey(center)
+                                -- store both center and its source part so we can copy color later
+                                voxelSet[key] = { center = center, source = part }
+                            end
+                        end
+                    end
+                    if cancelBuild then break end
+                end
+                if cancelBuild then break end
+            end
+            if cancelBuild then break end
+        end
+    end
+
+    if cancelBuild then
+        progLabel.Text = "Canceled."
+        model:Destroy()
+        return
+    end
+
+    progLabel.Text = "Preparing placement..."
+    local finalSet = {}
+    -- finalSet now maps snappedKey -> { pos = snappedPos, source = sourcePart }
+    for _, v in pairs(voxelSet) do
+        local center = v.center
+        local sourcePart = v.source
+        local targetWorld = center + offset
+        local snapped = snapToGrid(targetWorld)
+        local snappedKey = makeKey(snapped)
+        -- keep first encountered source for a snapped cell (simple dedupe)
+        if not finalSet[snappedKey] then
+            finalSet[snappedKey] = { pos = snapped, source = sourcePart }
+        end
+    end
+
+    local list = {}
+    local hrpPos = hrp.Position
+    for _, v in pairs(finalSet) do
+        table.insert(list, v) -- v = { pos = Vector3, source = BasePart }
+    end
+    table.sort(list, function(a,b)
+        return (a.pos - hrpPos).Magnitude < (b.pos - hrpPos).Magnitude
+    end)
+
+    progLabel.Text = ("Spawning %d blocks..."):format(#list)
+    local spawned = 0
+    local succeeded = 0
+    local failed = 0
+    local total = #list
+
+    for idx, entry in ipairs(list) do
+        if cancelBuild then break end
+
+        local args = {
+            [1] = "Part",
+            [2] = CFrame.new(entry.pos)
+        }
+
+        local ok, err = safeFireAdd(args)
+
+        spawned = spawned + 1
+        if ok then succeeded = succeeded + 1 else failed = failed + 1 end
+
+        progLabel.Text = string.format("Sent %d/%d", spawned, total)
+
+        -- slight pause to give the server time to create the part in the target folder
+        task.wait(0.15)
+
+        -- try to find the newly-created unpainted part near the spawn pos
+        local found = findNearestUnpaintedPart(entry.pos, math.max(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z) * 0.8)
+        if found then
+            -- determine color from the source part (safe access)
+            local sourceColor
+            local okColor = false
+            if entry.source then
+                okColor, sourceColor = pcall(function() return entry.source.Color end)
+            end
+            if not okColor or not sourceColor then
+                -- fallback: try to use found.Color as source (if server created pre-colored parts)
+                local okF, fcol = pcall(function() return found.Color end)
+                if okF and fcol then
+                    sourceColor = fcol
+                end
+            end
+
+            if sourceColor then
+                -- check if it already has the same color (component-wise)
+                local alreadySameColor = false
+                local okFcol, fcol = pcall(function() return found.Color end)
+                if okFcol and fcol then
+                    local dr = math.abs(fcol.R - sourceColor.R)
+                    local dg = math.abs(fcol.G - sourceColor.G)
+                    local db = math.abs(fcol.B - sourceColor.B)
+                    if dr <= 0.01 and dg <= 0.01 and db <= 0.01 then
+                        alreadySameColor = true
+                    end
+                end
+
+                if not alreadySameColor and not paintedSet[found] then
+                    local pOk, pErr = safePaint(found, sourceColor)
+                    if pOk then
+                        paintedSet[found] = true
+                    end
+                end
+            end
+        end
+
+        -- wait SPAWN_DELAY seconds before next spawn (obey rate limit)
+        task.wait(SPAWN_DELAY)
+    end
+
+    if cancelBuild then
+        progLabel.Text = ("Canceled after %d/%d"):format(spawned, total)
+    else
+        progLabel.Text = ("Done. Sent %d blocks (failed %d)."):format(succeeded, failed)
+    end
+end
+
+-- ---------- UI Bind ----------
+buildBtn.MouseButton1Click:Connect(function()
+    local id = tonumber(idBox.Text)
+    if not id then
+        progLabel.Text = "Invalid ID"
+        return
+    end
+    cancelBuild = false
+    progLabel.Text = "Starting..."
+    task.spawn(function()
+        buildModelFromAsset(id)
+    end)
+end)
+
+-- Cleanup convenience: hide on reset, optional
+Players.LocalPlayer.OnTeleport:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- End of script
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, -20, 0, 28)
 title.Position = UDim2.new(0, 10, 0, 8)
