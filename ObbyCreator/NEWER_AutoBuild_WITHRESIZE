@@ -1,0 +1,513 @@
+-- Full script with anchoring, cleanup, robust painting, AND rotation/size support (MoveObject)
+-- Minimal changes only: added MoveObject wrapper, stored sourceSize/sourceCFrame, and transform attempts.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local AddObjectRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("AddObject")
+local PaintRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("PaintObject")
+local MoveRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("MoveObject") -- NEW
+
+-- Config
+local BLOCK_SIZE = Vector3.new(4, 1, 2)
+local EPSILON = 0.01
+local SPAWN_DELAY = 1.80
+
+-- State
+local cancelBuild = false
+local paintedSet = {} -- keyed by instance
+local transformedSet = {} -- NEW: keyed by instance for move/resize/rotate
+local savedModelsFolderName = "Models" -- workspace folder name for saved model clones
+
+-- ---------- UI (unchanged) ----------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FastModelBuilder"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 360, 0, 170)
+frame.Position = UDim2.new(0.5, -180, 0.5, -85)
+frame.BackgroundColor3 = Color3.fromRGB(28, 28, 30)
+frame.BorderSizePixel = 0
+frame.Visible = true
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0,8)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -20, 0, 28)
+title.Position = UDim2.new(0, 10, 0, 8)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Text = "Fast Model Builder"
+
+local idBox = Instance.new("TextBox", frame)
+idBox.Size = UDim2.new(1, -20, 0, 30)
+idBox.Position = UDim2.new(0, 10, 0, 42)
+idBox.PlaceholderText = "Enter model ID (numbers only)"
+idBox.ClearTextOnFocus = false
+idBox.Text = ""
+
+local buildBtn = Instance.new("TextButton", frame)
+buildBtn.Size = UDim2.new(0.48, -10, 0, 34)
+buildBtn.Position = UDim2.new(0, 10, 0, 80)
+buildBtn.Text = "Build"
+buildBtn.Font = Enum.Font.GothamBold
+buildBtn.TextSize = 15
+buildBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
+buildBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local cancelBtn = Instance.new("TextButton", frame)
+cancelBtn.Size = UDim2.new(0.48, -10, 0, 34)
+cancelBtn.Position = UDim2.new(0.52, 0, 0, 80)
+cancelBtn.Text = "Cancel"
+cancelBtn.Font = Enum.Font.GothamBold
+cancelBtn.TextSize = 15
+cancelBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+cancelBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local progLabel = Instance.new("TextLabel", frame)
+progLabel.Size = UDim2.new(1, -20, 0, 20)
+progLabel.Position = UDim2.new(0, 10, 0, 124)
+progLabel.BackgroundTransparency = 1
+progLabel.Font = Enum.Font.Gotham
+progLabel.TextSize = 13
+progLabel.TextColor3 = Color3.fromRGB(200,200,200)
+progLabel.Text = "Idle"
+
+local toggleGuiBtn = Instance.new("TextButton", screenGui)
+toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
+toggleGuiBtn.Position = UDim2.new(1, -60, 0.35, 0)
+toggleGuiBtn.Text = "⚙️"
+toggleGuiBtn.Font = Enum.Font.Gotham
+toggleGuiBtn.TextSize = 20
+toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+toggleGuiBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleGuiBtn.Name = "ToggleBuilder"
+
+toggleGuiBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+cancelBtn.MouseButton1Click:Connect(function() cancelBuild = true end)
+
+-- ---------- Helpers ----------
+local function snapToGrid(pos)
+    return Vector3.new(
+        math.floor(pos.X / BLOCK_SIZE.X + 0.5) * BLOCK_SIZE.X,
+        math.floor(pos.Y / BLOCK_SIZE.Y + 0.5) * BLOCK_SIZE.Y,
+        math.floor(pos.Z / BLOCK_SIZE.Z + 0.5) * BLOCK_SIZE.Z
+    )
+end
+
+local function makeKey(v)
+    return string.format("%.3f,%.3f,%.3f", v.X, v.Y, v.Z)
+end
+
+local function pointInsidePart(part, worldPoint)
+    local ok, localP = pcall(function() return part.CFrame:PointToObjectSpace(worldPoint) end)
+    if not ok or not localP then return false end
+    local sx, sy, sz = part.Size.X/2 + EPSILON, part.Size.Y/2 + EPSILON, part.Size.Z/2 + EPSILON
+    return math.abs(localP.X) <= sx and math.abs(localP.Y) <= sy and math.abs(localP.Z) <= sz
+end
+
+local function partWorldAABB(part)
+    local hx, hy, hz = part.Size.X/2, part.Size.Y/2, part.Size.Z/2
+    local corners = {
+        Vector3.new( hx,  hy,  hz), Vector3.new( hx,  hy, -hz),
+        Vector3.new( hx, -hy,  hz), Vector3.new( hx, -hy, -hz),
+        Vector3.new(-hx,  hy,  hz), Vector3.new(-hx,  hy, -hz),
+        Vector3.new(-hx, -hy,  hz), Vector3.new(-hx, -hy, -hz),
+    }
+    local minx, miny, minz = math.huge, math.huge, math.huge
+    local maxx, maxy, maxz = -math.huge, -math.huge, -math.huge
+    for _, c in ipairs(corners) do
+        local world = part.CFrame:PointToWorldSpace(c)
+        minx = math.min(minx, world.X); miny = math.min(miny, world.Y); minz = math.min(minz, world.Z)
+        maxx = math.max(maxx, world.X); maxy = math.max(maxy, world.Y); maxz = math.max(maxz, world.Z)
+    end
+    return Vector3.new(minx, miny, minz), Vector3.new(maxx, maxy, maxz)
+end
+
+-- Remote wrappers (unchanged for AddObject/Paint)
+local isRemoteEvent = AddObjectRemote.ClassName == "RemoteEvent"
+local function safeFireAdd(args)
+    if isRemoteEvent then
+        local ok, err = pcall(function() AddObjectRemote:FireServer(unpack(args)) end)
+        return ok, err
+    else
+        local co = coroutine.create(function()
+            pcall(function() AddObjectRemote:InvokeServer(unpack(args)) end)
+        end)
+        local ok, err = coroutine.resume(co)
+        return ok, err
+    end
+end
+
+local isPaintEvent = PaintRemote.ClassName == "RemoteEvent"
+local function safePaint(partInstance, color3)
+    if not partInstance or not partInstance.Parent then return false, "no part" end
+    local args = { [1] = { [1] = partInstance }, [2] = "Color", [3] = color3 }
+    if isPaintEvent then
+        local ok, err = pcall(function() PaintRemote:FireServer(unpack(args)) end)
+        return ok, err
+    else
+        local ok, err = pcall(function() PaintRemote:InvokeServer(unpack(args)) end)
+        return ok, err
+    end
+end
+
+-- NEW: MoveObject wrapper (same pattern)
+local isMoveEvent = MoveRemote.ClassName == "RemoteEvent"
+local function safeMove(partInstance, targetCFrame, targetSize)
+    if not partInstance or not partInstance.Parent then return false, "no part" end
+    -- args shape based on your examples: top-level table with nested arrays
+    local moveArgs = {
+        [1] = {
+            [1] = {
+                [1] = partInstance,
+                [2] = targetCFrame,
+                [3] = targetSize
+            }
+        }
+    }
+    if isMoveEvent then
+        local ok, err = pcall(function() MoveRemote:FireServer(unpack(moveArgs)) end)
+        return ok, err
+    else
+        local ok, err = pcall(function() MoveRemote:InvokeServer(unpack(moveArgs)) end)
+        return ok, err
+    end
+end
+
+-- robust finder: search for nearest unpainted "Part" in the known folder (by position)
+local function findNearestUnpaintedPart(targetPos, maxRadius)
+    maxRadius = maxRadius or math.max(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z) * 0.6
+    local ok, partsFolder = pcall(function()
+        return workspace:WaitForChild("Obbies"):WaitForChild("bogui_5"):WaitForChild("Items"):WaitForChild("Parts")
+    end)
+    if not ok or not partsFolder then return nil end
+
+    local best, bestDist
+    for _, c in ipairs(partsFolder:GetChildren()) do
+        if c:IsA("BasePart") and c.Name == "Part" and not paintedSet[c] then
+            local dist = (c.Position - targetPos).Magnitude
+            if dist <= maxRadius then
+                if not best or dist < bestDist then best = c; bestDist = dist end
+            end
+        end
+    end
+    return best
+end
+
+-- Save model to workspace.Models and to disk (if writefile is available)
+local function ensureModelsFolder()
+    local folder = workspace:FindFirstChild(savedModelsFolderName)
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = savedModelsFolderName
+        folder.Parent = workspace
+    end
+    return folder
+end
+
+local function serializeModelParts(model)
+    local parts = {}
+    for _, p in ipairs(model:GetDescendants()) do
+        if p:IsA("BasePart") then
+            parts[#parts+1] = {
+                Name = p.Name,
+                Position = { x = p.Position.X, y = p.Position.Y, z = p.Position.Z },
+                Size = { x = p.Size.X, y = p.Size.Y, z = p.Size.Z },
+                Color = { r = p.Color.R, g = p.Color.G, b = p.Color.B },
+                Material = tostring(p.Material),
+                Transparency = p.Transparency,
+                Anchored = p.Anchored
+            }
+        end
+    end
+    return parts
+end
+
+local function saveModelToDisk(model, assetId)
+    local ok, encoded = pcall(function()
+        local data = { assetId = assetId, parts = serializeModelParts(model), savedAt = os.time() }
+        return HttpService:JSONEncode(data)
+    end)
+    if not ok then return false end
+
+    local fname = "Models/"..tostring(assetId)..".build"
+    local wrote = false
+    if type(writefile) == "function" then
+        pcall(function() writefile(fname, encoded); wrote = true end)
+    elseif type(writefile_async) == "function" then
+        pcall(function() writefile_async(fname, encoded); wrote = true end)
+    end
+    return wrote, fname
+end
+
+-- helper to try deleting a file (different executors expose different APIs)
+local function tryDeleteFile(path)
+    if not path then return false end
+    local ok = false
+    if type(delfile) == "function" then pcall(function() delfile(path); ok = true end) end
+    if not ok and type(deletefile) == "function" then pcall(function() deletefile(path); ok = true end) end
+    if not ok and type(removefile) == "function" then pcall(function() removefile(path); ok = true end) end
+    return ok
+end
+
+-- ---------- Voxelization & Build ----------
+local function buildModelFromAsset(assetId)
+    cancelBuild = false
+    progLabel.Text = "Loading asset..."
+    local success, arr = pcall(function()
+        return game:GetObjects("rbxassetid://" .. tostring(assetId))
+    end)
+    if not success or not arr or #arr == 0 then
+        progLabel.Text = "Failed to load asset."
+        return
+    end
+    local model = arr[1]
+
+    -- Save model clone into workspace.Models for preview (non-destructive)
+    local modelsFolder = ensureModelsFolder()
+    local savedClone = nil
+    pcall(function()
+        local clone = model:Clone()
+        clone.Name = "Model_"..tostring(assetId)
+        clone.Parent = modelsFolder
+        savedClone = clone
+    end)
+
+    -- Try saving to disk (optional)
+    local wrote, savedFileName = pcall(function() return saveModelToDisk(model, assetId) end)
+    if type(wrote) == "boolean" and wrote and type(savedFileName) == "string" then
+        -- ok
+    else
+        local ok2, fname2 = saveModelToDisk(model, assetId)
+        if ok2 then savedFileName = fname2 end
+    end
+
+    -- Ensure primary part
+    if not model.PrimaryPart then
+        for _, v in ipairs(model:GetDescendants()) do
+            if v:IsA("BasePart") then model.PrimaryPart = v; break end
+        end
+        if not model.PrimaryPart then progLabel.Text = "Model has no parts."; model:Destroy(); return end
+    end
+
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local origin = hrp.Position
+    local offset = origin - model.PrimaryPart.Position
+
+    progLabel.Text = "Voxelizing..."
+    local voxelSet = {} -- key -> { center = Vector3, sourceColor = Color3, sourceSize = Vector3, sourceCFrame = CFrame }
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local aabbMin, aabbMax = partWorldAABB(part)
+            aabbMin = aabbMin - Vector3.new(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z)
+            aabbMax = aabbMax + Vector3.new(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z)
+
+            local ixMin = math.floor(aabbMin.X / BLOCK_SIZE.X) - 1
+            local iyMin = math.floor(aabbMin.Y / BLOCK_SIZE.Y) - 1
+            local izMin = math.floor(aabbMin.Z / BLOCK_SIZE.Z) - 1
+            local ixMax = math.ceil(aabbMax.X / BLOCK_SIZE.X) + 1
+            local iyMax = math.ceil(aabbMax.Y / BLOCK_SIZE.Y) + 1
+            local izMax = math.ceil(aabbMax.Z / BLOCK_SIZE.Z) + 1
+
+            -- capture source attributes safely
+            local okCol, srcColor = pcall(function() return part.Color end)
+            local okSize, srcSize = pcall(function() return part.Size end)
+            local okCFrame, srcCFrame = pcall(function() return part.CFrame end)
+
+            for ix = ixMin, ixMax do
+                if cancelBuild then break end
+                local x = ix * BLOCK_SIZE.X
+                for iy = iyMin, iyMax do
+                    local y = iy * BLOCK_SIZE.Y
+                    for iz = izMin, izMax do
+                        local z = iz * BLOCK_SIZE.Z
+                        local center = Vector3.new(x, y, z)
+                        if center.X >= aabbMin.X - 0.001 and center.X <= aabbMax.X + 0.001
+                        and center.Y >= aabbMin.Y - 0.001 and center.Y <= aabbMax.Y + 0.001
+                        and center.Z >= aabbMin.Z - 0.001 and center.Z <= aabbMax.Z + 0.001 then
+                            if pointInsidePart(part, center) then
+                                local key = makeKey(center)
+                                -- store center and source attributes (color/size/cframe if available)
+                                voxelSet[key] = {
+                                    center = center,
+                                    sourceColor = (okCol and srcColor) and srcColor or nil,
+                                    sourceSize = (okSize and srcSize) and srcSize or nil,
+                                    sourceCFrame = (okCFrame and srcCFrame) and srcCFrame or nil,
+                                    sourcePosition = (okCFrame and srcCFrame) and srcCFrame.Position or nil -- helper
+                                }
+                            end
+                        end
+                    end
+                    if cancelBuild then break end
+                end
+                if cancelBuild then break end
+            end
+            if cancelBuild then break end
+        end
+    end
+
+    if cancelBuild then
+        progLabel.Text = "Canceled."
+        model:Destroy()
+        -- cleanup saved clone & file if present
+        if savedClone and savedClone.Parent then pcall(function() savedClone:Destroy() end) end
+        tryDeleteFile(savedFileName)
+        return
+    end
+
+    -- Snap & dedupe, keep source attributes with each snapped cell
+    progLabel.Text = "Preparing placement..."
+    local finalSet = {}
+    for _, v in pairs(voxelSet) do
+        local center = v.center
+        local sourceColor = v.sourceColor
+        local sourceSize = v.sourceSize
+        local sourceCFrame = v.sourceCFrame
+        local sourcePosition = v.sourcePosition
+        local targetWorld = center + offset
+        local snapped = snapToGrid(targetWorld)
+        local snappedKey = makeKey(snapped)
+        if not finalSet[snappedKey] then
+            finalSet[snappedKey] = {
+                pos = snapped,
+                sourceColor = sourceColor,
+                sourceSize = sourceSize,
+                sourceCFrame = sourceCFrame,
+                sourcePosition = sourcePosition
+            }
+        end
+    end
+
+    local list = {}
+    local hrpPos = hrp.Position
+    for _, v in pairs(finalSet) do table.insert(list, v) end
+    table.sort(list, function(a,b) return (a.pos - hrpPos).Magnitude < (b.pos - hrpPos).Magnitude end)
+
+    progLabel.Text = ("Spawning %d blocks..."):format(#list)
+    local spawned, succeeded, failed, total = 0, 0, 0, #list
+
+    for idx, entry in ipairs(list) do
+        if cancelBuild then break end
+
+        local args = { [1] = "Part", [2] = CFrame.new(entry.pos) }
+        local ok, err = safeFireAdd(args)
+
+        spawned = spawned + 1
+        if ok then succeeded = succeeded + 1 else failed = failed + 1 end
+        progLabel.Text = string.format("Sent %d/%d", spawned, total)
+
+        -- After spawn: robustly search and apply transforms (move/resize/rotate) and then paint/anchor using retries
+        local function tryTransformAndPaintWithRetries()
+            -- if no color/size info, nothing to do
+            local searchRadius = math.max(BLOCK_SIZE.X, BLOCK_SIZE.Y, BLOCK_SIZE.Z) * 0.8
+            local attempts = { 0.12, 0.18, 0.28, 0.45, 0.8, 1.25 }
+            for i = 1, #attempts do
+                if cancelBuild then return false end
+                local found = findNearestUnpaintedPart(entry.pos, searchRadius)
+                if found then
+                    -- NEW: apply move/resize/rotate if we have source size/CFrame and not already transformed
+                    if not transformedSet[found] and (entry.sourceSize or entry.sourceCFrame) then
+                        local targetSize = entry.sourceSize or found.Size
+                        local targetCFrame = nil
+                        -- compute rotation-only component from sourceCFrame if available
+                        if entry.sourceCFrame and entry.sourcePosition then
+                            -- rotationOnly = sourceCFrame * CFrame.new(-sourcePosition)
+                            local okRot, rotationOnly = pcall(function()
+                                return entry.sourceCFrame * CFrame.new(-entry.sourcePosition)
+                            end)
+                            if okRot and rotationOnly then
+                                targetCFrame = CFrame.new(entry.pos) * rotationOnly
+                            end
+                        end
+                        -- fallback: if no source rotation found just use position-only CFrame
+                        if not targetCFrame then targetCFrame = CFrame.new(entry.pos) end
+
+                        -- attempt move
+                        local mOk, mErr = safeMove(found, targetCFrame, targetSize)
+                        if mOk then
+                            transformedSet[found] = true
+                            -- try anchoring right away (safe)
+                            pcall(function() found.Anchored = true end)
+                        end
+                    end
+
+                    -- attempt anchor regardless (safe)
+                    pcall(function() found.Anchored = true end)
+
+                    -- painting: only if sourceColor exists and not already painted
+                    if entry.sourceColor and not paintedSet[found] then
+                        -- check if server already colored same color
+                        local okF, fcol = pcall(function() return found.Color end)
+                        if okF and fcol then
+                            local dr = math.abs(fcol.R - entry.sourceColor.R)
+                            local dg = math.abs(fcol.G - entry.sourceColor.G)
+                            local db = math.abs(fcol.B - entry.sourceColor.B)
+                            if dr <= 0.01 and dg <= 0.01 and db <= 0.01 then
+                                paintedSet[found] = true
+                                return true
+                            end
+                        end
+
+                        local pOk, pErr = safePaint(found, entry.sourceColor)
+                        if pOk then
+                            paintedSet[found] = true
+                            -- anchor after successful paint (safe)
+                            pcall(function() found.Anchored = true end)
+                            return true
+                        else
+                            -- even if paint failed, we may have transformed the part; anchor and continue trying
+                            pcall(function() found.Anchored = true end)
+                            -- continue retrying paint in later attempts
+                        end
+                    else
+                        -- either no source color or already painted: treat transform as success if transformed or anchored
+                        if transformedSet[found] then return true end
+                    end
+                end
+                task.wait(attempts[i]) -- progressively wait
+            end
+            return false
+        end
+
+        pcall(tryTransformAndPaintWithRetries)
+
+        -- obey global spawn delay (rate-limit)
+        task.wait(SPAWN_DELAY)
+    end
+
+    -- cleanup saved clone & file (both on normal finish and on cancel path above)
+    if savedClone and savedClone.Parent then
+        pcall(function() savedClone:Destroy() end)
+    end
+    tryDeleteFile(savedFileName)
+
+    if cancelBuild then
+        progLabel.Text = ("Canceled after %d/%d"):format(spawned, total)
+    else
+        progLabel.Text = ("Done. Sent %d blocks (failed %d)."):format(succeeded, failed)
+    end
+end
+
+-- ---------- UI Bind ----------
+buildBtn.MouseButton1Click:Connect(function()
+    local id = tonumber(idBox.Text)
+    if not id then progLabel.Text = "Invalid ID"; return end
+    cancelBuild = false
+    progLabel.Text = "Starting..."
+    task.spawn(function() buildModelFromAsset(id) end)
+end)
+
+-- Cleanup
+Players.LocalPlayer.OnTeleport:Connect(function() screenGui:Destroy() end)
