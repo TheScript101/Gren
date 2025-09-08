@@ -1,4 +1,4 @@
--- LocalScript inside StarterGui (updated: ResetOnSpawn=false, periodic refresh every 2s)
+-- LocalScript inside StarterGui
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local backpack = player:WaitForChild("Backpack")
@@ -12,7 +12,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Toggle Button (shows/hides whole frame)
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
-toggleGuiBtn.Position = UDim2.new(1, -278, 0.349999994, -167)
+toggleGuiBtn.Position = UDim2.new(1, -278, 0.35, -167)
 toggleGuiBtn.Text = "⚙️"
 toggleGuiBtn.Font = Enum.Font.Gotham
 toggleGuiBtn.TextSize = 20
@@ -30,7 +30,6 @@ frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 frame.BorderSizePixel = 0
 frame.Visible = true
 frame.Parent = screenGui
-
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 local stroke = Instance.new("UIStroke", frame)
 stroke.Thickness = 2
@@ -97,81 +96,74 @@ confirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 confirmBtn.Parent = frame
 Instance.new("UICorner", confirmBtn).CornerRadius = UDim.new(0, 8)
 
--- Toggle button hides/shows the whole frame
+-- toggle state so refreshes won't override user choice
+local frameHidden = false
 toggleGuiBtn.MouseButton1Click:Connect(function()
-    frame.Visible = not frame.Visible
+    frameHidden = not frameHidden
+    frame.Visible = not frameHidden
 end)
 
--- Confirm Button Logic
+-- Confirm Button Logic (deletes tool from backpack or character)
 confirmBtn.MouseButton1Click:Connect(function()
     local toolName = textBox.Text
     if toolName ~= "" then
         local character = player.Character or player.CharacterAdded:Wait()
-
         local tool = backpack:FindFirstChild(toolName)
-        if tool then
-            tool:Destroy()
-        end
-
+        if tool then tool:Destroy() end
         local charTool = character:FindFirstChild(toolName)
-        if charTool then
-            charTool:Destroy()
-        end
+        if charTool then charTool:Destroy() end
     end
 end)
 
--- Helper: try to find an image for a tool (Tool.TextureId, Handle.Decal, Handle.TextureID, SpecialMesh.TextureId)
+-- Helper: try to find an image for a tool (Tool.TextureId, Handle.Decal, SpecialMesh/ Mesh.TextureId, Handle.Texture)
 local function findToolImage(tool)
-    -- prefer Tool.TextureId
+    if not tool then return nil end
+
     if tool:IsA("Tool") then
         local ok, tId = pcall(function() return tool.TextureId end)
-        if ok and tId and tId ~= "" then
-            return tId
-        end
+        if ok and tId and tostring(tId) ~= "" then return tostring(tId) end
     end
 
     local handle = tool:FindFirstChild("Handle")
     if handle then
-        -- check Decal
         local decal = handle:FindFirstChildOfClass("Decal")
         if decal and decal.Texture and decal.Texture ~= "" then
             return decal.Texture
         end
 
-        -- check SpecialMesh or Mesh for TextureId
         for _, child in ipairs(handle:GetChildren()) do
             if child:IsA("SpecialMesh") or child:IsA("Mesh") then
                 local ok2, tex = pcall(function() return child.TextureId end)
-                if ok2 and tex and tex ~= "" then
-                    return tex
+                if ok2 and tex and tostring(tex) ~= "" then
+                    return tostring(tex)
                 end
             end
         end
 
-        -- check Handle.TextureID / Texture
         local ok3, hTex = pcall(function() return handle.TextureID or handle.Texture end)
-        if ok3 and hTex and hTex ~= "" then
-            return hTex
+        if ok3 and hTex and tostring(hTex) ~= "" then
+            return tostring(hTex)
         end
     end
 
     return nil
 end
 
--- Function to refresh item bubbles (keeps original layout/behavior, adds circular icon if present)
+-- Refresh items list (only rebuilds bubbles; does NOT change frame.Visible)
 local function refreshItems()
-    -- remove previous item buttons (TextButtons)
+    -- don't touch frame.Visible here (toggle manages that)
+    -- clear previous item buttons while keeping the UIGridLayout
     for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
+        if child ~= layout then
             child:Destroy()
         end
     end
 
-    -- helper to create bubble for a tool instance
     local function createBubbleForTool(tool)
         if not tool or not tool.Parent then return end
 
         local itemBtn = Instance.new("TextButton")
+        itemBtn.Name = "ItemBtn_" .. tostring(tool.Name)
         itemBtn.Size = UDim2.new(0, 50, 0, 50)
         itemBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -179,10 +171,8 @@ local function refreshItems()
         itemBtn.Parent = scrollFrame
         Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(1, 0)
 
-        -- try get image
         local imageId = findToolImage(tool)
         if imageId and imageId ~= "" then
-            -- hide text and show circular image
             itemBtn.Text = ""
             local icon = Instance.new("ImageLabel")
             icon.Size = UDim2.new(1, -8, 1, -8)
@@ -190,30 +180,26 @@ local function refreshItems()
             icon.BackgroundTransparency = 1
             icon.Image = imageId
             icon.Parent = itemBtn
-
-            local icRound = Instance.new("UICorner", icon)
-            icRound.CornerRadius = UDim.new(1, 0)
+            Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
         else
-            -- no image: show scaled text (shorten visually via TextScaled/TextWrapped)
             itemBtn.Text = tool.Name
             itemBtn.TextScaled = true
             itemBtn.TextWrapped = true
         end
 
-        -- Click fills TextBox
         itemBtn.MouseButton1Click:Connect(function()
             textBox.Text = tool.Name
         end)
     end
 
-    -- Add tools from Backpack
+    -- Add tools in Backpack
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
             createBubbleForTool(tool)
         end
     end
 
-    -- Add tools from Character (equipped ones)
+    -- Add equipped tools in Character
     local character = player.Character
     if character then
         for _, tool in ipairs(character:GetChildren()) do
@@ -223,33 +209,32 @@ local function refreshItems()
         end
     end
 
-    -- update canvas size (grid layout absolute size)
-    local contentY = layout.AbsoluteContentSize.Y
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentY)
+    -- update canvas size
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
--- Live updates when backpack or character changes (keeps tools visible when equipped)
-backpack.ChildAdded:Connect(refreshItems)
-backpack.ChildRemoved:Connect(refreshItems)
+-- Live updates
+backpack.ChildAdded:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
+backpack.ChildRemoved:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
 
 player.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(refreshItems)
-    char.ChildRemoved:Connect(refreshItems)
-    -- small delay to ensure tools are parented
+    char.ChildAdded:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
+    char.ChildRemoved:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
+    -- small delay to ensure tools are parented after respawn
     task.delay(0.05, refreshItems)
 end)
 
 -- initial
 refreshItems()
 
--- periodic refresh every 2 seconds (keeps list in sync and covers respawn timing)
+-- periodic refresh every 2 seconds
 task.spawn(function()
     while task.wait(2) do
         refreshItems()
     end
 end)
 
--- optional: run external script (safe pcall wrapper)
+-- optional: attempt to run external script safely (pcall)
 pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Dahood/SpamTool.txt"))()
 end)
