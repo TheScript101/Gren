@@ -6,6 +6,7 @@ local backpack = player:WaitForChild("Backpack")
 -- Main ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ToolRemoverGui"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Toggle Button (shows/hides remover frame but My Items stays visible)
