@@ -1,4 +1,4 @@
--- LocalScript inside StarterGui (updated to add circular icons + watch Character)
+-- LocalScript inside StarterGui (updated: ResetOnSpawn=false, periodic refresh every 2s)
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local backpack = player:WaitForChild("Backpack")
@@ -6,9 +6,10 @@ local backpack = player:WaitForChild("Backpack")
 -- Main ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ToolRemoverGui"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Toggle Button (shows/hides remover frame but My Items stays visible)
+-- Toggle Button (shows/hides whole frame)
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
 toggleGuiBtn.Position = UDim2.new(1, -278, 0.349999994, -167)
@@ -35,7 +36,7 @@ local stroke = Instance.new("UIStroke", frame)
 stroke.Thickness = 2
 stroke.Color = Color3.fromRGB(70, 70, 70)
 
--- My Items Label (no longer button, always shown)
+-- My Items Label (always shown)
 local myItemsLabel = Instance.new("TextLabel")
 myItemsLabel.Size = UDim2.new(1, -20, 0, 30)
 myItemsLabel.Position = UDim2.new(0, 10, 0, 10)
@@ -159,7 +160,7 @@ end
 
 -- Function to refresh item bubbles (keeps original layout/behavior, adds circular icon if present)
 local function refreshItems()
-    -- remove previous item buttons (only TextButtons)
+    -- remove previous item buttons (TextButtons)
     for _, child in ipairs(scrollFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -241,236 +242,9 @@ end)
 -- initial
 refreshItems()
 
--- My Items Label (no longer button, always shown)
-local myItemsLabel = Instance.new("TextLabel")
-myItemsLabel.Size = UDim2.new(1, -20, 0, 30)
-myItemsLabel.Position = UDim2.new(0, 10, 0, 10)
-myItemsLabel.Text = "My Items"
-myItemsLabel.Font = Enum.Font.GothamBold
-myItemsLabel.TextSize = 18
-myItemsLabel.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-myItemsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-myItemsLabel.Parent = frame
-Instance.new("UICorner", myItemsLabel).CornerRadius = UDim.new(0, 8)
-
--- ScrollingFrame (always visible)
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 0, 100)
-scrollFrame.Position = UDim2.new(0, 10, 0, 50)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 6
-scrollFrame.Parent = frame
-
-local layout = Instance.new("UIGridLayout")
-layout.CellSize = UDim2.new(0, 50, 0, 50)
-layout.CellPadding = UDim2.new(0, 5, 0, 5)
-layout.Parent = scrollFrame
-
--- Tool Remover Section
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 25)
-title.Position = UDim2.new(0, 10, 0, 160)
-title.BackgroundTransparency = 1
-title.Text = "Tool Remover"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextXAlignment = Enum.TextXAlignment.Center
-title.Parent = frame
-
-local textBox = Instance.new("TextBox")
-textBox.Size = UDim2.new(0.8, 0, 0, 30)
-textBox.Position = UDim2.new(0.1, 0, 0, 195)
-textBox.PlaceholderText = "Enter tool name..."
-textBox.Text = ""
-textBox.ClearTextOnFocus = true
-textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-textBox.Font = Enum.Font.Gotham
-textBox.TextSize = 16
-textBox.Parent = frame
-Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 8)
-
-local confirmBtn = Instance.new("TextButton")
-confirmBtn.Size = UDim2.new(0.5, 0, 0, 30)
-confirmBtn.Position = UDim2.new(0.25, 0, 0, 235)
-confirmBtn.Text = "Confirm"
-confirmBtn.Font = Enum.Font.GothamBold
-confirmBtn.TextSize = 16
-confirmBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 120)
-confirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmBtn.Parent = frame
-Instance.new("UICorner", confirmBtn).CornerRadius = UDim.new(0, 8)
-
--- Toggle button hides/shows the whole frame
-toggleGuiBtn.MouseButton1Click:Connect(function()
-    frame.Visible = not frame.Visible
-end)
-
--- Confirm Button Logic
-confirmBtn.MouseButton1Click:Connect(function()
-    local toolName = textBox.Text
-    if toolName ~= "" then
-        local character = player.Character or player.CharacterAdded:Wait()
-
-        local tool = backpack:FindFirstChild(toolName)
-        if tool then
-            tool:Destroy()
-        end
-
-        local charTool = character:FindFirstChild(toolName)
-        if charTool then
-            charTool:Destroy()
-        end
+-- periodic refresh every 2 seconds (keeps list in sync and covers respawn timing)
+task.spawn(function()
+    while task.wait(2) do
+        refreshItems()
     end
 end)
-
--- Helper: try to find an image for a tool (Tool.TextureId, Handle.Decal, Handle.TextureID, SpecialMesh.TextureId)
-local function findToolImage(tool)
-    -- prefer Tool.TextureId
-    if tool:IsA("Tool") then
-        local ok, tId = pcall(function() return tool.TextureId end)
-        if ok and tId and tId ~= "" then
-            return tId
-        end
-    end
-
-    local handle = tool:FindFirstChild("Handle")
-    if handle then
-        -- check Decal
-        local decal = handle:FindFirstChildOfClass("Decal")
-        if decal and decal.Texture and decal.Texture ~= "" then
-            return decal.Texture
-        end
-
-        -- check SpecialMesh or Mesh for TextureId
-        for _, child in ipairs(handle:GetChildren()) do
-            if child:IsA("SpecialMesh") or child:IsA("Mesh") then
-                local ok2, tex = pcall(function() return child.TextureId end)
-                if ok2 and tex and tex ~= "" then
-                    return tex
-                end
-            end
-        end
-
-        -- check Handle.TextureID / Texture
-        local ok3, hTex = pcall(function() return handle.TextureID or handle.Texture end)
-        if ok3 and hTex and hTex ~= "" then
-            return hTex
-        end
-    end
-
-    return nil
-end
-
--- Function to refresh item bubbles (keeps original layout/behavior, adds circular icon if present)
-local function refreshItems()
-    -- remove previous item buttons (only TextButtons)
-    for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
-
-    -- helper to create bubble for a tool instance
-    local function createBubbleForTool(tool)
-        if not tool or not tool.Parent then return end
-
-        local itemBtn = Instance.new("TextButton")
-        itemBtn.Size = UDim2.new(0, 50, 0, 50)
-        itemBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        itemBtn.Font = Enum.Font.GothamBold
-        itemBtn.Parent = scrollFrame
-        Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(1, 0)
-
-        -- try get image
-        local imageId = findToolImage(tool)
-        if imageId and imageId ~= "" then
-            -- hide text and show circular image
-            itemBtn.Text = ""
-            local icon = Instance.new("ImageLabel")
-            icon.Size = UDim2.new(1, -8, 1, -8)
-            icon.Position = UDim2.new(0, 4, 0, 4)
-            icon.BackgroundTransparency = 1
-            icon.Image = imageId
-            icon.Parent = itemBtn
-
-            local icRound = Instance.new("UICorner", icon)
-            icRound.CornerRadius = UDim.new(1, 0)
-        else
-            -- no image: show scaled text (shorten visually via TextScaled/TextWrapped)
-            itemBtn.Text = tool.Name
-            itemBtn.TextScaled = true
-            itemBtn.TextWrapped = true
-        end
-
-        -- Click fills TextBox
-        itemBtn.MouseButton1Click:Connect(function()
-            textBox.Text = tool.Name
-        end)
-    end
-
-    -- Add tools from Backpack
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            createBubbleForTool(tool)
-        end
-    end
-
-    -- Add tools from Character (equipped ones)
-    local character = player.Character
-    if character then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") then
-                createBubbleForTool(tool)
-            end
-        end
-    end
-
-    -- update canvas size (grid layout absolute size)
-    local contentY = layout.AbsoluteContentSize.Y
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentY)
-end
-
--- Live updates when backpack or character changes (keeps tools visible when equipped)
-backpack.ChildAdded:Connect(refreshItems)
-backpack.ChildRemoved:Connect(refreshItems)
-
-player.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(refreshItems)
-    char.ChildRemoved:Connect(refreshItems)
-    -- small delay to ensure tools are parented
-    task.delay(0.05, refreshItems)
-end)
-
--- initial
-refreshItems()
-
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            local itemBtn = Instance.new("TextButton")
-            itemBtn.Size = UDim2.new(0, 50, 0, 50)
-            itemBtn.Text = tool.Name
-            itemBtn.TextScaled = true
-            itemBtn.TextWrapped = true
-            itemBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            itemBtn.Font = Enum.Font.GothamBold
-            itemBtn.Parent = scrollFrame
-            Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(1, 0)
-
-            -- Click fills TextBox
-            itemBtn.MouseButton1Click:Connect(function()
-                textBox.Text = tool.Name
-            end)
-        end
-    end
-end
-
--- Live updates when backpack changes
-backpack.ChildAdded:Connect(refreshItems)
-backpack.ChildRemoved:Connect(refreshItems)
-
--- Initial load
-refreshItems()
