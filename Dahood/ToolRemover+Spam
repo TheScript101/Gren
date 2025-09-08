@@ -241,34 +241,6 @@ end)
 -- initial
 refreshItems()
 
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            local itemBtn = Instance.new("TextButton")
-            itemBtn.Size = UDim2.new(0, 50, 0, 50)
-            itemBtn.Text = tool.Name
-            itemBtn.TextScaled = true
-            itemBtn.TextWrapped = true
-            itemBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            itemBtn.Font = Enum.Font.GothamBold
-            itemBtn.Parent = scrollFrame
-            Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(1, 0)
-
-            -- Click fills TextBox
-            itemBtn.MouseButton1Click:Connect(function()
-                textBox.Text = tool.Name
-            end)
-        end
-    end
-end
-
--- Live updates when backpack changes
-backpack.ChildAdded:Connect(refreshItems)
-backpack.ChildRemoved:Connect(refreshItems)
-
--- Initial load
-refreshItems()
-
 pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Dahood/SpamTool.txt"))()
 end)
