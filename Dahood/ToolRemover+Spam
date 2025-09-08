@@ -213,21 +213,22 @@ local function refreshItems()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
--- Live updates
-backpack.ChildAdded:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
-backpack.ChildRemoved:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
+-- Live updates when backpack or character changes (keeps tools visible when equipped)
+backpack.ChildAdded:Connect(refreshItems)
+backpack.ChildRemoved:Connect(refreshItems)
 
 player.CharacterAdded:Connect(function(char)
-    char.ChildAdded:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
-    char.ChildRemoved:Connect(function() if not frameHidden then refreshItems() else refreshItems() end end)
-    -- small delay to ensure tools are parented after respawn
-    task.delay(0.05, refreshItems)
+    -- whenever you respawn, refresh immediately so backpack shows up
+    task.defer(refreshItems)
+
+    char.ChildAdded:Connect(refreshItems)
+    char.ChildRemoved:Connect(refreshItems)
 end)
 
 -- initial
 refreshItems()
 
--- periodic refresh every 2 seconds
+-- periodic refresh every 2 seconds (keeps list in sync across deaths)
 task.spawn(function()
     while task.wait(2) do
         refreshItems()
