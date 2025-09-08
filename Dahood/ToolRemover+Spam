@@ -11,7 +11,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 -- Toggle Button (shows/hides remover frame but My Items stays visible)
 local toggleGuiBtn = Instance.new("TextButton")
 toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
-toggleGuiBtn.Position = UDim2.new(1, -60, 0.35, 0)
+toggleGuiBtn.Position = UDim2.new(1, -278, 0.349999994, -167)
 toggleGuiBtn.Text = "⚙️"
 toggleGuiBtn.Font = Enum.Font.Gotham
 toggleGuiBtn.TextSize = 20
