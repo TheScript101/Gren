@@ -730,6 +730,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RepairTimerGui"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 -- Create TextLabel
