@@ -1,3 +1,4 @@
+-- LocalScript inside StarterGui (updated: repositioned/enlarged panel + Prediction toggle)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -6,15 +7,15 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
 -- config
-local ROTATE_SMOOTH = 1           
-local MODE_CLICK_DELAY = 1.5      
+local ROTATE_SMOOTH = 1
+local MODE_CLICK_DELAY = 1.5
 local AUTO_START_AFTER_MODE_CLICK = true
 
 -- smoothing config for camera lerp (higher = faster response)
 local CAM_SMOOTHNESS = 3.5 -- you can tweak this (6 is "a bit fast" feel)
 
 -- state
-local mode = "Toggle"             
+local mode = "Toggle"
 local Locking = false
 local LockedTarget = nil
 local HighlightHandle = nil
@@ -23,6 +24,7 @@ local camSmoothMode = false  -- existing: smooth camera orientation mode
 local aimHeadEnabled = false -- existing: aim head toggle (replaced old wall-check)
 local smoothSwitching = false -- NEW: active while Smooth CamLock is transitioning
 local aimBasedEnabled = false -- NEW: Aim-based locking using screen-center projection
+local predictionEnabled = false -- NEW: Prediction on/off
 
 -- UI
 local screenGui = Instance.new("ScreenGui")
@@ -32,8 +34,9 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
 
 local panel = Instance.new("Frame", screenGui)
-panel.Size = UDim2.new(0, 500, 0, 280) -- RESTORED ORIGINAL size
-panel.Position = UDim2.new(0.0199999996, 169, 0.050000006, 92)
+-- enlarged size to fit new button, repositioned per your coordinates
+panel.Size = UDim2.new(0, 500, 0, 325)
+panel.Position = UDim2.new(0.0199999996, 169, 0.0500000045, 55)
 panel.BackgroundColor3 = Color3.fromRGB(20,20,25)
 panel.BorderSizePixel = 0
 panel.Active = true
@@ -51,7 +54,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "Which Lock Do You Want?"
 
 local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 250) -- RESTORED ORIGINAL height
+-- increased height to match panel
+buttonsFrame.Size = UDim2.new(1, -20, 0, 280)
 buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
 buttonsFrame.BackgroundTransparency = 1
 
@@ -85,8 +89,11 @@ local aimHeadBtn = makeModeButton(buttonsFrame, 240, 100, "AimHead: OFF")
 -- NEW: Smooth CamLock button (new 4th row)
 local smoothCamBtn = makeModeButton(buttonsFrame, 0, 150, "Smooth CamLock")
 
--- NEW: Aim Based toggle button (uses screen-center projection)
+-- NEW: Aim Based toggle button
 local aimBasedBtn = makeModeButton(buttonsFrame, 240, 150, "Aim Based: OFF")
+
+-- NEW: Prediction toggle button (added, matches AimHead style)
+local predictionBtn = makeModeButton(buttonsFrame, 0, 200, "Prediction: OFF")
 
 local statusLabel = Instance.new("TextLabel", panel)
 statusLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -207,344 +214,46 @@ local function rotateTowards(pos)
     end
 end
 
--- NEW: smooth switch (used only by Smooth CamLock)
-local function smoothSwitchTo(player)
-    if not player or not player.Character then return end
-    local targetPart = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return end
-
-    smoothSwitching = true
-    local duration = 0.85
-    local elapsed = 0
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    -- temporarily disable snap so we control the transition
-    local prevCamLock = camLockEnabled
-    camLockEnabled = false
-
-    while elapsed < duration do
-        if LockedTarget ~= player then break end
-        local dt = RunService.RenderStepped:Wait()
-        elapsed += dt
-
-        if not hrp or not hrp.Parent then
-            char = LocalPlayer.Character
-            hrp = char and char:FindFirstChild("HumanoidRootPart")
-        end
-
-        local tpos = targetPart.Position
-        -- smooth character turn
-        if hrp then
-            local lookDir = (Vector3.new(tpos.X, hrp.Position.Y, tpos.Z) - hrp.Position).Unit
-            local desired = CFrame.new(hrp.Position, hrp.Position + lookDir)
-            hrp.CFrame = hrp.CFrame:Lerp(desired, math.clamp(CAM_SMOOTHNESS * dt, 0, 1))
-        end
-        -- smooth camera turn
-        local camPos = Camera.CFrame.Position
-        local camDesired = CFrame.new(camPos, tpos)
-        Camera.CFrame = Camera.CFrame:Lerp(camDesired, math.clamp(CAM_SMOOTHNESS * dt, 0, 1))
+-- prediction helper: returns a predicted position (or current position if disabled)
+local function getPredictedPosition(player, targetPart)
+    if not targetPart then return nil end
+    if not predictionEnabled then
+        return targetPart.Position
     end
 
-    -- finalize: resume CamLock snap after the smooth switch
-    if LockedTarget == player then
-        local t = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
-        if t then
-            if hrp then
-                local lookDir = (Vector3.new(t.Position.X, hrp.Position.Y, t.Position.Z) - hrp.Position).Unit
-                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + lookDir)
-            end
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position)
-        end
-    end
-
-    camLockEnabled = true -- force CamLock to stay ON after smooth switch
-    smoothSwitching = false
-end
-
--- main loop (dt used for smoothing)
-RunService.RenderStepped:Connect(function(dt)
-    if not Locking then return end
-
-    local validTarget = LockedTarget and LockedTarget.Character and LockedTarget.Character:FindFirstChild("Humanoid") and LockedTarget.Character.Humanoid.Health > 0
-
-    if mode == "Always" or mode == "AlwaysCam" or mode == "AlwaysSmooth" or mode == "SmoothCam" then
-        local nearest = getNearestPlayer()
-        if nearest ~= LockedTarget then
-            LockedTarget = nearest
-            if LockedTarget then
-                applyHighlightToCharacter(LockedTarget.Character)
-                if mode == "SmoothCam" then
-                    smoothSwitchTo(LockedTarget) -- smooth only on switch in this mode
-                end
-            else
-                clearHighlight()
-            end
-        end
-    elseif mode == "Toggle" or mode == "ToggleCam" then
-        if not validTarget then
-            LockedTarget = getNearestPlayer()
-            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
-        end
-    end
-
-    if LockedTarget and LockedTarget.Character then
-        -- during smooth switch, let the smoother drive orientation
-        if smoothSwitching then
-            statusLabel.Text = ("Mode: %s | Lock: Switching -> %s"):format(mode, LockedTarget.Name or "Unknown")
-            return
-        end
-
-        -- choose target part based on AimHead toggle
-        local targetPart = LockedTarget.Character:FindFirstChild("HumanoidRootPart")
-        if aimHeadEnabled and LockedTarget.Character:FindFirstChild("Head") then
-            targetPart = LockedTarget.Character:FindFirstChild("Head")
-        end
-
-        if targetPart then
-            local targetPos = targetPart.Position
-            rotateTowards(targetPos)
-
-            -- SMOOTH CAMERA BEHAVIOR (for AlwaysSmooth only)
-            if camSmoothMode then
-                local camPos = Camera.CFrame.Position
-                local desired = CFrame.new(camPos, targetPos)
-                local alpha = math.clamp(CAM_SMOOTHNESS * dt, 0, 1)
-                Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
-            elseif camLockEnabled then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-            end
-
-            statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name or "Unknown")
-        end
+    -- use basepart velocity if available
+    local vel = Vector3.new(0,0,0)
+    if targetPart and targetPart:IsA("BasePart") then
+        vel = targetPart.Velocity
     else
-        statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode)
-    end
-end)
-
--- lock toggle
-local function setLocking(on)
-    Locking = on
-    if not on then
-        LockedTarget = nil
-        clearHighlight()
-        lockToggle.Text = "🔒 OFF"
-        lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
-        statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode)
-
-        local cam = workspace.CurrentCamera
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            cam.CameraSubject = hum
-            cam.CameraType = Enum.CameraType.Custom
-        end
-    else
-        LockedTarget = getNearestPlayer()
-        if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
-        lockToggle.Text = "🔒 ON"
-        lockToggle.BackgroundColor3 = Color3.fromRGB(160,30,30)
-    end
-end
-
--- mode handlers
-local function setMode(m)
-    mode = m
-    camLockEnabled = (m == "AlwaysCam" or m == "ToggleCam" or m == "SmoothCam")
-    camSmoothMode = (m == "AlwaysSmooth" or m == "ToggleSmooth") -- unchanged
-
-    alwaysBtn.BackgroundColor3     = (m == "Always")       and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    toggleBtn.BackgroundColor3     = (m == "Toggle")       and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    alwaysCamBtn.BackgroundColor3  = (m == "AlwaysCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    toggleCamBtn.BackgroundColor3  = (m == "ToggleCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    alwaysSmoothBtn.BackgroundColor3 = (m == "AlwaysSmooth") and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-    smoothCamBtn.BackgroundColor3  = (m == "SmoothCam")    and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-
-    if AUTO_START_AFTER_MODE_CLICK then
-        task.delay(MODE_CLICK_DELAY, function()
-            setLocking(true)
-        end)
-    end
-end
-
--- connect buttons
-alwaysBtn.MouseButton1Click:Connect(function() setMode("Always") end)
-toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
-alwaysCamBtn.MouseButton1Click:Connect(function() setMode("AlwaysCam") end)
-toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
-alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end)
-smoothCamBtn.MouseButton1Click:Connect(function() setMode("SmoothCam") end)
-lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
-
--- AimHead button toggle (unchanged)
-aimHeadBtn.MouseButton1Click:Connect(function()
-    aimHeadEnabled = not aimHeadEnabled
-    aimHeadBtn.Text = "AimHead: " .. (aimHeadEnabled and "ON" or "OFF")
-    aimHeadBtn.BackgroundColor3 = aimHeadEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-end)
-
--- NEW: Aim Based toggle handler
-aimBasedBtn.MouseButton1Click:Connect(function()
-    aimBasedEnabled = not aimBasedEnabled
-    aimBasedBtn.Text = "Aim Based: " .. (aimBasedEnabled and "ON" or "OFF")
-    aimBasedBtn.BackgroundColor3 = aimBasedEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
-end)
-
--- cleanup
-Players.PlayerRemoving:Connect(function(p) if LockedTarget == p then LockedTarget = nil clearHighlight() end end)
-LocalPlayer.CharacterRemoving:Connect(function() clearHighlight() LockedTarget = nil end)
-
--- toggle show/hide panel
-local pickLockToggle = Instance.new("TextButton", screenGui)
-pickLockToggle.Name = "PickLockToggleBtn"
-pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
-pickLockToggle.Position = UDim2.new(1, -60, 0.358799934, 0)
-pickLockToggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
-pickLockToggle.Text = "⚙️"
-pickLockToggle.Font = Enum.Font.GothamBold
-pickLockToggle.TextSize = 20
-pickLockToggle.TextColor3 = Color3.fromRGB(255,255,255)
-
-local panelVisible = true
-pickLockToggle.MouseButton1Click:Connect(function()
-    panelVisible = not panelVisible
-    panel.Visible = panelVisible
-end)panel.BorderSizePixel = 0
-panel.Active = true
-local panelCorner = Instance.new("UICorner", panel)
-panelCorner.CornerRadius = UDim.new(0, 14)
-
-local title = Instance.new("TextLabel", panel)
-title.Size = UDim2.new(1, -20, 0, 36)
-title.Position = UDim2.new(0, 10, 0, 10)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(230,230,230)
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Text = "Which Lock Do You Want?"
-
-local buttonsFrame = Instance.new("Frame", panel)
-buttonsFrame.Size = UDim2.new(1, -20, 0, 250) -- RESTORED ORIGINAL height
-buttonsFrame.Position = UDim2.new(0, 10, 0, 54)
-buttonsFrame.BackgroundTransparency = 1
-
-local function makeModeButton(parent, xOffset, yOffset, text)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(0, 230, 0, 40)
-    btn.Position = UDim2.new(0, xOffset, 0, yOffset)
-    btn.Text = text
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 16
-    btn.TextColor3 = Color3.fromRGB(240,240,240)
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    btn.BorderSizePixel = 0
-    return btn
-end
-
--- original 2 buttons
-local alwaysBtn = makeModeButton(buttonsFrame, 0, 0, "Always Nearest")
-local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
-
--- camlock buttons
-local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
-local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
-
--- Always Smooth button
-local alwaysSmoothBtn = makeModeButton(buttonsFrame, 0, 100, "Always Smooth")
-
--- AimHead toggle button
-local aimHeadBtn = makeModeButton(buttonsFrame, 240, 100, "AimHead: OFF")
-
--- NEW: Smooth CamLock button (new 4th row)
-local smoothCamBtn = makeModeButton(buttonsFrame, 0, 150, "Smooth CamLock")
-
--- NEW: Aim Based toggle button (duplicate block)
-local aimBasedBtn = makeModeButton(buttonsFrame, 240, 150, "Aim Based: OFF")
-
-local statusLabel = Instance.new("TextLabel", panel)
-statusLabel.Size = UDim2.new(1, -20, 0, 18)
-statusLabel.Position = UDim2.new(0, 10, 1, -26)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextSize = 14
-statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Text = "Mode: Toggle | Lock: OFF"
-
--- toggle button (draggable)
-local lockToggle = Instance.new("TextButton", screenGui)
-lockToggle.Name = "LockToggleBtn"
-lockToggle.Size = UDim2.new(0, 80, 0, 40)
-lockToggle.Position = UDim2.new(0.5, 163, 0.850000024, -339)
-lockToggle.AnchorPoint = Vector2.new(0.5, 0)
-lockToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
-lockToggle.TextColor3 = Color3.fromRGB(255,255,255)
-lockToggle.Font = Enum.Font.GothamBold
-lockToggle.TextSize = 16
-lockToggle.Text = "🔒 OFF"
-lockToggle.Active = true
-
--- helpers (no wall-check anywhere)
-
-local function getNearestPlayer()
-    -- Aim-based priority only for TOGGLE modes (duplicate block)
-    if aimBasedEnabled and (mode == "Toggle" or mode == "ToggleCam" or mode == "ToggleSmooth") then
-        local aimed = getPlayerFromCameraAim()
-        if aimed and aimed ~= LocalPlayer then
-            return aimed
-        end
+        -- try humanoidrootpart fallback
+        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then vel = hrp.Velocity end
     end
 
-    local closest, dist = nil, math.huge
+    -- estimate lead time based on distance (shorter for close targets, longer for far)
     local myChar = LocalPlayer.Character
-    if not myChar then return nil end
-    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
-    for _, pl in ipairs(Players:GetPlayers()) do
-        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") and pl.Character:FindFirstChild("Humanoid") and pl.Character.Humanoid.Health > 0 then
-            local mag = (myHRP.Position - pl.Character.HumanoidRootPart.Position).Magnitude
-            if mag < dist then
-                dist = mag
-                closest = pl
-            end
-        end
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local dist = 0
+    if myHRP then
+        dist = (myHRP.Position - targetPart.Position).Magnitude
+    else
+        dist = 10
     end
-    return closest
+
+    -- leadTime formula: distance divided by an empirical speed (tweakable)
+    -- larger divisor -> less prediction; smaller -> more aggressive
+    local leadTime = math.clamp(dist / 40, 0, 1.5) -- tweak divisor to change prediction aggressiveness
+
+    -- also factor in some smoothing for vertical velocity to avoid large jumps
+    local verticalFactor = math.clamp(math.abs(vel.Y) / 50, 0, 0.6)
+    leadTime = leadTime * (1 - verticalFactor) + (leadTime * verticalFactor * 0.5)
+
+    local predicted = targetPart.Position + vel * leadTime
+    return predicted
 end
 
-local function clearHighlight()
-    if HighlightHandle then
-        pcall(function() HighlightHandle:Destroy() end)
-        HighlightHandle = nil
-    end
-end
-
-local function applyHighlightToCharacter(char)
-    clearHighlight()
-    if not char then return end
-    local HL = Instance.new("Highlight")
-    HL.Adornee = char
-    HL.FillColor = Color3.fromRGB(255,40,40)
-    HL.OutlineColor = Color3.fromRGB(255,255,255)
-    HL.FillTransparency = 0.25
-    HL.OutlineTransparency = 0
-    HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    HL.Parent = game:GetService("CoreGui")
-    HighlightHandle = HL
-end
-
-local function rotateTowards(pos)
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local dir = (Vector3.new(pos.X, hrp.Position.Y, pos.Z) - hrp.Position)
-    if dir.Magnitude > 0 then
-        hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + dir.Unit)
-    end
-end
-
--- NEW: smooth switch (used only by Smooth CamLock)
+-- NEW: smooth switch (used only by Smooth CamLock) - updated to use prediction when enabled
 local function smoothSwitchTo(player)
     if not player or not player.Character then return end
     local targetPart = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
@@ -570,7 +279,8 @@ local function smoothSwitchTo(player)
             hrp = char and char:FindFirstChild("HumanoidRootPart")
         end
 
-        local tpos = targetPart.Position
+        local tpos = getPredictedPosition(player, targetPart) or targetPart.Position
+
         -- smooth character turn
         if hrp then
             local lookDir = (Vector3.new(tpos.X, hrp.Position.Y, tpos.Z) - hrp.Position).Unit
@@ -587,11 +297,12 @@ local function smoothSwitchTo(player)
     if LockedTarget == player then
         local t = (aimHeadEnabled and player.Character:FindFirstChild("Head")) or player.Character:FindFirstChild("HumanoidRootPart")
         if t then
+            local tpos = getPredictedPosition(player, t) or t.Position
             if hrp then
-                local lookDir = (Vector3.new(t.Position.X, hrp.Position.Y, t.Position.Z) - hrp.Position).Unit
+                local lookDir = (Vector3.new(tpos.X, hrp.Position.Y, tpos.Z) - hrp.Position).Unit
                 hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + lookDir)
             end
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, tpos)
         end
     end
 
@@ -639,7 +350,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         if targetPart then
-            local targetPos = targetPart.Position
+            local targetPos = getPredictedPosition(LockedTarget, targetPart) or targetPart.Position
             rotateTowards(targetPos)
 
             -- SMOOTH CAMERA BEHAVIOR (for AlwaysSmooth only)
@@ -712,18 +423,25 @@ alwaysSmoothBtn.MouseButton1Click:Connect(function() setMode("AlwaysSmooth") end
 smoothCamBtn.MouseButton1Click:Connect(function() setMode("SmoothCam") end)
 lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
 
--- AimHead button toggle (unchanged)
+-- AimHead button toggle (unchanged behavior)
 aimHeadBtn.MouseButton1Click:Connect(function()
     aimHeadEnabled = not aimHeadEnabled
     aimHeadBtn.Text = "AimHead: " .. (aimHeadEnabled and "ON" or "OFF")
     aimHeadBtn.BackgroundColor3 = aimHeadEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
 end)
 
--- NEW: Aim Based toggle handler (duplicate block)
+-- Aim Based toggle handler
 aimBasedBtn.MouseButton1Click:Connect(function()
     aimBasedEnabled = not aimBasedEnabled
     aimBasedBtn.Text = "Aim Based: " .. (aimBasedEnabled and "ON" or "OFF")
     aimBasedBtn.BackgroundColor3 = aimBasedEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+end)
+
+-- Prediction toggle handler (matches AimHead style & applies globally)
+predictionBtn.MouseButton1Click:Connect(function()
+    predictionEnabled = not predictionEnabled
+    predictionBtn.Text = "Prediction: " .. (predictionEnabled and "ON" or "OFF")
+    predictionBtn.BackgroundColor3 = predictionEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
 end)
 
 -- cleanup
