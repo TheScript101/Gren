@@ -221,35 +221,51 @@ local function getPredictedPosition(player, targetPart)
         return targetPart.Position
     end
 
-    -- use basepart velocity if available
+    -- try direct velocity first
     local vel = Vector3.new(0,0,0)
     if targetPart and targetPart:IsA("BasePart") then
-        vel = targetPart.Velocity
-    else
-        -- try humanoidrootpart fallback
-        local hrp = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then vel = hrp.Velocity end
+        vel = targetPart.Velocity or Vector3.new(0,0,0)
     end
 
-    -- estimate lead time based on distance (shorter for close targets, longer for far)
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local dist = 0
-    if myHRP then
+    -- fallback: if velocity is tiny, try using humanoid MoveDirection * WalkSpeed
+    local humanoid = player and player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid and vel.Magnitude < 1 then
+        local moveDir = humanoid.MoveDirection
+        if moveDir.Magnitude > 0 then
+            vel = moveDir.Unit * (humanoid.WalkSpeed or 16)
+        end
+    end
+
+    -- fallback 2: if still tiny, try HumanoidRootPart velocity
+    if vel.Magnitude < 1 and player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp:IsA("BasePart") then
+            vel = hrp.Velocity or vel
+        end
+    end
+
+    -- compute distance to target and clamp sensible defaults
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local dist = 10
+    if myHRP and targetPart and targetPart.Position then
         dist = (myHRP.Position - targetPart.Position).Magnitude
-    else
-        dist = 10
     end
 
-    -- leadTime formula: distance divided by an empirical speed (tweakable)
-    -- larger divisor -> less prediction; smaller -> more aggressive
-    local leadTime = math.clamp(dist / 40, 0, 1.5) -- tweak divisor to change prediction aggressiveness
+    -- compute a lead time that scales with distance and target speed:
+    -- faster and farther targets get slightly larger lead; close targets get minimal lead
+    local speed = math.max(vel.Magnitude, 1) -- avoid divide by zero / tiny speeds
+    -- base divisor (tweakable): bigger => less prediction. We scale it by (1 + speed*0.05) to moderate extreme velocities.
+    local baseDiv = 40 * (1 + (speed * 0.05))
+    local leadTime = math.clamp(dist / baseDiv, 0, 1.6)
 
-    -- also factor in some smoothing for vertical velocity to avoid large jumps
-    local verticalFactor = math.clamp(math.abs(vel.Y) / 50, 0, 0.6)
+    -- small vertical smoothing factor to reduce overshoot when target jumps
+    local verticalFactor = math.clamp(math.abs(vel.Y) / 60, 0, 0.6)
     leadTime = leadTime * (1 - verticalFactor) + (leadTime * verticalFactor * 0.5)
 
+    -- final predicted position and a light lerp to avoid huge instant jumps
     local predicted = targetPart.Position + vel * leadTime
+    predicted = targetPart.Position:Lerp(predicted, 0.9)
+
     return predicted
 end
 
