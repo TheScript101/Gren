@@ -1,0 +1,502 @@
+-- LocalScript: JumpPower Changer w/ clone-toggle on long-press
+-- Paste into StarterGui as a LocalScript (replace prior scripts)
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- ====== Config / defaults ======
+local DEFAULT_JP = tonumber(StarterPlayer.CharacterJumpPower) or 50
+if DEFAULT_JP <= 0 then DEFAULT_JP = 50 end
+local JP_MIN = DEFAULT_JP
+local JP_MAX = DEFAULT_JP + 100
+local SLIDER_WIDTH = 360
+local SLIDER_HEIGHT = 18
+
+-- ====== State ======
+local isApplyingJP = false      -- whether JP application is active
+local currentJP = DEFAULT_JP   -- current JP value set by slider
+local hideOpenerVisual = false -- whether opener is visually hidden
+local dragging = false         -- slider drag state
+local cloneButton = nil        -- reference to the cloned toggle (if created)
+
+-- ====== UI creation (modern look) ======
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "JumpPowerChangerGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-- Opener button (small)
+local opener = Instance.new("TextButton")
+opener.Name = "JPOpener"
+opener.Size = UDim2.new(0, 54, 0, 54)
+opener.Position = UDim2.new(1, -74, 0.12, 0)
+opener.AnchorPoint = Vector2.new(0, 0)
+opener.BackgroundColor3 = Color3.fromRGB(28, 29, 33)
+opener.Text = "JP"
+opener.Font = Enum.Font.GothamBold
+opener.TextSize = 18
+opener.TextColor3 = Color3.fromRGB(245,245,245)
+opener.AutoButtonColor = true
+opener.Parent = screenGui
+opener.Active = true
+-- manual drag fallback (we also set Draggable below to be safe)
+opener.Draggable = true
+local openerCorner = Instance.new("UICorner", opener); openerCorner.CornerRadius = UDim.new(0,12)
+local openerStroke = Instance.new("UIStroke", opener); openerStroke.Color = Color3.fromRGB(45,45,48); openerStroke.Thickness = 1
+
+-- Main panel (draggable)
+local panel = Instance.new("Frame")
+panel.Name = "JumpPanel"
+panel.Size = UDim2.new(0, 420, 0, 220)
+panel.Position = UDim2.new(1, -486, 0.12, 0)
+panel.BackgroundColor3 = Color3.fromRGB(22,22,24)
+panel.BorderSizePixel = 0
+panel.Parent = screenGui
+panel.Visible = false
+panel.Active = true
+panel.Draggable = true
+local panelCorner = Instance.new("UICorner", panel); panelCorner.CornerRadius = UDim.new(0,14)
+local panelStroke = Instance.new("UIStroke", panel); panelStroke.Color = Color3.fromRGB(50,50,54); panelStroke.Thickness = 1
+
+-- Title + subtitle
+local title = Instance.new("TextLabel", panel)
+title.Size = UDim2.new(1, -28, 0, 36)
+title.Position = UDim2.new(0, 14, 0, 10)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(230,230,230)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "Jumpower Changer"
+
+local sub = Instance.new("TextLabel", panel)
+sub.Size = UDim2.new(1, -28, 0, 18)
+sub.Position = UDim2.new(0, 14, 0, 36)
+sub.BackgroundTransparency = 1
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 12
+sub.TextColor3 = Color3.fromRGB(170,170,170)
+sub.Text = ("Range: %d → %d"):format(JP_MIN, JP_MAX)
+sub.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Slider (track, fill, knob)
+local sliderFrame = Instance.new("Frame", panel)
+sliderFrame.Size = UDim2.new(0, SLIDER_WIDTH, 0, SLIDER_HEIGHT + 12)
+sliderFrame.Position = UDim2.new(0.5, -(SLIDER_WIDTH/2), 0, 70)
+sliderFrame.BackgroundTransparency = 1
+
+local track = Instance.new("Frame", sliderFrame)
+track.Size = UDim2.new(1, 0, 0, SLIDER_HEIGHT)
+track.Position = UDim2.new(0, 0, 0, 6)
+track.BackgroundColor3 = Color3.fromRGB(40,40,44)
+track.BorderSizePixel = 0
+local trackCorner = Instance.new("UICorner", track); trackCorner.CornerRadius = UDim.new(0,8)
+local trackStroke = Instance.new("UIStroke", track); trackStroke.Color = Color3.fromRGB(60,60,64); trackStroke.Thickness = 1
+
+local fill = Instance.new("Frame", track)
+fill.Size = UDim2.new(0, 0, 1, 0)
+fill.Position = UDim2.new(0, 0, 0, 0)
+fill.BackgroundColor3 = Color3.fromRGB(90,170,255)
+local fillCorner = Instance.new("UICorner", fill); fillCorner.CornerRadius = UDim.new(0,8)
+
+local knob = Instance.new("ImageButton", track)
+knob.Size = UDim2.new(0, 22, 0, 22)
+knob.AnchorPoint = Vector2.new(0.5, 0.5)
+knob.Position = UDim2.new(0, 0, 0.5, 0)
+knob.BackgroundColor3 = Color3.fromRGB(245,245,245)
+knob.Image = ""
+knob.AutoButtonColor = false
+local knobCorner = Instance.new("UICorner", knob); knobCorner.CornerRadius = UDim.new(0,12)
+local knobStroke = Instance.new("UIStroke", knob); knobStroke.Color = Color3.fromRGB(210,210,210); knobStroke.Thickness = 1
+
+-- JP value label
+local valueLabel = Instance.new("TextLabel", panel)
+valueLabel.Size = UDim2.new(1, -28, 0, 28)
+valueLabel.Position = UDim2.new(0, 14, 0, 106)
+valueLabel.BackgroundTransparency = 1
+valueLabel.Font = Enum.Font.Gotham
+valueLabel.TextSize = 16
+valueLabel.TextColor3 = Color3.fromRGB(230,230,230)
+valueLabel.Text = ("JumpPower: %d"):format(DEFAULT_JP)
+valueLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+-- JP on/off toggle (main)
+local jpToggleBtn = Instance.new("TextButton", panel)
+jpToggleBtn.Name = "JPToggle"
+jpToggleBtn.Size = UDim2.new(0, 180, 0, 40)
+jpToggleBtn.Position = UDim2.new(0, 14, 0, 142)
+jpToggleBtn.Text = "JumpPower: OFF"
+jpToggleBtn.Font = Enum.Font.GothamBold
+jpToggleBtn.TextSize = 14
+jpToggleBtn.BackgroundColor3 = Color3.fromRGB(48,48,52)
+jpToggleBtn.TextColor3 = Color3.fromRGB(235,235,235)
+local jpCorner = Instance.new("UICorner", jpToggleBtn); jpCorner.CornerRadius = UDim.new(0,8)
+local jpStroke = Instance.new("UIStroke", jpToggleBtn); jpStroke.Color = Color3.fromRGB(60,60,64); jpStroke.Thickness = 1
+
+-- Hide Toggles: visually hide opener but keep clickable
+local hideTogglesBtn = Instance.new("TextButton", panel)
+hideTogglesBtn.Size = UDim2.new(0, 220, 0, 40)
+hideTogglesBtn.Position = UDim2.new(0, 206, 0, 142)
+hideTogglesBtn.Text = "Hide Toggles: OFF"
+hideTogglesBtn.Font = Enum.Font.GothamBold
+hideTogglesBtn.TextSize = 14
+hideTogglesBtn.BackgroundColor3 = Color3.fromRGB(48,48,52)
+hideTogglesBtn.TextColor3 = Color3.fromRGB(235,235,235)
+local hideCorner = Instance.new("UICorner", hideTogglesBtn); hideCorner.CornerRadius = UDim.new(0,8)
+local hideStroke = Instance.new("UIStroke", hideTogglesBtn); hideStroke.Color = Color3.fromRGB(60,60,64); hideStroke.Thickness = 1
+
+-- Note
+local note = Instance.new("TextLabel", panel)
+note.Size = UDim2.new(1, -28, 0, 18)
+note.Position = UDim2.new(0, 14, 1, -36)
+note.BackgroundTransparency = 1
+note.Font = Enum.Font.Gotham
+note.TextSize = 12
+note.TextColor3 = Color3.fromRGB(170,170,170)
+note.Text = "remember where you left the toggle button!"
+note.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ====== Helpers ======
+
+local function safeSetJump(hum, jp)
+    pcall(function()
+        if hum then
+            -- try UseJumpPower then JumpPower
+            pcall(function() hum.UseJumpPower = true end)
+            pcall(function() hum.JumpPower = jp end)
+        end
+    end)
+end
+
+local function applyJumpToCharacter(jp)
+    local char = player.Character
+    if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    safeSetJump(humanoid, jp)
+    return true
+end
+
+-- Ensure default JP is restored to humanoid when JP is OFF
+local function restoreDefaultJPToCharacter()
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        safeSetJump(humanoid, DEFAULT_JP)
+    end
+end
+
+-- ====== Slider logic ======
+local function ratioToJP(ratio)
+    ratio = math.clamp(ratio, 0, 1)
+    local val = JP_MIN + (JP_MAX - JP_MIN) * ratio
+    return math.floor(val + 0.5)
+end
+
+local function setSliderFromRatio(ratio)
+    ratio = math.clamp(ratio, 0, 1)
+    fill.Size = UDim2.new(ratio, 0, 1, 0)
+    local trackWidth = track.AbsoluteSize.X
+    if trackWidth <= 0 then trackWidth = track.Size.X.Offset or SLIDER_WIDTH end
+    local x = math.clamp(trackWidth * ratio, 0, trackWidth)
+    knob.Position = UDim2.new(0, x, 0.5, 0)
+    local jp = ratioToJP(ratio)
+    currentJP = jp
+    valueLabel.Text = ("JumpPower: %d"):format(jp)
+    if isApplyingJP then
+        applyJumpToCharacter(jp)
+    end
+end
+
+-- init slider from humanoid if available
+do
+    local initial = DEFAULT_JP
+    local char = player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and type(humanoid.JumpPower) == "number" then
+            initial = tonumber(humanoid.JumpPower) or initial
+        end
+    end
+    initial = math.clamp(initial, JP_MIN, JP_MAX)
+    local ratio = 0
+    if JP_MAX - JP_MIN > 0 then ratio = (initial - JP_MIN) / (JP_MAX - JP_MIN) end
+    setSliderFromRatio(ratio)
+end
+
+-- track input functions
+local function updateFromInputX(posX)
+    local trackPos = track.AbsolutePosition.X
+    local trackWidth = track.AbsoluteSize.X
+    if trackWidth <= 0 then trackWidth = track.Size.X.Offset or SLIDER_WIDTH end
+    if trackWidth and trackWidth > 0 then
+        local rel = (posX - trackPos) / trackWidth
+        setSliderFromRatio(rel)
+    end
+end
+
+knob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        updateFromInputX(input.Position.X)
+    end
+end)
+knob.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+track.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        updateFromInputX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateFromInputX(input.Position.X)
+    end
+end)
+
+-- ====== JP toggle behavior (main + clone sync) ======
+local function updateToggleVisuals(on)
+    if on then
+        jpToggleBtn.Text = "JumpPower: ON"
+        jpToggleBtn.BackgroundColor3 = Color3.fromRGB(70,160,90)
+    else
+        jpToggleBtn.Text = "JumpPower: OFF"
+        jpToggleBtn.BackgroundColor3 = Color3.fromRGB(48,48,52)
+    end
+    if cloneButton then
+        cloneButton.Text = (on and "JP: ON" or "JP: OFF")
+        cloneButton.BackgroundColor3 = (on and Color3.fromRGB(70,160,90) or Color3.fromRGB(48,48,52))
+    end
+end
+
+local function setJPEnabled(on)
+    isApplyingJP = on
+    updateToggleVisuals(on)
+    if on then
+        -- immediate apply then start loop (loop exists below)
+        applyJumpToCharacter(currentJP)
+    else
+        -- revert humanoid JP to default immediately
+        restoreDefaultJPToCharacter()
+    end
+end
+
+jpToggleBtn.MouseButton1Click:Connect(function()
+    setJPEnabled(not isApplyingJP)
+end)
+
+-- ====== Long-press to create clone toggle ======
+-- Creates a small draggable clone button that toggles JP; only one clone allowed
+-- robust createCloneToggle replacement (paste in place of your old function)
+local function createCloneToggle()
+    if cloneButton and cloneButton.Parent then return end
+
+    local btn = Instance.new("TextButton")
+    btn.Name = "JPCloneToggle"
+    btn.Size = UDim2.new(0, 110, 0, 36)
+    btn.Position = UDim2.new(1, -200, 0.12, 0)
+    btn.AnchorPoint = Vector2.new(0, 0)
+    btn.BackgroundColor3 = (isApplyingJP and Color3.fromRGB(70,160,90)) or Color3.fromRGB(48,48,52)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(235,235,235)
+    btn.Text = (isApplyingJP and "JP: ON") or "JP: OFF"
+    btn.Parent = screenGui
+    btn.Active = true
+    btn.ZIndex = 50
+
+    local cCorner = Instance.new("UICorner", btn); cCorner.CornerRadius = UDim.new(0,8)
+    local cStroke = Instance.new("UIStroke", btn); cStroke.Color = Color3.fromRGB(60,60,64); cStroke.Thickness = 1
+
+    -- clicking toggles JP (reuses your existing setter)
+    btn.MouseButton1Click:Connect(function()
+        setJPEnabled(not isApplyingJP)
+    end)
+
+    -- Robust dragging using UserInputService
+    local draggingClone = false
+    local moveConnection = nil
+    local startMousePos = nil
+    local startBtnPos = nil
+
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingClone = true
+            startMousePos = input.Position
+            startBtnPos = btn.Position
+
+            -- Connect to global InputChanged to track mouse movement
+            moveConnection = UserInputService.InputChanged:Connect(function(mi)
+                if draggingClone and mi.UserInputType == Enum.UserInputType.MouseMovement then
+                    local delta = mi.Position - startMousePos
+                    local newX = startBtnPos.X.Offset + delta.X
+                    local newY = startBtnPos.Y.Offset + delta.Y
+                    btn.Position = UDim2.new(startBtnPos.X.Scale, newX, startBtnPos.Y.Scale, newY)
+                end
+            end)
+        end
+    end)
+
+    local function stopDrag()
+        draggingClone = false
+        if moveConnection then
+            moveConnection:Disconnect()
+            moveConnection = nil
+        end
+    end
+
+    -- Stop dragging on InputEnded (mouse up) and also from UserInputService InputEnded (safeguard)
+    btn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            stopDrag()
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            stopDrag()
+        end
+    end)
+
+    cloneButton = btn
+end
+
+-- long-press detection on main jpToggleBtn
+do
+    local holdTime = 5 -- seconds
+    local holding = false
+    local accumulator = 0
+    local connection = nil
+
+    local function startHold()
+        if holding then return end
+        holding = true
+        accumulator = 0
+        connection = RunService.Heartbeat:Connect(function(dt)
+            accumulator = accumulator + dt
+            if accumulator >= holdTime then
+                -- create clone and stop hold monitoring
+                createCloneToggle()
+                if connection then connection:Disconnect(); connection = nil end
+                holding = false
+            end
+        end)
+    end
+
+    local function stopHold()
+        holding = false
+        accumulator = 0
+        if connection then connection:Disconnect(); connection = nil end
+    end
+
+    -- start on input began, stop on input ended or move
+    jpToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            startHold()
+        end
+    end)
+    jpToggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            stopHold()
+        end
+    end)
+end
+
+-- ====== Hide opener visual but keep usable (transparency) ======
+hideTogglesBtn.MouseButton1Click:Connect(function()
+    hideOpenerVisual = not hideOpenerVisual
+    hideTogglesBtn.Text = "Hide Toggles: " .. (hideOpenerVisual and "ON" or "OFF")
+    hideTogglesBtn.BackgroundColor3 = hideOpenerVisual and Color3.fromRGB(110,110,110) or Color3.fromRGB(48,48,52)
+    -- visually hide but keep clickable
+    if hideOpenerVisual then
+        opener.BackgroundTransparency = 1
+        opener.TextTransparency = 1
+        opener.BorderSizePixel = 0
+    else
+        opener.BackgroundTransparency = 0
+        opener.TextTransparency = 0
+        opener.BorderSizePixel = 1
+    end
+end)
+
+-- opener toggles panel
+opener.MouseButton1Click:Connect(function()
+    panel.Visible = not panel.Visible
+    if panel.Visible then opener.BackgroundColor3 = Color3.fromRGB(36,36,40) else opener.BackgroundColor3 = Color3.fromRGB(28,29,33) end
+end)
+
+-- manual drag fallback for opener (ensures draggable on all clients)
+do
+    local draggingOpener = false
+    local dragStartPos, openerStart
+    opener.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingOpener = true
+            dragStartPos = input.Position
+            openerStart = opener.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then draggingOpener = false end
+            end)
+        end
+    end)
+    opener.InputChanged:Connect(function(input)
+        if draggingOpener and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStartPos
+            local newX = openerStart.X.Offset + delta.X
+            local newY = openerStart.Y.Offset + delta.Y
+            opener.Position = UDim2.new(openerStart.X.Scale, newX, openerStart.Y.Scale, newY)
+        end
+    end)
+end
+
+-- ====== Heartbeat loop to apply JP every 0.1s when ON ======
+do
+    local accumulator = 0
+    local INTERVAL = 0.1
+    RunService.Heartbeat:Connect(function(dt)
+        accumulator = accumulator + (dt or 0)
+        if accumulator >= INTERVAL then
+            accumulator = accumulator - INTERVAL
+            if isApplyingJP then
+                pcall(applyJumpToCharacter, currentJP)
+            end
+        end
+    end)
+end
+
+-- ====== Respawn handling ======
+player.CharacterAdded:Connect(function(char)
+    -- wait for humanoid and then enforce state
+    local ok, hum = pcall(function() return char:WaitForChild("Humanoid", 5) end)
+    if ok and hum then
+        if isApplyingJP then
+            -- apply current JP to new humanoid
+            safeSetJump(hum, currentJP)
+        else
+            -- ensure default JP restored
+            safeSetJump(hum, DEFAULT_JP)
+        end
+    end
+end)
+
+-- ====== Cleanup/persistence ======
+player.AncestryChanged:Connect(function()
+    if not player:IsDescendantOf(game) then
+        pcall(function() screenGui:Destroy() end)
+    end
+end)
+screenGui.ResetOnSpawn = false
+
+-- initial UI update
+valueLabel.Text = ("JumpPower: %d"):format(currentJP)
+updateToggleVisuals(isApplyingJP)
+
+-- done
