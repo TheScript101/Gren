@@ -304,70 +304,29 @@ local function createCloneToggle()
     btn.Name = "JPCloneToggle"
     btn.Size = UDim2.new(0, 110, 0, 36)
     btn.Position = UDim2.new(1, -200, 0.12, 0)
-    btn.AnchorPoint = Vector2.new(0, 0)
     btn.BackgroundColor3 = (isApplyingJP and Color3.fromRGB(70,160,90)) or Color3.fromRGB(48,48,52)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.TextColor3 = Color3.fromRGB(235,235,235)
     btn.Text = (isApplyingJP and "JP: ON") or "JP: OFF"
     btn.Parent = screenGui
-    btn.Active = true
     btn.ZIndex = 50
 
     local cCorner = Instance.new("UICorner", btn); cCorner.CornerRadius = UDim.new(0,8)
     local cStroke = Instance.new("UIStroke", btn); cStroke.Color = Color3.fromRGB(60,60,64); cStroke.Thickness = 1
 
-    -- clicking toggles JP (reuses your existing setter)
+    -- clicking toggles JP
     btn.MouseButton1Click:Connect(function()
         setJPEnabled(not isApplyingJP)
     end)
 
-    -- Robust dragging using UserInputService
-    local draggingClone = false
-    local moveConnection = nil
-    local startMousePos = nil
-    local startBtnPos = nil
-
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingClone = true
-            startMousePos = input.Position
-            startBtnPos = btn.Position
-
-            -- Connect to global InputChanged to track mouse movement
-            moveConnection = UserInputService.InputChanged:Connect(function(mi)
-                if draggingClone and mi.UserInputType == Enum.UserInputType.MouseMovement then
-                    local delta = mi.Position - startMousePos
-                    local newX = startBtnPos.X.Offset + delta.X
-                    local newY = startBtnPos.Y.Offset + delta.Y
-                    btn.Position = UDim2.new(startBtnPos.X.Scale, newX, startBtnPos.Y.Scale, newY)
-                end
-            end)
-        end
-    end)
-
-    local function stopDrag()
-        draggingClone = false
-        if moveConnection then
-            moveConnection:Disconnect()
-            moveConnection = nil
-        end
-    end
-
-    -- Stop dragging on InputEnded (mouse up) and also from UserInputService InputEnded (safeguard)
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            stopDrag()
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            stopDrag()
-        end
-    end)
+    -- make draggable with UIDragDetector
+    local drag = Instance.new("UIDragDetector")
+    drag.Parent = btn
 
     cloneButton = btn
 end
+
 
 -- long-press detection on main jpToggleBtn
 do
