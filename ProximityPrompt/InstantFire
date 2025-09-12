@@ -1,0 +1,333 @@
+-- LocalScript (StarterGui) -- Burst spammer with robust STOP ALL (invalidation token)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local HEARTBEAT = RunService.Heartbeat
+
+-- Config
+local FIRE_INTERVAL = 0.01
+local BURST_MIN = 1
+local BURST_MAX = 50
+local SEARCH_RADIUS = 40
+
+-- GUI setup (keeps your layout/size)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BurstPromptSpammerGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainBtn = Instance.new("Frame")
+mainBtn.Size = UDim2.new(0, 300, 0, 160)
+mainBtn.Position = UDim2.new(0.5, -150, 0.12, 0)
+mainBtn.AnchorPoint = Vector2.new(0.5, 0)
+mainBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+mainBtn.Parent = screenGui
+mainBtn.Active = true
+mainBtn.Draggable = true
+local mainCorner = Instance.new("UICorner", mainBtn); mainCorner.CornerRadius = UDim.new(0,10)
+
+local titleLabel = Instance.new("TextLabel", mainBtn)
+titleLabel.Size = UDim2.new(1, -16, 0, 20)
+titleLabel.Position = UDim2.new(0, 8, 0, 6)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 14
+titleLabel.TextColor3 = Color3.fromRGB(230,230,230)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Text = "Prompt Spammer"
+
+local toggle = Instance.new("TextButton", mainBtn)
+toggle.Size = UDim2.new(0, 150, 0, 44)
+toggle.Position = UDim2.new(0, 8, 0, 32)
+toggle.Text = "Spammer: OFF"
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 14
+toggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+toggle.TextColor3 = Color3.fromRGB(255,255,255)
+local togCorner = Instance.new("UICorner", toggle); togCorner.CornerRadius = UDim.new(0,8)
+
+local burstDisplay = Instance.new("TextLabel", mainBtn)
+burstDisplay.Size = UDim2.new(0, 80, 0, 28)
+burstDisplay.Position = UDim2.new(0, 168, 0, 36)
+burstDisplay.Text = "Burst: 5"
+burstDisplay.Font = Enum.Font.Gotham
+burstDisplay.TextSize = 14
+burstDisplay.BackgroundTransparency = 1
+burstDisplay.TextColor3 = Color3.fromRGB(220,220,220)
+burstDisplay.TextXAlignment = Enum.TextXAlignment.Center
+
+local plusBtn = Instance.new("TextButton", mainBtn)
+plusBtn.Size = UDim2.new(0, 28, 0, 28)
+plusBtn.Position = UDim2.new(0, 252, 0, 36)
+plusBtn.Text = "+"
+plusBtn.Font = Enum.Font.GothamBold
+plusBtn.TextSize = 18
+plusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+plusBtn.TextColor3 = Color3.fromRGB(255,255,255)
+local plusCorner = Instance.new("UICorner", plusBtn); plusCorner.CornerRadius = UDim.new(0,6)
+
+local minusBtn = Instance.new("TextButton", mainBtn)
+minusBtn.Size = UDim2.new(0, 28, 0, 28)
+minusBtn.Position = UDim2.new(0, 214, 0, 36)
+minusBtn.Text = "–"
+minusBtn.Font = Enum.Font.GothamBold
+minusBtn.TextSize = 18
+minusBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+minusBtn.TextColor3 = Color3.fromRGB(255,255,255)
+local minusCorner = Instance.new("UICorner", minusBtn); minusCorner.CornerRadius = UDim.new(0,6)
+
+local status = Instance.new("TextLabel", mainBtn)
+status.Size = UDim2.new(1, -16, 0, 28)
+status.Position = UDim2.new(0, 8, 0, 80)
+status.BackgroundTransparency = 1
+status.Font = Enum.Font.Gotham
+status.TextSize = 13
+status.Text = "Status: Idle"
+status.TextColor3 = Color3.fromRGB(200,200,200)
+status.TextXAlignment = Enum.TextXAlignment.Left
+
+local stopAll = Instance.new("TextButton", mainBtn)
+stopAll.Size = UDim2.new(1, -16, 0, 40)
+stopAll.Position = UDim2.new(0, 8, 0, 112)
+stopAll.Text = "STOP ALL"
+stopAll.Font = Enum.Font.GothamBold
+stopAll.TextSize = 16
+stopAll.BackgroundColor3 = Color3.fromRGB(200,50,50)
+stopAll.TextColor3 = Color3.fromRGB(255,255,255)
+local stopCorner = Instance.new("UICorner", stopAll); stopCorner.CornerRadius = UDim.new(0,8)
+
+-- state
+local running = false
+local conn = nil
+local burstCount = 5
+local runToken = 0      -- <- token/version to invalidate in-flight bursts
+
+-- helpers
+
+local function getPromptPosition(prompt)
+    if not prompt or not prompt.Parent then return nil end
+    local p = prompt.Parent
+    if p:IsA("BasePart") then return p.Position end
+    if p:IsA("Attachment") then
+        if p.WorldPosition then return p.WorldPosition end
+        local prt = p.Parent
+        if prt and prt:IsA("BasePart") then
+            return prt.CFrame:PointToWorldSpace(p.Position)
+        end
+    end
+    if p:IsA("Model") then
+        if p.PrimaryPart and p.PrimaryPart:IsA("BasePart") then return p.PrimaryPart.Position end
+        for _, c in ipairs(p:GetChildren()) do
+            if c:IsA("BasePart") then return c.Position end
+        end
+    end
+    for _, c in ipairs(p:GetDescendants()) do
+        if c:IsA("BasePart") then return c.Position end
+    end
+    return nil
+end
+
+-- robust fire method; receives the token that was current when the attempt started.
+-- it checks the token at key points and aborts if invalidated.
+local function tryFirePromptWithToken(prompt, token)
+    if token ~= runToken then return false end
+    if not prompt then return false end
+
+    -- 1) exploit helper if present
+    if type(fireproximityprompt) == "function" then
+        local ok = false
+        local suc, err = pcall(function() fireproximityprompt(prompt) end)
+        ok = suc
+        if token ~= runToken then return false end
+        if ok then return true end
+    end
+
+    if token ~= runToken then return false end
+
+    -- 2) InputHoldBegin/End fallback
+    local ok2 = false
+    local suc2, err2 = pcall(function()
+        if prompt.InputHoldBegin then
+            prompt:InputHoldBegin()
+            -- small simulated hold; check token during hold
+            local holdTime = 0.01
+            local elapsed = 0
+            while elapsed < holdTime do
+                if token ~= runToken then
+                    -- attempt to release input then abort
+                    if prompt.InputHoldEnd then
+                        pcall(function() prompt:InputHoldEnd() end)
+                    end
+                    error("aborted")
+                end
+                task.wait(0.005)
+                elapsed = elapsed + 0.005
+            end
+            if prompt.InputHoldEnd then
+                prompt:InputHoldEnd()
+            end
+            return true
+        end
+    end)
+    ok2 = suc2 and (not err2)
+    if token ~= runToken then return false end
+    if ok2 then return true end
+
+    if token ~= runToken then return false end
+
+    -- 3) BindableEvent heuristic (game-specific)
+    local parent = prompt.Parent
+    if parent then
+        for _, child in ipairs(parent:GetChildren()) do
+            if token ~= runToken then return false end
+            if child:IsA("BindableEvent") and (child.Name:lower():find("activate") or child.Name:lower():find("trigger")) then
+                local suc3, _ = pcall(function() child:Fire(player) end)
+                if suc3 then
+                    if token ~= runToken then return false end
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+local function findNearestPrompt()
+    local char = player.Character
+    if not char then return nil, nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil, nil end
+
+    local nearest, nearestDist = nil, math.huge
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local pos = getPromptPosition(obj)
+            if pos then
+                local d = (pos - hrp.Position).Magnitude
+                if d <= SEARCH_RADIUS and d < nearestDist then
+                    local maxAct = tonumber(obj.MaxActivationDistance) or 0
+                    if maxAct <= 0 or d <= math.min(SEARCH_RADIUS, maxAct) then
+                        nearest = obj
+                        nearestDist = d
+                    end
+                end
+            end
+        end
+    end
+    return nearest, nearestDist
+end
+
+-- start the loop: increments token to invalidate previous runs, then runs with a captured token
+local function startLoop()
+    -- ensure any previous run invalidated & disconnected
+    runToken = runToken + 1
+    if conn then
+        conn:Disconnect()
+        conn = nil
+    end
+
+    local myToken = runToken
+    local accum = 0
+    conn = HEARTBEAT:Connect(function(dt)
+        -- if token changed since start, just return early
+        if myToken ~= runToken then
+            return
+        end
+
+        accum = accum + dt
+        if accum < FIRE_INTERVAL then return end
+        accum = accum - FIRE_INTERVAL
+
+        -- re-check token before heavy work
+        if myToken ~= runToken then return end
+        local prompt, dist = findNearestPrompt()
+        if not prompt then
+            status.Text = "Status: ON — no prompt in range"
+            return
+        end
+
+        local successAny = false
+        for i = 1, burstCount do
+            if myToken ~= runToken then break end
+            local ok = tryFirePromptWithToken(prompt, myToken)
+            if ok then successAny = true end
+            -- no extra yields here; `tryFirePromptWithToken` may yield a little in hold logic but checks token.
+        end
+
+        if myToken ~= runToken then return end
+        if successAny then
+            status.Text = ("Status: Spamming '%s' (%.1f studs) — burst=%d"):format(prompt.Name or "Prompt", dist or 0, burstCount)
+        else
+            status.Text = ("Status: Tried '%s' (%.1f studs) — no local method"):format(prompt.Name or "Prompt", dist or 0)
+        end
+    end)
+end
+
+local function stopLoopImmediate()
+    -- increment token to abort any in-flight attempts, then disconnect connection
+    runToken = runToken + 1
+    if conn then
+        conn:Disconnect()
+        conn = nil
+    end
+end
+
+-- STOP ALL: fully stop spammer and reset UI (but keep burstCount)
+local function stopAllNow()
+    -- increment token to immediately invalidate in-flight work, ensure conn disconnected, update UI/state
+    stopLoopImmediate()
+    running = false
+    toggle.Text = "Spammer: OFF"
+    toggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    status.Text = "Status: STOPPED ALL"
+end
+
+local function setRunning(on)
+    if on then
+        if running then return end
+        running = true
+        toggle.Text = "Spammer: ON"
+        toggle.BackgroundColor3 = Color3.fromRGB(70,170,80)
+        startLoop()
+    else
+        if not running then return end
+        -- stop gracefully via token invalidation
+        stopAllNow()
+    end
+end
+
+-- UI handlers
+toggle.MouseButton1Click:Connect(function()
+    setRunning(not running)
+end)
+
+plusBtn.MouseButton1Click:Connect(function()
+    burstCount = math.min(BURST_MAX, burstCount + 1)
+    burstDisplay.Text = ("Burst: %d"):format(burstCount)
+end)
+
+minusBtn.MouseButton1Click:Connect(function()
+    burstCount = math.max(BURST_MIN, burstCount - 1)
+    burstDisplay.Text = ("Burst: %d"):format(burstCount)
+end)
+
+stopAll.MouseButton1Click:Connect(function()
+    stopAllNow()
+end)
+
+-- cleanup
+player.AncestryChanged:Connect(function()
+    if not player:IsDescendantOf(game) then
+        stopAllNow()
+    end
+end)
+screenGui.AncestryChanged:Connect(function()
+    if not screenGui:IsDescendantOf(game) then
+        stopAllNow()
+    end
+end)
+
+-- init
+burstDisplay.Text = ("Burst: %d"):format(burstCount)
+status.Text = "Status: Idle"
