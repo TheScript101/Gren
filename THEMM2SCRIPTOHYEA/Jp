@@ -300,16 +300,25 @@ end)
 local function createCloneToggle()
     if cloneButton and cloneButton.Parent then return end
 
+    -- Create a frame that will be draggable
+    local dragFrame = Instance.new("Frame")
+    dragFrame.Name = "JPCloneToggleFrame"
+    dragFrame.Size = UDim2.new(0, 110, 0, 36)
+    dragFrame.Position = UDim2.new(1, -200, 0.12, 0)
+    dragFrame.BackgroundTransparency = 1 -- invisible background
+    dragFrame.Parent = screenGui
+    dragFrame.ZIndex = 49
+
+    -- Add the actual button inside
     local btn = Instance.new("TextButton")
     btn.Name = "JPCloneToggle"
-    btn.Size = UDim2.new(0, 110, 0, 36)
-    btn.Position = UDim2.new(1, -200, 0.12, 0)
+    btn.Size = UDim2.new(1, 0, 1, 0) -- fills the frame
     btn.BackgroundColor3 = (isApplyingJP and Color3.fromRGB(70,160,90)) or Color3.fromRGB(48,48,52)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.TextColor3 = Color3.fromRGB(235,235,235)
     btn.Text = (isApplyingJP and "JP: ON") or "JP: OFF"
-    btn.Parent = screenGui
+    btn.Parent = dragFrame
     btn.ZIndex = 50
 
     local cCorner = Instance.new("UICorner", btn); cCorner.CornerRadius = UDim.new(0,8)
@@ -320,13 +329,12 @@ local function createCloneToggle()
         setJPEnabled(not isApplyingJP)
     end)
 
-    -- make draggable with UIDragDetector
+    -- make the frame draggable (not the button itself)
     local drag = Instance.new("UIDragDetector")
-    drag.Parent = btn
-    drag.InputsVisible = true  -- allow clicks to go through while draggable
+    drag.Parent = dragFrame
+    drag.InputsVisible = true
 
-
-    cloneButton = btn
+    cloneButton = dragFrame -- save reference to the draggable container
 end
 
 
