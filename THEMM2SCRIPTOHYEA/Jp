@@ -300,22 +300,20 @@ end)
 local function createCloneToggle()
     if cloneButton and cloneButton.Parent then return end
 
-    -- Draggable holder
+    -- holder for dragging
     local holder = Instance.new("Frame")
     holder.Name = "JPCloneHolder"
     holder.Size = UDim2.new(0, 110, 0, 36)
     holder.Position = UDim2.new(1, -200, 0.12, 0)
     holder.BackgroundTransparency = 1
     holder.Active = true
-    holder.Draggable = true
     holder.Parent = screenGui
     holder.ZIndex = 50
 
-    -- The actual toggle button inside
+    -- button inside
     local btn = Instance.new("TextButton")
     btn.Name = "JPCloneToggle"
     btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.Position = UDim2.new(0, 0, 0, 0)
     btn.BackgroundColor3 = (isApplyingJP and Color3.fromRGB(70,160,90)) or Color3.fromRGB(48,48,52)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
@@ -331,7 +329,32 @@ local function createCloneToggle()
         setJPEnabled(not isApplyingJP)
     end)
 
-    cloneButton = holder
+    -- custom dragging (does not block clicks)
+    local dragging = false
+    local dragStart, startPos
+
+    holder.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = holder.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    holder.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            holder.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    cloneButton = btn
 end
 
 
