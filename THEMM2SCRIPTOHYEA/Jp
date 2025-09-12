@@ -323,6 +323,8 @@ local function createCloneToggle()
     -- make draggable with UIDragDetector
     local drag = Instance.new("UIDragDetector")
     drag.Parent = btn
+    drag.InputsVisible = true  -- allow clicks to go through while draggable
+
 
     cloneButton = btn
 end
