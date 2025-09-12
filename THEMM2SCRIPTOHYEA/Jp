@@ -298,69 +298,42 @@ end)
 -- Creates a small draggable clone button that toggles JP; only one clone allowed
 -- robust createCloneToggle replacement (paste in place of your old function)
 local function createCloneToggle()
-    -- don't create if we already have one
     if cloneButton and cloneButton.Parent then return end
 
-    -- guard to prevent re-entrancy/race creating multiple clones
-    if screenGui:GetAttribute("CloneCreating") then return end
-    screenGui:SetAttribute("CloneCreating", true)
+    -- Draggable holder
+    local holder = Instance.new("Frame")
+    holder.Name = "JPCloneHolder"
+    holder.Size = UDim2.new(0, 110, 0, 36)
+    holder.Position = UDim2.new(1, -200, 0.12, 0)
+    holder.BackgroundTransparency = 1
+    holder.Active = true
+    holder.Draggable = true
+    holder.Parent = screenGui
+    holder.ZIndex = 50
 
-    -- create the draggable frame (frame handles dragging, not the button)
-    local dragFrame = Instance.new("Frame")
-    dragFrame.Name = "JPCloneToggleFrame"
-    dragFrame.Size = UDim2.new(0, 110, 0, 36)
-
-    -- position it near the opener (safe fallback if opener.Position fields are nil)
-    local openerPos = opener and opener.Position
-    if openerPos then
-        local xOff = (openerPos.X.Offset and openerPos.X.Offset - 200) or -200
-        dragFrame.Position = UDim2.new(openerPos.X.Scale, xOff, openerPos.Y.Scale, openerPos.Y.Offset)
-    else
-        dragFrame.Position = UDim2.new(1, -200, 0.12, 0)
-    end
-
-    dragFrame.BackgroundTransparency = 1
-    dragFrame.Active = true
-    -- use Frame.Draggable so the child button remains clickable on mobile
-    pcall(function() dragFrame.Draggable = true end)
-    dragFrame.Parent = screenGui
-    dragFrame.ZIndex = 49
-
-    -- create the actual clickable button inside the frame
+    -- The actual toggle button inside
     local btn = Instance.new("TextButton")
     btn.Name = "JPCloneToggle"
     btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Position = UDim2.new(0, 0, 0, 0)
     btn.BackgroundColor3 = (isApplyingJP and Color3.fromRGB(70,160,90)) or Color3.fromRGB(48,48,52)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.TextColor3 = Color3.fromRGB(235,235,235)
     btn.Text = (isApplyingJP and "JP: ON") or "JP: OFF"
-    btn.Parent = dragFrame
-    btn.ZIndex = 50
-    btn.Active = true
+    btn.Parent = holder
 
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(60,60,64)
-    stroke.Thickness = 1
-    stroke.Parent = btn
+    local cCorner = Instance.new("UICorner", btn); cCorner.CornerRadius = UDim.new(0,8)
+    local cStroke = Instance.new("UIStroke", btn); cStroke.Color = Color3.fromRGB(60,60,64); cStroke.Thickness = 1
 
-    -- use Activated for best cross-device compatibility
-    btn.Activated:Connect(function()
+    -- clicking toggles JP
+    btn.MouseButton1Click:Connect(function()
         setJPEnabled(not isApplyingJP)
-        -- keep visuals in sync
-        pcall(function()
-            btn.Text = isApplyingJP and "JP: ON" or "JP: OFF"
-            btn.BackgroundColor3 = isApplyingJP and Color3.fromRGB(70,160,90) or Color3.fromRGB(48,48,52)
-        end)
     end)
 
-    -- store reference to the clickable button (so other code that expects cloneButton.Text still works)
-    cloneButton = btn
-
-    -- clear the creating flag
-    screenGui:SetAttribute("CloneCreating", false)
+    cloneButton = holder
 end
+
 
 
 
