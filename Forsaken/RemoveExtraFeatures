@@ -1141,7 +1141,7 @@ local function updateESP()
         end
 
         updateHealthIndicators()
-        task.wait(3)
+        task.wait(1.5)
     end
 end
 
