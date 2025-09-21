@@ -48,7 +48,7 @@ end)
 
 -- other thing
 pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/NyansakenHub/NyansakenHub/refs/heads/main/forsaken.lua"))()
+    loadstring(game:HttpGet('https://github.com/NyansakenHub/NyansakenHub/raw/refs/heads/main/forsakenupdate'))()
 end)
 ------------------------------------------------------------------------
 wait(0.5)
