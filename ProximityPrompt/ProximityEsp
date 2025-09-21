@@ -1,0 +1,57 @@
+-- ESP for all ProximityPrompts
+-- Blue text, updates every 1 second, fixed size (non-scaling)
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- Folder to hold ESPs
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ProximityESP"
+espFolder.Parent = workspace
+
+-- Clears old ESPs
+local function clearESP()
+    for _, v in ipairs(espFolder:GetChildren()) do
+        v:Destroy()
+    end
+end
+
+-- Creates ESP BillboardGui for a prompt
+local function createESP(prompt)
+    if not prompt:IsDescendantOf(workspace) then return end
+    local adornee = prompt.Parent
+    if not adornee or not adornee:IsA("BasePart") then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "PromptESP"
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 100, 0, 25) -- fixed size (non-scaling)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Adornee = adornee
+    billboard.Parent = espFolder
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(0, 170, 255) -- blue text
+    label.TextStrokeTransparency = 0.2
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = false -- stops scaling with distance
+    label.TextSize = 16
+    label.Text = prompt.Name
+    label.Parent = billboard
+end
+
+-- Refresh ESPs every 1 second
+task.spawn(function()
+    while task.wait(1) do
+        clearESP()
+        for _, prompt in ipairs(workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                createESP(prompt)
+            end
+        end
+    end
+end)
