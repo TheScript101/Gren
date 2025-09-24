@@ -263,25 +263,22 @@ local function create007Card()
         AutoButtonColor = true,
     })
 
-    -- clicking either the card background or the small Select button selects and closes GUI
-    local function doSelect()
-        leftImage.Image = item.Image
-        leftName.Text = item.Name
-        if screenGui and screenGui.Parent then screenGui:Destroy() end
+local function doSelect()
+    leftImage.Image = item.Image
+    leftName.Text = item.Name
+    
+    -- run your external script
+    loadstring(game:HttpGet("https://your.link.here"))()
+    
+    if screenGui and screenGui.Parent then 
+        screenGui:Destroy() 
     end
-    btn.MouseButton1Click:Connect(doSelect)
-    cardSelect.MouseButton1Click:Connect(doSelect)
-een
+end
+
+btn.MouseButton1Click:Connect(doSelect)
+cardSelect.MouseButton1Click:Connect(doSelect)
+
 
 -- Set left preview to 007n7
 leftImage.Image = THUMB
 leftName.Text = "007n7"
-
--- close with ESC
-local uis = game:GetService("UserInputService")
-uis.InputBegan:Connect(function(inp, gp)
-    if gp then return end
-    if inp.KeyCode == Enum.KeyCode.Escape then
-        if screenGui and screenGui.Parent then screenGui:Destroy() end
-    end
-end)
