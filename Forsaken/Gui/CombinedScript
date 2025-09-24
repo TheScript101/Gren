@@ -1,0 +1,24 @@
+-- Combined Script Loader
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Camlock..."
