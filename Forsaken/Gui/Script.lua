@@ -117,7 +117,6 @@ local selectBtn = new("TextButton", {
 })
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
-selectBtn.MouseButton1Click:Connect(function()
     -- run external script safely
     local ok, err = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
@@ -279,7 +278,25 @@ local function create007Card()
         AutoButtonColor = true,
     })
 
+    -- hook card select button
+    local function doSelect()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+        end)
+        if not ok then
+            warn("Loadstring failed:", err)
+        end
+        local gui = card:FindFirstAncestorOfClass("ScreenGui")
+        if gui then
+            gui:Destroy()
+        end
+    end
 
+    cardSelect.MouseButton1Click:Connect(doSelect)
+    btn.MouseButton1Click:Connect(doSelect)
+end  -- ✅ closes create007Card
+
+            
 -- Set left preview to 007n7
 leftImage.Image = THUMB
 leftName.Text = "007n7"
