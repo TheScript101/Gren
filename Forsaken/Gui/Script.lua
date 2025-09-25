@@ -267,15 +267,12 @@ local function doSelect()
     leftImage.Image = item.Image
     leftName.Text = item.Name
     
-    -- run your external script
-    pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
-end)
+    -- run CODE ------------------------------------------
     
     if screenGui and screenGui.Parent then 
         screenGui:Destroy() 
+        end
     end
-end
 
 btn.MouseButton1Click:Connect(doSelect)
 cardSelect.MouseButton1Click:Connect(doSelect)
