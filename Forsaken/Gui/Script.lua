@@ -267,20 +267,20 @@ local function doSelect()
     leftImage.Image = item.Image
     leftName.Text = item.Name
 
-    -- run your external script safely and asynchronously
-    task.defer(function()
+    -- run your external script safely
+    task.spawn(function()
         local ok, err = pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+            loadstring(game:HttpGet("https://your.link.here"))()
         end)
-        if not ok then
-            warn("Loadstring failed:", err)
-        end
+        if not ok then warn("Loadstring failed:", err) end
     end)
 
-    if screenGui and screenGui.Parent then 
-        screenGui:Destroy() 
+    -- hide GUI instead of destroying
+    if screenGui then
+        screenGui.Enabled = false
     end
 end
+
 
 
 -- Set left preview to 007n7
