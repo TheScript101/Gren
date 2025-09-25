@@ -50,11 +50,6 @@ end)
 pcall(function()
     loadstring(game:HttpGet('https://github.com/NyansakenHub/NyansakenHub/raw/refs/heads/main/forsakenupdate'))()
 end)
-
--- other thing
-pcall(function()
-    loadstring(game:HttpGet('https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/Script.lua'))()
-end)
 ------------------------------------------------------------------------
 wait(0.5)
 local CoreGui = game:GetService("CoreGui")
