@@ -178,7 +178,8 @@ selectBtn.MouseButton1Click:Connect(function()
         end
 
 -- Create overlay with custom text and duration
-local label = CreateLoadingOverlay("Loading Character Advantage...", 1)
+local label = CreateLoadingOverlay("Loading Advantages...", 1)
+wait(1)
 
 
     -- Then safely run the loadstring
