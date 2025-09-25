@@ -291,12 +291,15 @@ local content = Instance.new("Frame", pad)
 content.Size = UDim2.new(1, 0, 0, CONTENT_H)
 content.Position = UDim2.new(0, 0, 0, HEADER_H + SEP_H + 8)
 content.BackgroundTransparency = 1
+content.Name = "Image+Info"
+
+Frame - ImageCol pos: {} | size: {0.439999998, 0}, {0.5, 0}
 
 -- Left image column
 local imageCol = Instance.new("Frame", content)
 imageCol.Name = "ImageCol"
-imageCol.Size = UDim2.new(0.44, 0, 1, 0)
-imageCol.Position = UDim2.new(0, 0, 0, 0)
+imageCol.Size = UDim2.new(0.439999998, 0, 0.50, 0)
+imageCol.Position = UDim2.new(0.300000012, 0, 0, -25)
 imageCol.BackgroundTransparency = 1
 
 local imageBox = Instance.new("Frame", imageCol)
