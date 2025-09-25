@@ -119,7 +119,6 @@ local selectBtn = new("TextButton", {
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
     if screenGui and screenGui.Parent then screenGui:Destroy() end
-
 loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
 end)
 
