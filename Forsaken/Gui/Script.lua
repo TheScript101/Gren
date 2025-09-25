@@ -269,7 +269,7 @@ local function doSelect()
     
     -- run your external script
     pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
 end)
     
     if screenGui and screenGui.Parent then 
