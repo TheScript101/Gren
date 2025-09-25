@@ -12,6 +12,56 @@ local playerGui = player:WaitForChild("PlayerGui")
 local old = playerGui:FindFirstChild("SelectionUI")
 if old then old:Destroy() end
 
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Function to create a loading overlay
+local function CreateLoadingOverlay(text, duration)
+    -- default values if not provided
+    text = text or "Placeholder..."
+    duration = duration or 1
+
+    -- Create ScreenGui
+    local loadingGui = Instance.new("ScreenGui")
+    loadingGui.Name = "LoadingCamlockGui7"
+    loadingGui.Parent = PlayerGui
+    loadingGui.ResetOnSpawn = false
+
+    -- Background
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0.6
+    bg.Parent = loadingGui
+
+    -- Label
+    local label = Instance.new("TextLabel")
+    label.Parent = bg
+    label.Size = UDim2.new(1, 0, 0, 100)
+    label.Position = UDim2.new(0, 0, 0.5, -50)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.Font = Enum.Font.Roboto
+    label.TextSize = 48
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeTransparency = 0.7
+    label.TextWrapped = true
+    label.TextScaled = true
+
+    -- Fade out & destroy after duration
+    task.delay(duration, function()
+        for i = 0, 1, 0.05 do
+            bg.BackgroundTransparency = 0.6 + i * 0.4
+            label.TextTransparency = i
+            task.wait(0.03)
+        end
+        loadingGui:Destroy()
+    end)
+
+    return label -- 🔥 return label so you can update text externally
+end
+
+
 -- helper constructor
 local function new(class, props)
     local obj = Instance.new(class)
@@ -125,7 +175,11 @@ selectBtn.MouseButton1Click:Connect(function()
     local gui = playerd.PlayerGui:FindFirstChild("SelectionUI")
     if gui then
         gui:Destroy()
-    end
+        end
+
+-- Create overlay with custom text and duration
+local label = CreateLoadingOverlay("Loading Character Advantage...", 1)
+
 
     -- Then safely run the loadstring
     local ok, err = pcall(function()
