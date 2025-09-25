@@ -121,7 +121,7 @@ selectBtn.MouseButton1Click:Connect(function()
 -- Destroy the GUI first
 local playerd = game:GetService("Players").LocalPlayer
 for _, gui in pairs(playerd.PlayerGui:GetChildren()) do
-    if gui.Name == "YourGuiNameHere" then
+    if gui.Name == "SelectionUI" then
         gui:Destroy()
             end
         end
