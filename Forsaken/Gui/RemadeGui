@@ -1,0 +1,506 @@
+-- LocalScript: Clean "Selection" UI (tidy side panel + select highlight, no overlaps)
+-- Paste into StarterPlayerScripts or run from an executor.
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Clean up any old UI
+local old = playerGui:FindFirstChild("SelectionUI")
+if old then old:Destroy() end
+
+-- helper constructor
+local function new(class, props)
+    local obj = Instance.new(class)
+    if props then
+        for k,v in pairs(props) do
+            obj[k] = v
+        end
+    end
+    return obj
+end
+
+-- loading overlay
+local function CreateLoadingOverlay(text, duration)
+    text = text or "Placeholder..."
+    duration = duration or 1
+    local loadingGui = Instance.new("ScreenGui")
+    loadingGui.Name = "LoadingCamlockGui7"
+    loadingGui.Parent = playerGui
+    loadingGui.ResetOnSpawn = false
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0.6
+    bg.Parent = loadingGui
+
+    local label = Instance.new("TextLabel")
+    label.Parent = bg
+    label.Size = UDim2.new(1, 0, 0, 100)
+    label.Position = UDim2.new(0, 0, 0.5, -50)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.Font = Enum.Font.Roboto
+    label.TextSize = 48
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeTransparency = 0.7
+    label.TextWrapped = true
+    label.TextScaled = true
+
+    task.delay(duration, function()
+        for i = 0, 1, 0.05 do
+            bg.BackgroundTransparency = 0.6 + i * 0.4
+            label.TextTransparency = i
+            task.wait(0.03)
+        end
+        loadingGui:Destroy()
+    end)
+
+    return label
+end
+
+-- Theme / thumbnail
+local THUMB = "rbxthumb://type=Asset&id=121597096026340&w=420&h=420"
+
+-- Root ScreenGui
+local screenGui = new("ScreenGui", {
+    Name = "SelectionUI",
+    Parent = playerGui,
+    ResetOnSpawn = false,
+})
+pcall(function() screenGui.IgnoreGuiInset = true end)
+
+-- Main container
+local main = new("Frame", {
+    Parent = screenGui,
+    Name = "MainFrame",
+    AnchorPoint = Vector2.new(0.5,0.5),
+    Position = UDim2.new(0.5,0,0.5,0),
+    Size = UDim2.new(0.84,0,0.74,0),
+    BackgroundColor3 = Color3.fromRGB(30,30,32),
+    BorderSizePixel = 0,
+})
+new("UICorner", { Parent = main, CornerRadius = UDim.new(0,22) })
+new("UIStroke", { Parent = main, Color = Color3.fromRGB(255,255,255), Thickness = 3, Transparency = 0.9 })
+
+-- Header
+local title = new("TextLabel", {
+    Parent = main,
+    Name = "Title",
+    BackgroundTransparency = 1,
+    Text = "SELECTION",
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 36,
+    TextColor3 = Color3.fromRGB(255,255,255),
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,0.01,0),
+    Size = UDim2.new(0.6,0,0.12,0),
+    TextScaled = true,
+    TextXAlignment = Enum.TextXAlignment.Center,
+})
+local note = new("TextLabel", {
+    Parent = main,
+    Name = "Note",
+    BackgroundTransparency = 1,
+    Text = "Select What You Are Using",
+    Font = Enum.Font.SourceSans,
+    TextSize = 18,
+    TextColor3 = Color3.fromRGB(220,220,220),
+    AnchorPoint = Vector2.new(0.5,0),
+    Position = UDim2.new(0.5,0,0.12,0),
+    Size = UDim2.new(0.6,0,0.06,0),
+    TextScaled = true,
+    TextXAlignment = Enum.TextXAlignment.Center,
+})
+
+-- Top separator
+local sepTop = new("Frame", {
+    Parent = main,
+    BackgroundColor3 = Color3.fromRGB(140,140,140),
+    BackgroundTransparency = 0.85,
+    Size = UDim2.new(0.94,0,0,2),
+    Position = UDim2.new(0.03,0,0.20,0),
+})
+
+-- LEFT: preview card
+local leftContainer = new("Frame", {
+    Parent = main,
+    BackgroundTransparency = 1,
+    Size = UDim2.new(0.26,0,0.68,0),
+    Position = UDim2.new(0.03,0,0.22,0),
+})
+local leftCard = new("Frame", {
+    Parent = leftContainer,
+    Name = "LeftCard",
+    Size = UDim2.new(1,0,0.95,0),
+    BackgroundColor3 = Color3.fromRGB(22,22,24),
+})
+new("UICorner", { Parent = leftCard, CornerRadius = UDim.new(0,12) })
+new("UIStroke", { Parent = leftCard, Color = Color3.fromRGB(255,255,255), Thickness = 1, Transparency = 0.9 })
+
+-- Select button (will toggle blue)
+local selectBtn = new("TextButton", {
+    Parent = leftCard,
+    Name = "SelectBtn",
+    Text = "Select",
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 16,
+    BackgroundColor3 = Color3.fromRGB(70,70,75),
+    TextColor3 = Color3.fromRGB(255,255,255),
+    Size = UDim2.new(0.85,0,0.11,0),
+    Position = UDim2.new(0.06,0,0.04,0),
+    AutoButtonColor = true,
+})
+new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
+
+-- small thin separator under the Select button
+local sepUnderSelect = new("Frame", {
+    Parent = leftCard,
+    BackgroundColor3 = Color3.fromRGB(110,110,110),
+    Size = UDim2.new(0.9,0,0,2),
+    Position = UDim2.new(0.05,0,0.16,0),
+    BackgroundTransparency = 0.6,
+})
+
+-- Character image (centered)
+local leftImage = new("ImageLabel", {
+    Parent = leftCard,
+    Name = "CharacterImage",
+    BackgroundTransparency = 1,
+    Size = UDim2.new(0.9,0,0.6,0),
+    Position = UDim2.new(0.05,0,0.18,0),
+    ScaleType = Enum.ScaleType.Fit,
+    Image = THUMB,
+})
+new("UICorner", { Parent = leftImage, CornerRadius = UDim.new(0,10) })
+
+-- separator above name
+local sepAboveName = new("Frame", {
+    Parent = leftCard,
+    BackgroundColor3 = Color3.fromRGB(110,110,110),
+    Size = UDim2.new(0.9,0,0,2),
+    Position = UDim2.new(0.05,0,0.80,0),
+    BackgroundTransparency = 0.6,
+})
+
+-- Name label
+local leftName = new("TextLabel", {
+    Parent = leftCard,
+    Name = "LeftName",
+    Text = "007n7",
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 18,
+    TextColor3 = Color3.fromRGB(255,255,255),
+    BackgroundTransparency = 1,
+    Position = UDim2.new(0.05,0,0.82,0),
+    Size = UDim2.new(0.9,0,0.12,0),
+    TextScaled = true,
+    TextXAlignment = Enum.TextXAlignment.Center,
+})
+
+-- RIGHT: scroll container (kept empty for layout)
+local rightContainer = new("Frame", {
+    Parent = main,
+    BackgroundTransparency = 1,
+    Size = UDim2.new(0.66,0,0.68,0),
+    Position = UDim2.new(0.31,0,0.22,0),
+})
+local scroll = new("ScrollingFrame", {
+    Parent = rightContainer,
+    Name = "ScrollArea",
+    BackgroundTransparency = 1,
+    Size = UDim2.new(1, -8, 1, 0),
+    ScrollBarThickness = 10,
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    VerticalScrollBarInset = Enum.ScrollBarInset.Always,
+})
+local grid = new("UIGridLayout", {
+    Parent = scroll,
+    CellSize = UDim2.new(0, 150, 0, 160),
+    CellPadding = UDim2.new(0, 12, 0, 12),
+    FillDirection = Enum.FillDirection.Horizontal,
+})
+grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    local abs = grid.AbsoluteContentSize
+    scroll.CanvasSize = UDim2.new(0, 0, 0, abs.Y + 20)
+end)
+
+-- (create007Card removed as requested)
+
+-- keep left preview set
+leftImage.Image = THUMB
+leftName.Text = "007n7"
+
+-- =========================
+-- Clean Confirmation Panel (fixed non-overlapping layout)
+-- =========================
+
+local confirmPanel = Instance.new("Frame")
+confirmPanel.Name = "ConfirmPanel"
+confirmPanel.Parent = main
+confirmPanel.Size = UDim2.new(0.340000004, 0, 0.75999999, 0)
+confirmPanel.Position = UDim2.new(0.639999986, 0, 0.220000118, 0)
+confirmPanel.BackgroundColor3 = Color3.fromRGB(30,30,32)
+confirmPanel.BorderSizePixel = 0
+confirmPanel.Visible = false
+new("UICorner", { Parent = confirmPanel, CornerRadius = UDim.new(0, 12) })
+local confirmStroke = Instance.new("UIStroke", confirmPanel)
+confirmStroke.Color = Color3.fromRGB(200,200,200)
+confirmStroke.Transparency = 0.9
+confirmStroke.Thickness = 1
+
+-- Use a padding container inside confirmPanel for predictable layout:
+local pad = Instance.new("Frame", confirmPanel)
+pad.Name = "Pad"
+pad.Size = UDim2.new(1, -28, 1, -28) -- leave 14px padding on each side
+pad.Position = UDim2.new(0, 14, 0, 14)
+pad.BackgroundTransparency = 1
+                            
+-- Fixed heights for rows to avoid overlap
+local HEADER_H = 48
+local SEP_H = 2
+local CONTENT_H = 180   -- image height + small margin
+local ADV_H = 120       -- advantages area
+local FOOTER_H = 86
+
+-- Header
+local header = Instance.new("Frame", pad)
+header.Size = UDim2.new(1, 0, 0, 28)
+header.Position = UDim2.new(0, 0, -0.0500000007, 0)
+header.BackgroundTransparency = 1
+header.Name = "IsThisCorrectFrame"
+local panelTitle = Instance.new("TextLabel", header)
+panelTitle.Size = UDim2.new(1, 0, 1, 0)
+panelTitle.BackgroundTransparency = 1
+panelTitle.Text = "Is This Correct?"
+panelTitle.Font = Enum.Font.SourceSansBold
+panelTitle.TextSize = 20
+panelTitle.TextColor3 = Color3.fromRGB(255,255,255)
+panelTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local headerSep = Instance.new("Frame", pad)
+headerSep.Size = UDim2.new(1, 0, 0, SEP_H)
+headerSep.Position = UDim2.new(0, 0, 0, 20)
+headerSep.BackgroundColor3 = Color3.fromRGB(110,110,110)
+headerSep.BackgroundTransparency = 0.6
+headerSep.Name = "Line1"
+
+-- Content row (image left, info right)
+local content = Instance.new("Frame", pad)
+content.Size = UDim2.new(1, 0, 0, CONTENT_H)
+content.Position = UDim2.new(0, 0, 0, HEADER_H + SEP_H + 8)
+content.BackgroundTransparency = 1
+
+-- Left image column
+local imageCol = Instance.new("Frame", content)
+imageCol.Name = "ImageCol"
+imageCol.Size = UDim2.new(0.44, 0, 1, 0)
+imageCol.Position = UDim2.new(0, 0, 0, 0)
+imageCol.BackgroundTransparency = 1
+
+local imageBox = Instance.new("Frame", imageCol)
+imageBox.Size = UDim2.new(1, 0, 1, 0)
+imageBox.Position = UDim2.new(0, 0, 0, 0)
+imageBox.BackgroundColor3 = Color3.fromRGB(20,20,20)
+imageBox.BorderSizePixel = 0
+new("UICorner", { Parent = imageBox, CornerRadius = UDim.new(0, 8) })
+local imageBoxStroke = Instance.new("UIStroke", imageBox)
+imageBoxStroke.Color = Color3.fromRGB(120,120,120)
+imageBoxStroke.Transparency = 0.85
+imageBoxStroke.Thickness = 2
+
+local panelImage = Instance.new("ImageLabel", imageBox)
+panelImage.Size = UDim2.new(1, -12, 1, -12)
+panelImage.Position = UDim2.new(0, 6, 0, 6)
+panelImage.BackgroundTransparency = 1
+panelImage.Image = THUMB
+panelImage.ScaleType = Enum.ScaleType.Fit
+new("UICorner", { Parent = panelImage, CornerRadius = UDim.new(0, 6) })
+
+-- Right info column
+local infoCol = Instance.new("Frame", content)
+infoCol.Name = "InfoCol"
+infoCol.Size = UDim2.new(0.56, 0, 1, 0)
+infoCol.Position = UDim2.new(0.44, 12, 0, 0)
+infoCol.BackgroundTransparency = 1
+
+-- Name label
+local nameLabelPanel = Instance.new("TextLabel", infoCol)
+nameLabelPanel.Size = UDim2.new(1, 0, 0, 28)
+nameLabelPanel.Position = UDim2.new(0, 0, 0, 0)
+nameLabelPanel.BackgroundTransparency = 1
+nameLabelPanel.Text = "007n7"
+nameLabelPanel.Font = Enum.Font.SourceSansBold
+nameLabelPanel.TextSize = 22
+nameLabelPanel.TextColor3 = Color3.fromRGB(255,255,255)
+nameLabelPanel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- small ID display under name
+local smallIdBox = Instance.new("Frame", infoCol)
+smallIdBox.Size = UDim2.new(1, 0, 0, 56)
+smallIdBox.Position = UDim2.new(0, 0, 0, 36)
+smallIdBox.BackgroundColor3 = Color3.fromRGB(18,18,18)
+smallIdBox.BorderSizePixel = 0
+new("UICorner", { Parent = smallIdBox, CornerRadius = UDim.new(0,6) })
+local smallIdStroke = Instance.new("UIStroke", smallIdBox)
+smallIdStroke.Color = Color3.fromRGB(120,120,120)
+smallIdStroke.Transparency = 0.85
+smallIdStroke.Thickness = 1
+
+local smallIdText = Instance.new("TextLabel", smallIdBox)
+smallIdText.Size = UDim2.new(1, -12, 1, -12)
+smallIdText.Position = UDim2.new(0, 6, 0, 6)
+smallIdText.BackgroundTransparency = 1
+smallIdText.Text = "Image Id: N/A"
+smallIdText.Font = Enum.Font.SourceSans
+smallIdText.TextSize = 14
+smallIdText.TextColor3 = Color3.fromRGB(200,200,200)
+smallIdText.TextXAlignment = Enum.TextXAlignment.Left
+smallIdText.TextYAlignment = Enum.TextYAlignment.Center
+
+-- Separator between content and advantages
+local contentBottomY = HEADER_H + SEP_H + 8 + CONTENT_H
+local infoSep = Instance.new("Frame", pad)
+infoSep.Size = UDim2.new(1, 0, 0, SEP_H)
+infoSep.Position = UDim2.new(0, 0, 0, contentBottomY + 8)
+infoSep.BackgroundColor3 = Color3.fromRGB(110,110,110)
+infoSep.BackgroundTransparency = 0.6
+
+-- Advantages area (fixed height)
+local advTopY = contentBottomY + 8 + SEP_H + 8
+local advHeading = Instance.new("TextLabel", pad)
+advHeading.Size = UDim2.new(1, 0, 0, 20)
+advHeading.Position = UDim2.new(0, 0, 0, advTopY)
+advHeading.BackgroundTransparency = 1
+advHeading.Text = "What Advantages You Will Gain:"
+advHeading.Font = Enum.Font.SourceSans
+advHeading.TextSize = 14
+advHeading.TextColor3 = Color3.fromRGB(200,200,200)
+advHeading.TextXAlignment = Enum.TextXAlignment.Left
+
+local advBox = Instance.new("Frame", pad)
+advBox.Size = UDim2.new(1, 0, 0, ADV_H)
+advBox.Position = UDim2.new(0, 0, 0, advTopY + 24)
+advBox.BackgroundColor3 = Color3.fromRGB(20,20,20)
+advBox.BorderSizePixel = 0
+new("UICorner", { Parent = advBox, CornerRadius = UDim.new(0,6) })
+local advStroke = Instance.new("UIStroke", advBox)
+advStroke.Transparency = 0.9
+advStroke.Thickness = 1
+
+local advText = Instance.new("TextLabel", advBox)
+advText.Size = UDim2.new(1, -12, 1, -12)
+advText.Position = UDim2.new(0, 6, 0, 6)
+advText.BackgroundTransparency = 1
+advText.Text = "+ Automatically Change To Cursor Mode On Spawn"
+advText.Font = Enum.Font.SourceSans
+advText.TextSize = 16
+advText.TextColor3 = Color3.fromRGB(220,220,220)
+advText.TextWrapped = true
+advText.TextXAlignment = Enum.TextXAlignment.Left
+advText.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Footer (buttons) fixed to bottom inside pad
+local footer = Instance.new("Frame", pad)
+footer.Size = UDim2.new(1, 0, 0, FOOTER_H)
+footer.Position = UDim2.new(0, 0, 1, -FOOTER_H)
+footer.BackgroundTransparency = 1
+
+local confirmBtn = Instance.new("TextButton", footer)
+confirmBtn.Name = "ConfirmBtn"
+confirmBtn.Size = UDim2.new(0.5, -12, 0, 56)
+confirmBtn.Position = UDim2.new(0.5, 12, 0, 12)
+confirmBtn.AnchorPoint = Vector2.new(0.5, 0)
+confirmBtn.BackgroundColor3 = Color3.fromRGB(35, 160, 55)
+confirmBtn.Text = "CONFIRM"
+confirmBtn.Font = Enum.Font.SourceSansBold
+confirmBtn.TextSize = 24
+confirmBtn.TextColor3 = Color3.fromRGB(255,255,255)
+confirmBtn.AutoButtonColor = true
+new("UICorner", { Parent = confirmBtn, CornerRadius = UDim.new(0, 12) })
+
+local cancelBtn = Instance.new("TextButton", footer)
+cancelBtn.Name = "CancelBtn"
+cancelBtn.Size = UDim2.new(0.34, 0, 0, 40)
+cancelBtn.Position = UDim2.new(0.5, -8, 0, 68)
+cancelBtn.AnchorPoint = Vector2.new(0.5, 0)
+cancelBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+cancelBtn.Text = "CANCEL"
+cancelBtn.Font = Enum.Font.SourceSans
+cancelBtn.TextSize = 18
+cancelBtn.TextColor3 = Color3.fromRGB(255,255,255)
+cancelBtn.AutoButtonColor = true
+new("UICorner", { Parent = cancelBtn, CornerRadius = UDim.new(0, 10) })
+
+-- safe connection refs
+local confirmConn, cancelConn
+
+-- clear select highlight helper
+local function clearSelectHighlight()
+    if selectBtn and selectBtn:IsA("TextButton") then
+        selectBtn.BackgroundColor3 = Color3.fromRGB(70,70,75)
+        selectBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    end
+end
+
+-- showConfirmPanel: populates and displays neat panel
+local function showConfirmPanel(item)
+    if not item then return end
+
+    -- populate
+    nameLabelPanel.Text = item.Name or "Unknown"
+    panelImage.Image = item.Image or THUMB
+    smallIdText.Text = ("Image Id: %s"):format(item.Id or "N/A")
+    if item.Advantages and type(item.Advantages) == "table" then
+        advText.Text = table.concat(item.Advantages, "\n")
+    else
+        advText.Text = item.Advantages or "+ Automatically Change To Cursor Mode On Spawn"
+    end
+
+    -- highlight select button (blue)
+    selectBtn.BackgroundColor3 = Color3.fromRGB(80,140,255)
+    selectBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+    -- show panel
+    confirmPanel.Visible = true
+
+    -- disconnect previous handlers
+    if confirmConn and typeof(confirmConn) == "RBXScriptConnection" then confirmConn:Disconnect() end
+    if cancelConn and typeof(cancelConn) == "RBXScriptConnection" then cancelConn:Disconnect() end
+
+    -- Confirm: apply, loading overlay, destroy selection UI
+    confirmConn = confirmBtn.MouseButton1Click:Connect(function()
+        CreateLoadingOverlay("Applying selection...", 1)
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+        end)
+        if not ok then warn("Loadstring failed:", err) end
+        if screenGui and screenGui.Parent then
+            screenGui:Destroy()
+        end
+    end)
+
+    -- Cancel: hide panel, remove highlight
+    cancelConn = cancelBtn.MouseButton1Click:Connect(function()
+        confirmPanel.Visible = false
+        clearSelectHighlight()
+    end)
+end
+
+-- wire the left select button so it opens the panel for the left preview
+selectBtn.MouseButton1Click:Connect(function()
+    local item = {
+        Name = leftName.Text,
+        Image = leftImage.Image,
+        Id = "121597096026340", -- optional numeric id display
+        Advantages = { "+ Automatically Change To Cursor Mode On Spawn" }
+    }
+    showConfirmPanel(item)
+end)
+
+-- initialize appearance
+confirmPanel.Visible = false
+clearSelectHighlight()
+
+-- Done
