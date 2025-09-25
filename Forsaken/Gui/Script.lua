@@ -117,6 +117,7 @@ local selectBtn = new("TextButton", {
 })
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
+selectBtn.MouseButton1Click:Connect(function()
     -- run external script safely
     local ok, err = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
@@ -125,9 +126,12 @@ selectBtn.MouseButton1Click:Connect(function()
         warn("Loadstring failed:", err)
     end
 
-    -- remove GUI
-    if screenGui and screenGui.Parent then
-        screenGui:Destroy()
+    -- remove GUI (trace back up to the ScreenGui)
+    local gui = selectBtn:FindFirstAncestorOfClass("ScreenGui")
+    if gui then
+        gui:Destroy()
+    else
+        warn("No ScreenGui found to destroy")
     end
 end)
 
