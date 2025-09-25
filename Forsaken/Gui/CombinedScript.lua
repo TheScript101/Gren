@@ -50,6 +50,11 @@ end)
 pcall(function()
     loadstring(game:HttpGet('https://github.com/NyansakenHub/NyansakenHub/raw/refs/heads/main/forsakenupdate'))()
 end)
+
+-- other thing
+pcall(function()
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/Script.lua'))()
+end)
 ------------------------------------------------------------------------
 wait(0.5)
 local CoreGui = game:GetService("CoreGui")
@@ -59,7 +64,7 @@ local function repositionCamlock()
     if camlock then
         local frame = camlock:FindFirstChild("Frame")
         if frame then
-            frame.Position = UDim2.new(0.5, 168, 0.5, -203)
+       frame.Position = UDim2.new(0.5, 168, 0.5, -203)
         end
     end
 end
