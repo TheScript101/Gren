@@ -270,7 +270,7 @@ local function doSelect()
     -- run your external script safely and asynchronously
     task.defer(function()
         local ok, err = pcall(function()
-            loadstring(game:HttpGet("https://your.link.here"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
         end)
         if not ok then
             warn("Loadstring failed:", err)
