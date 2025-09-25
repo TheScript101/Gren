@@ -77,7 +77,7 @@ local main = new("Frame", {
     Name = "MainFrame",
     AnchorPoint = Vector2.new(0.5,0.5),
     Position = UDim2.new(0.5,0,0.5,0),
-    Size = UDim2.new(0.84,0,0.74,0),
+    Size = UDim2.new(0.839999974, 0, 0.930000186, 0),
     BackgroundColor3 = Color3.fromRGB(30,30,32),
     BorderSizePixel = 0,
 })
