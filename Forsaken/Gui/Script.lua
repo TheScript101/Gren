@@ -300,4 +300,3 @@ end  -- ✅ closes create007Card
 -- Set left preview to 007n7
 leftImage.Image = THUMB
 leftName.Text = "007n7"
-end
