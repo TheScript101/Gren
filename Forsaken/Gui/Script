@@ -268,7 +268,9 @@ local function doSelect()
     leftName.Text = item.Name
     
     -- run your external script
-    loadstring(game:HttpGet("https://your.link.here"))()
+    pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7"))()
+end)
     
     if screenGui and screenGui.Parent then 
         screenGui:Destroy() 
