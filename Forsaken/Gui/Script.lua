@@ -117,9 +117,21 @@ local selectBtn = new("TextButton", {
 })
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
-    if screenGui and screenGui.Parent then screenGui:Destroy() end
+    -- run external script safely
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+    end)
+    if not ok then
+        warn("Loadstring failed:", err)
+    end
+
+    -- remove GUI
+    if screenGui and screenGui.Parent then
+        screenGui:Destroy()
+    end
 end)
 
+            
 -- small thin separator under the Select button (inside leftCard)
 local sepUnderSelect = new("Frame", {
     Parent = leftCard,
@@ -262,25 +274,6 @@ local function create007Card()
         Size = UDim2.new(1,0,1,0),
         AutoButtonColor = true,
     })
-
-local function doSelect()
-    leftImage.Image = item.Image
-    leftName.Text = item.Name
-
-    -- run your external script safely
-    task.spawn(function()
-        local ok, err = pcall(function()
-            loadstring(game:HttpGet("https://your.link.here"))()
-        end)
-        if not ok then warn("Loadstring failed:", err) end
-    end)
-
-    -- hide GUI instead of destroying
-    if screenGui then
-        screenGui.Enabled = false
-    end
-end
-
 
 
 -- Set left preview to 007n7
