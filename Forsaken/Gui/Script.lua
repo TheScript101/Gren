@@ -118,7 +118,6 @@ local selectBtn = new("TextButton", {
 })
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
-selectBtn.MouseButton1Click:Connect(function()
 -- Destroy the GUI first
 local playerd = game:GetService("Players").LocalPlayer
 for _, gui in pairs(playerd.PlayerGui:GetChildren()) do
