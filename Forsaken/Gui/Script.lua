@@ -119,9 +119,12 @@ local selectBtn = new("TextButton", {
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
 selectBtn.MouseButton1Click:Connect(function()
 -- Destroy the GUI first
-if screenGui and screenGui.Parent then
-    screenGui:Destroy()
-end
+local playerd = game:GetService("Players").LocalPlayer
+for _, gui in pairs(playerd.PlayerGui:GetChildren()) do
+    if gui.Name == "YourGuiNameHere" then
+        gui:Destroy()
+            end
+        end
 
 -- Then safely run the loadstring
 local ok, err = pcall(function()
