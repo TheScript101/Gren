@@ -117,25 +117,26 @@ local selectBtn = new("TextButton", {
     AutoButtonColor = true,
 })
 new("UICorner", { Parent = selectBtn, CornerRadius = UDim.new(0,8) })
+
+-- ✅ properly closed function
 selectBtn.MouseButton1Click:Connect(function()
--- Destroy the GUI first
-local playerd = game:GetService("Players").LocalPlayer
-for _, gui in pairs(playerd.PlayerGui:GetChildren()) do
-    if gui.Name == "SelectionUI" then
+    -- Destroy the GUI first
+    local playerd = game:GetService("Players").LocalPlayer
+    local gui = playerd.PlayerGui:FindFirstChild("SelectionUI")
+    if gui then
         gui:Destroy()
-                    end
-                end
+    end
 
--- Then safely run the loadstring
-local ok, err = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+    -- Then safely run the loadstring
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
+    end)
+
+    -- Warn if it failed
+    if not ok then
+        warn("Loadstring failed:", err)
+    end
 end)
-
--- Warn if it failed
-if not ok then
-    warn("Loadstring failed:", err)
-                end
-
 
             
 -- small thin separator under the Select button (inside leftCard)
