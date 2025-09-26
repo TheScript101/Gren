@@ -58,7 +58,7 @@ end)
 
 -- 007n7
 pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/TwoTime%2BShed%2BNoob"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/Gui/007n7.lua"))()
 end)
 ------------------------------------------------------------------------
 wait(0.5)
