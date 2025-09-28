@@ -480,3 +480,127 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
 end)
+
+-- <<--- APPENDED: LockKiller UI + logic (no changes made to your original script above) --->>
+
+-- Add LockKiller button to the side of Prediction
+local lockKillerBtn = makeModeButton(buttonsFrame, 240, 200, "LockKiller: OFF")
+local lockKillerEnabled = false
+
+-- internal killer model tracker
+local killerModel = nil
+
+-- try to find a killer model inside workspace.Players.Killers
+local function findKillerModelOnce()
+    local wkPlayers = workspace:FindFirstChild("Players")
+    if not wkPlayers then return nil end
+    local killersFolder = wkPlayers:FindFirstChild("Killers")
+    if not killersFolder then return nil end
+
+    -- first check direct children
+    for _, child in ipairs(killersFolder:GetChildren()) do
+        if child:IsA("Model") then
+            local hrp = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Torso") or child:FindFirstChild("UpperTorso")
+            local hum = child:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                return child
+            end
+        end
+    end
+
+    -- fallback: scan descendants (in case model nested)
+    for _, desc in ipairs(killersFolder:GetDescendants()) do
+        if desc:IsA("Model") then
+            local hrp = desc:FindFirstChild("HumanoidRootPart") or desc:FindFirstChild("Torso") or desc:FindFirstChild("UpperTorso")
+            local hum = desc:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                return desc
+            end
+        end
+    end
+
+    return nil
+end
+
+-- continuous updater: keep killerModel up to date as rounds start/end
+task.spawn(function()
+    while true do
+        local okModel = nil
+        pcall(function()
+            okModel = findKillerModelOnce()
+        end)
+        killerModel = okModel -- can be nil if none present
+        task.wait(0.6) -- throttle checks
+    end
+end)
+
+-- toggle handler
+lockKillerBtn.MouseButton1Click:Connect(function()
+    lockKillerEnabled = not lockKillerEnabled
+    lockKillerBtn.Text = "LockKiller: " .. (lockKillerEnabled and "ON" or "OFF")
+    lockKillerBtn.BackgroundColor3 = lockKillerEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+
+    if not lockKillerEnabled then
+        -- stop locking onto killer: clear highlight only if it was applied
+        -- do not modify other state; respect your original clearHighlight behavior
+        clearHighlight()
+        -- if LockedTarget was the killer wrapper, clear it to let original logic pick nearest player again
+        if LockedTarget and type(LockedTarget) == "table" and LockedTarget.Character == killerModel then
+            LockedTarget = nil
+        end
+    end
+end)
+
+-- Helper to produce a lightweight "player-like" wrapper for the killer model
+local function killerAsFakeTarget(model)
+    if not model then return nil end
+    return { Character = model, Name = model.Name or "Killer" }
+end
+
+-- Enforcer: while LockKiller is on and Locking is on, keep orienting & camlocking to killer each frame
+RunService.RenderStepped:Connect(function(dt)
+    if not lockKillerEnabled then return end
+    if not Locking then return end
+    if not killerModel or not killerModel.Parent then
+        -- no killer right now (round not started) — nothing to do, will auto-detect when present
+        return
+    end
+
+    -- ensure killer still has humanoid + hrp and is alive
+    local hum = killerModel:FindFirstChildOfClass("Humanoid")
+    local hrp = killerModel:FindFirstChild("HumanoidRootPart") or killerModel:FindFirstChild("Torso") or killerModel:FindFirstChild("UpperTorso")
+    if not hum or not hrp or hum.Health <= 0 then
+        return
+    end
+
+    -- create fake "player" wrapper so your existing code that expects LockedTarget.Character works
+    local fake = killerAsFakeTarget(killerModel)
+    if not fake then return end
+
+    -- set LockedTarget to the killer wrapper so UI shows killer name when applicable
+    LockedTarget = fake
+
+    -- apply highlight to the killer model (works like player highlight)
+    pcall(function() applyHighlightToCharacter(killerModel) end)
+
+    -- choose target part respecting AimHead toggle
+    local targetPart = (aimHeadEnabled and killerModel:FindFirstChild("Head")) or hrp
+    if not targetPart then return end
+
+    -- compute predicted position using your prediction helper
+    local tpos = getPredictedPosition(fake, targetPart) or targetPart.Position
+
+    -- rotate the local player's character toward the killer
+    pcall(function() rotateTowards(tpos) end)
+
+    -- apply camera orientation similar to your main loop behavior
+    pcall(function()
+        local camPos = Camera.CFrame.Position
+        if camSmoothMode then
+            -- quick lerp (we don't have dt here; this mirrors the camLock behavior)
+            Camera.CFrame = CFrame.new(camPos, tpos)
+        elseif camLockEnabled then
+            Camera.CFrame = CFrame.new(camPos, tpos)
+        end
+    end)
+end)
