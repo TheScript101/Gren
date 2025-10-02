@@ -536,20 +536,28 @@ task.delay(1, function()
     loadingGui:Destroy()
 end)
 wait(1)
-local Sprinting = game:GetService("ReplicatedStorage").Systems.Character.Game.Sprinting
-local stamina = require(Sprinting)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
-spawn(function()
-    while true do
-        stamina.MaxStamina = 100
-        stamina.MinStamina = -5
-        stamina.StaminaGain = 35
-        stamina.StaminaLoss = 8.5
-        stamina.SprintSpeed = 27
-        stamina.StaminaLossDisabled = false
+local function applySettings()
+    local Sprinting = game:GetService("ReplicatedStorage").Systems.Character.Game.Sprinting
+    local stamina = require(Sprinting)
 
-        wait(1)
-    end
+    stamina.MaxStamina = 100
+    stamina.MinStamina = -5
+    stamina.StaminaGain = 35
+    stamina.StaminaLoss = 8.5
+    stamina.SprintSpeed = 27
+    stamina.StaminaLossDisabled = false
+end
+
+-- Run once
+applySettings()
+
+-- Re-run after every respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1) -- small delay so modules load fully
+    applySettings()
 end)
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
