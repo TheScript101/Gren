@@ -46,9 +46,9 @@ pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Forsaken/CamlockRedid"))()
 end)
 
--- other thing
+-- autoblock
 pcall(function()
-    loadstring(game:HttpGet('https://github.com/NyansakenHub/NyansakenHub/raw/refs/heads/main/forsakenupdate'))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/u8324080211-art/Auto-Block-99-/refs/heads/main/Auto%20Block"))()
 end)
 
 -- TwoTimeAndShedAndNoobThing
