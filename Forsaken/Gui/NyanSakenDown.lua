@@ -495,7 +495,62 @@ player.PlayerGui.ChildAdded:Connect(function(guiChild)
 end)
 
 --------------------------------------------------------------------------------------------------------------------
+wait(1)
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+-- Create ScreenGui for loading overlay
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingCamlockGui677"
+loadingGui.Parent = PlayerGui
+loadingGui.ResetOnSpawn = false
+
+-- Black semi-transparent full screen background
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 0.6
+bg.Parent = loadingGui
+
+-- Big centered text label
+local label = Instance.new("TextLabel")
+label.Parent = bg
+label.Size = UDim2.new(1, 0, 0, 100)
+label.Position = UDim2.new(0, 0, 0.5, -50) -- center vertically
+label.BackgroundTransparency = 1
+label.Text = "Loading Speed Advantages..."
+label.Font = Enum.Font.Roboto
+label.TextSize = 48
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.7
+label.TextWrapped = true
+label.TextScaled = true
+
+-- After 1 seconds, fade out and destroy the GUI
+task.delay(1, function()
+    for i = 0, 1, 0.05 do
+        bg.BackgroundTransparency = 0.6 + i * 0.4 -- fade from 0.6 to 1
+        label.TextTransparency = i
+        task.wait(0.03)
+    end
+    loadingGui:Destroy()
+end)
+wait(1)
+local Sprinting = game:GetService("ReplicatedStorage").Systems.Character.Game.Sprinting
+local stamina = require(Sprinting)
+
+spawn(function()
+    while true do
+        stamina.MaxStamina = 100
+        stamina.MinStamina = -5
+        stamina.StaminaGain = 35
+        stamina.StaminaLoss = 8.5
+        stamina.SprintSpeed = 27
+        stamina.StaminaLossDisabled = false
+
+        wait(1)
+    end
+end)
 --------------------------------------------------------------------------------------------------------------------
 wait(1)
 local Players = game:GetService("Players")
