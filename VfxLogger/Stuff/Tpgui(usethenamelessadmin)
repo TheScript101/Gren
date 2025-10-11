@@ -12,7 +12,7 @@ frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
 
 local textBox = Instance.new("TextBox", frame)
-textBox.PlaceholderText = "Enter path (ex: workspace.Folder.Part)"
+textBox.PlaceholderText = "Enter path (ex: workspace.Folder.Part or workspace[\"Local Parts\"])"
 textBox.Size = UDim2.new(1, -10, 0.5, -5)
 textBox.Position = UDim2.new(0, 5, 0, 5)
 textBox.ClearTextOnFocus = false
@@ -28,30 +28,141 @@ button.Text = "Teleport to Object"
 button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 button.TextColor3 = Color3.new(1,1,1)
 
+-- Trim helper
+local function trim(s)
+	if not s then return "" end
+	return s:match("^%s*(.-)%s*$")
+end
+
+-- Parse path into segments supporting:
+-- dot notation: A.B.C
+-- bracket notation with quotes: A["B C"].D['E']
+-- bracket notation without quotes (bareword): A[ChildName]
+local function parsePathSegments(path)
+	local segments = {}
+	if type(path) ~= "string" then return segments end
+	local i = 1
+	local n = #path
+	while i <= n do
+		-- skip whitespace
+		local c = path:sub(i,i)
+		if c == " " or c == "\t" or c == "\n" or c == "\r" then
+			i = i + 1
+		elseif c == "." then
+			i = i + 1
+		elseif c == "[" then
+			-- bracket segment
+			i = i + 1
+			-- skip whitespace
+			while i <= n and path:sub(i,i):match("%s") do i = i + 1 end
+			local q = path:sub(i,i)
+			if q == '"' or q == "'" then
+				-- quoted string
+				local quote = q
+				i = i + 1
+				local startI = i
+				local seg = ""
+				while i <= n do
+					local ch = path:sub(i,i)
+					if ch == "\\" then
+						-- escape next char
+						local nextc = path:sub(i+1,i+1)
+						if nextc ~= "" then
+							seg = seg .. nextc
+							i = i + 2
+						else
+							i = i + 1
+						end
+					elseif ch == quote then
+						break
+					else
+						seg = seg .. ch
+						i = i + 1
+					end
+				end
+				-- move past closing quote
+				i = i + 1
+				-- skip whitespace until closing ]
+				while i <= n and path:sub(i,i):match("%s") do i = i + 1 end
+				if path:sub(i,i) == "]" then
+					table.insert(segments, seg)
+					i = i + 1
+				else
+					-- malformed, abort returning what we have
+					return segments
+				end
+			else
+				-- unquoted; read until ]
+				local j = i
+				while j <= n and path:sub(j,j) ~= "]" do j = j + 1 end
+				if j > n then return segments end
+				local token = trim(path:sub(i, j-1))
+				-- token might be numeric; keep as string
+				if token ~= "" then table.insert(segments, token) end
+				i = j + 1
+			end
+		else
+			-- bareword (read until . or [ or end)
+			local j = i
+			while j <= n do
+				local ch = path:sub(j,j)
+				if ch == "." or ch == "[" then break end
+				j = j + 1
+			end
+			local tok = trim(path:sub(i, j-1))
+			if tok ~= "" then table.insert(segments, tok) end
+			i = j
+		end
+	end
+	return segments
+end
+
 -- Function to resolve a path string into an Instance
 local function getObjectFromPath(path)
-	local segments = string.split(path, ".")
-	local first = segments[1]:lower()
+	local segments = parsePathSegments(path)
+	if #segments == 0 then return nil end
 
-	-- Allow "workspace" and "game"
-	local current
-	if first == "workspace" then
+	-- Resolve first segment (allow lower/upper workspace or game)
+	local first = segments[1]
+	local firstLower = tostring(first):lower()
+	local current = nil
+	if firstLower == "workspace" or firstLower == "work" then
 		current = workspace
-	elseif first == "game" then
+	elseif firstLower == "game" then
 		current = game
 	else
-		current = game:FindFirstChild(segments[1])
+		-- try game root (Services or direct children)
+		current = game:FindFirstChild(first) or game:FindFirstChild(tostring(first))
+		-- if not found, also try workspace child by that name (common)
+		if not current then
+			current = workspace:FindFirstChild(first) or workspace:FindFirstChild(tostring(first))
+		end
 	end
 
 	if not current then return nil end
 
-	-- Walk down children
+	-- Walk remaining segments
 	for i = 2, #segments do
 		local seg = segments[i]
-		if current:FindFirstChild(seg) then
-			current = current[seg]
+		if not seg then return nil end
+		-- if current supports indexing directly (like Player.PlayerGui.Some), try current[seg]
+		local ok, val = pcall(function() return current[seg] end)
+		if ok and val ~= nil then
+			current = val
 		else
-			return nil
+			-- fallback to FindFirstChild if current is Instance
+			if typeof(current) == "Instance" and current.FindFirstChild then
+				local found = current:FindFirstChild(seg)
+				if found then
+					current = found
+				else
+					-- if not found, return nil
+					return nil
+				end
+			else
+				-- cannot traverse further
+				return nil
+			end
 		end
 	end
 
@@ -64,7 +175,7 @@ button.MouseButton1Click:Connect(function()
 	local target = getObjectFromPath(input)
 
 	if not target then
-		warn("Invalid path or object not found: " .. input)
+		warn("Invalid path or object not found: " .. tostring(input))
 		return
 	end
 
