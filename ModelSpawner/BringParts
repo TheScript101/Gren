@@ -1,0 +1,310 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local Character = player.Character or player.CharacterAdded:Wait()
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "PathBringGui"
+
+local frame = Instance.new("Frame", screenGui)
+frame.Position = UDim2.new(0.5, -200, 0.5, -50)
+frame.Size = UDim2.new(0, 400, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+
+local textBox = Instance.new("TextBox", frame)
+textBox.PlaceholderText = "Enter path (ex: workspace.Folder.Part or workspace[\"Local Parts\"])"
+textBox.Size = UDim2.new(1, -10, 0.5, -5)
+textBox.Position = UDim2.new(0, 5, 0, 5)
+textBox.ClearTextOnFocus = false
+textBox.Text = ""
+textBox.TextWrapped = true
+textBox.TextColor3 = Color3.new(1,1,1)
+textBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(1, -10, 0.4, -5)
+button.Position = UDim2.new(0, 5, 0.6, 0)
+button.Text = "Bring Object Here"
+button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+button.TextColor3 = Color3.new(1,1,1)
+
+-- Trim helper
+local function trim(s)
+	if not s then return "" end
+	return s:match("^%s*(.-)%s*$")
+end
+
+-- Parse path into segments (supports dot & bracket ["..."] & [unquoted])
+local function parsePathSegments(path)
+	local segments = {}
+	if type(path) ~= "string" then return segments end
+	local i = 1
+	local n = #path
+	while i <= n do
+		local c = path:sub(i,i)
+		-- skip whitespace
+		if c:match("%s") then
+			i = i + 1
+		elseif c == "." then
+			i = i + 1
+		elseif c == "[" then
+			i = i + 1
+			while i <= n and path:sub(i,i):match("%s") do i = i + 1 end
+			local q = path:sub(i,i)
+			if q == '"' or q == "'" then
+				local quote = q
+				i = i + 1
+				local seg = ""
+				while i <= n do
+					local ch = path:sub(i,i)
+					if ch == "\\" then
+						local nextc = path:sub(i+1,i+1)
+						if nextc ~= "" then
+							seg = seg .. nextc
+							i = i + 2
+						else
+							i = i + 1
+						end
+					elseif ch == quote then
+						break
+					else
+						seg = seg .. ch
+						i = i + 1
+					end
+				end
+				i = i + 1 -- skip closing quote
+				while i <= n and path:sub(i,i):match("%s") do i = i + 1 end
+				if path:sub(i,i) == "]" then
+					table.insert(segments, seg)
+					i = i + 1
+				else
+					return segments
+				end
+			else
+				-- unquoted identifier until ]
+				local j = i
+				while j <= n and path:sub(j,j) ~= "]" do j = j + 1 end
+				if j > n then return segments end
+				local token = trim(path:sub(i, j-1))
+				if token ~= "" then table.insert(segments, token) end
+				i = j + 1
+			end
+		else
+			-- bareword
+			local j = i
+			while j <= n do
+				local ch = path:sub(j,j)
+				if ch == "." or ch == "[" then break end
+				j = j + 1
+			end
+			local tok = trim(path:sub(i, j-1))
+			if tok ~= "" then table.insert(segments, tok) end
+			i = j
+		end
+	end
+	return segments
+end
+
+-- Resolve path to Instance
+local function getObjectFromPath(path)
+	local segments = parsePathSegments(path)
+	if #segments == 0 then return nil end
+
+	local first = segments[1]
+	local firstLower = tostring(first):lower()
+	local current = nil
+	if firstLower == "workspace" or firstLower == "work" then
+		current = workspace
+	elseif firstLower == "game" then
+		current = game
+	else
+		-- try game then workspace
+		current = game:FindFirstChild(first) or workspace:FindFirstChild(first)
+	end
+	if not current then return nil end
+
+	for i = 2, #segments do
+		local seg = segments[i]
+		if not seg then return nil end
+		local ok, val = pcall(function() return current[seg] end)
+		if ok and val ~= nil then
+			current = val
+		else
+			if typeof(current) == "Instance" and current.FindFirstChild then
+				local found = current:FindFirstChild(seg)
+				if found then
+					current = found
+				else
+					return nil
+				end
+			else
+				return nil
+			end
+		end
+	end
+
+	return current
+end
+
+-- Bring logic: move instance to 15 studs in front of player
+local function bringInstanceToPlayer(inst)
+	if not inst or not inst.Parent then return false end
+	Character = player.Character or player.CharacterAdded:Wait()
+	local hrp = Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+	local targetPos = hrp.Position + hrp.CFrame.LookVector * 15
+
+	-- If Model: prefer PivotTo, then SetPrimaryPartCFrame, else centroid move
+	if inst:IsA("Model") then
+		local ok = pcall(function()
+			-- try PivotTo (modern)
+			if inst.PivotTo then
+				inst:PivotTo(CFrame.new(targetPos))
+				return
+			end
+			-- try SetPrimaryPartCFrame
+			if inst.PrimaryPart then
+				inst:SetPrimaryPartCFrame(CFrame.new(targetPos))
+				return
+			end
+			-- fallback: move by centroid of baseparts
+			local parts = {}
+			for _, d in ipairs(inst:GetDescendants()) do
+				if d:IsA("BasePart") then table.insert(parts, d) end
+			end
+			if #parts > 0 then
+				local sum = Vector3.new(0,0,0)
+				for _, p in ipairs(parts) do sum = sum + p.Position end
+				local centroid = sum / #parts
+				local delta = targetPos - centroid
+				for _, p in ipairs(parts) do
+					p.CFrame = p.CFrame + delta
+				end
+				return
+			end
+		end)
+		if not ok then
+			-- best effort fallback: move first basepart
+			local first = inst:FindFirstChildWhichIsA("BasePart", true)
+			if first then first.CFrame = CFrame.new(targetPos) end
+		end
+		return true
+	end
+
+	-- If BasePart: move directly
+	if inst:IsA("BasePart") then
+		inst.CFrame = CFrame.new(targetPos)
+		return true
+	end
+
+	-- If Folder: move all baseparts inside by centroid
+	if inst:IsA("Folder") then
+		local parts = {}
+		for _, d in ipairs(inst:GetDescendants()) do
+			if d:IsA("BasePart") then table.insert(parts, d) end
+		end
+		if #parts == 0 then return false end
+		local sum = Vector3.new(0,0,0)
+		for _, p in ipairs(parts) do sum = sum + p.Position end
+		local centroid = sum / #parts
+		local delta = targetPos - centroid
+		for _, p in ipairs(parts) do p.CFrame = p.CFrame + delta end
+		return true
+	end
+
+	-- Generic fallback: move first basepart descendant
+	for _, d in ipairs(inst:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CFrame = CFrame.new(targetPos)
+			return true
+		end
+	end
+
+	return false
+end
+
+-- Button action: bring object specified by path
+button.MouseButton1Click:Connect(function()
+	local path = textBox.Text
+	local target = getObjectFromPath(path)
+	if not target then
+		warn("Object not found for path: " .. tostring(path))
+		return
+	end
+
+	local ok = bringInstanceToPlayer(target)
+	if not ok then
+		warn("Failed to bring object: " .. tostring(path))
+	end
+end)
+
+-- Toggle GUI button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "Toggle GUI"
+toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 16
+toggleButton.Name = "ToggleButton"
+toggleButton.Parent = screenGui
+
+toggleButton.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)    else
+        Thumbnail.Image = ""
+    end
+end)
+
+-- Spawn Model (Executor Method)
+SpawnButton.MouseButton1Click:Connect(function()
+    local humanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+
+    local assetId = tonumber(ModelBox.Text)
+    if assetId then
+        local success, model = pcall(function()
+            return game:GetObjects("rbxassetid://" .. assetId)[1]
+        end)
+
+        if success and model then
+            -- === NEW FEATURE: remove Humanoids and server Scripts/ModuleScripts inside model ===
+            -- Remove any Humanoid instances
+            for _, desc in ipairs(model:GetDescendants()) do
+                if desc:IsA("Humanoid") then
+                    desc:Destroy()
+                end
+            end
+            -- Remove non-local scripts (Script and ModuleScript). Keep LocalScripts.
+            for _, desc in ipairs(model:GetDescendants()) do
+                if desc:IsA("Script") or desc:IsA("ModuleScript") then
+                    desc:Destroy()
+                end
+            end
+            -- ======================================================================
+
+            -- Calculate spawn position 15 studs in front of the player
+            local spawnPosition = humanoidRootPart.Position + humanoidRootPart.CFrame.LookVector * 15
+
+            -- Set model to workspace and position it
+            model.Parent = game.Workspace
+            model.PrimaryPart = model:FindFirstChildWhichIsA("BasePart") or model:FindFirstChildOfClass("MeshPart")
+            if model.PrimaryPart then
+                model:SetPrimaryPartCFrame(CFrame.new(spawnPosition))
+            else
+                model:MoveTo(spawnPosition)
+            end
+
+            -- Anchor all parts, disable collisions, and remove cast shadow
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Anchored = true
+                    part.CanCollide = false
+                    part.CastShadow = false
+                end
+            end
+        end
+    end
+end)
