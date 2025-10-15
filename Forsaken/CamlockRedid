@@ -481,22 +481,20 @@ pickLockToggle.MouseButton1Click:Connect(function()
     panel.Visible = panelVisible
 end)
 
--- <<--- APPENDED: LockKiller UI + logic (no changes made to your original script above) --->>
+-- <<--- APPENDED: LockKiller UI + logic (REPLACEMENT) --->>
 
 -- Add LockKiller button to the side of Prediction
 local lockKillerBtn = makeModeButton(buttonsFrame, 240, 200, "LockKiller: OFF")
 local lockKillerEnabled = false
 
--- internal killer model tracker
+-- internal killer model tracker (may be a Model instance OR a Player instance)
 local killerModel = nil
-
--- === REPLACEMENT: killer detector + updater + enforcer ===
 
 -- Helper: checks an Instance (folder/node) for a valid killer model or username pointing to a player
 local function scanKillerNode(node)
     if not node or not node.Parent then return nil end
 
-    -- 1) direct model children
+    -- 1) direct model children (NPC-style killers)
     for _, child in ipairs(node:GetChildren()) do
         if child:IsA("Model") then
             local hrp = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Torso") or child:FindFirstChild("UpperTorso")
@@ -537,37 +535,36 @@ local function scanKillerNode(node)
     return nil
 end
 
--- Try to find a killer from known locations (keeps your original Players.Killers search)
+-- Try to find a killer from known locations
 local function findKillerModelOnce()
-    -- check workspace.Players.Killers (original flow)
-    local ok = nil
+    -- 1) check workspace.Players.Killers (original)
     local wkPlayers = workspace:FindFirstChild("Players")
     if wkPlayers then
         local killersFolder = wkPlayers:FindFirstChild("Killers")
         if killersFolder then
-            ok = scanKillerNode(killersFolder)
-            if ok then return ok end
+            local found = scanKillerNode(killersFolder)
+            if found then return found end
         end
     end
 
-    -- NEW: check workspace.GameAssets.Teams.Killer
+    -- 2) check workspace.GameAssets.Teams.Killer (requested)
     local gameAssets = workspace:FindFirstChild("GameAssets")
     if gameAssets then
         local teams = gameAssets:FindFirstChild("Teams")
         if teams then
             local killerNode = teams:FindFirstChild("Killer")
             if killerNode then
-                ok = scanKillerNode(killerNode)
-                if ok then return ok end
+                local found = scanKillerNode(killerNode)
+                if found then return found end
             end
         end
     end
 
-    -- fallback: a generic scan of common "Killer" named nodes anywhere under workspace (optional but useful)
+    -- 3) optional fallback to a top-level "Killer" node
     local generic = workspace:FindFirstChild("Killer") or workspace:FindFirstChild("killer")
     if generic then
-        ok = scanKillerNode(generic)
-        if ok then return ok end
+        local found = scanKillerNode(generic)
+        if found then return found end
     end
 
     return nil
@@ -580,8 +577,34 @@ task.spawn(function()
         pcall(function()
             okModel = findKillerModelOnce()
         end)
-        killerModel = okModel -- can be nil, an Instance Model, or a Player instance
+        killerModel = okModel -- can be nil, a Model, or a Player
         task.wait(0.6)
+    end
+end)
+
+-- LockKiller button toggle handler (ensures button actually toggles)
+lockKillerBtn.MouseButton1Click:Connect(function()
+    lockKillerEnabled = not lockKillerEnabled
+    lockKillerBtn.Text = "LockKiller: " .. (lockKillerEnabled and "ON" or "OFF")
+    lockKillerBtn.BackgroundColor3 = lockKillerEnabled and Color3.fromRGB(70,70,80) or Color3.fromRGB(40,40,50)
+
+    if not lockKillerEnabled then
+        -- turned OFF: clear highlight and allow main logic to resume picking nearest
+        clearHighlight()
+        if LockedTarget and type(LockedTarget) == "table" and LockedTarget.Character == killerModel then
+            LockedTarget = nil
+        end
+    else
+        -- turned ON: if already locking and a killer exists, let enforcer highlight it now
+        if Locking and killerModel then
+            pcall(function()
+                if typeof(killerModel) == "Instance" and killerModel:IsA("Model") then
+                    applyHighlightToCharacter(killerModel)
+                elseif typeof(killerModel) == "Instance" and killerModel:IsA("Player") and killerModel.Character then
+                    applyHighlightToCharacter(killerModel.Character)
+                end
+            end)
+        end
     end
 end)
 
@@ -589,7 +612,13 @@ end)
 RunService.RenderStepped:Connect(function(dt)
     if not lockKillerEnabled then return end
     if not Locking then return end
-    if not killerModel then return end
+    if not killerModel then
+        -- no killer: stay unlocked but UI shows waiting (main loop guard should avoid fallback)
+        statusLabel.Text = ("Mode: %s | Lock: ON (no killer)"):format(mode)
+        LockedTarget = nil
+        clearHighlight()
+        return
+    end
 
     -- Resolve hum/HRP depending on type
     local hum, hrp, killerCharacter, killerPlayer
@@ -607,32 +636,31 @@ RunService.RenderStepped:Connect(function(dt)
     end
 
     if not killerCharacter or not hum or not hrp or hum.Health <= 0 then
+        -- invalid or dead killer
+        LockedTarget = nil
+        clearHighlight()
         return
     end
 
     -- build a "player-like" target for existing logic (either the actual Player or a fake wrapper)
     local fakeTarget
     if killerPlayer then
-        -- real player object is fine for getPredictedPosition and UI text
         fakeTarget = killerPlayer
     else
-        -- keep previous style: lightweight wrapper so other code expecting `.Character` works
         fakeTarget = { Character = killerCharacter, Name = killerCharacter.Name or "Killer" }
     end
 
     -- set LockedTarget so UI shows killer name when applicable
     LockedTarget = fakeTarget
 
-    -- highlight the killer character (works for both character Models and player characters)
-    pcall(function()
-        applyHighlightToCharacter(killerCharacter)
-    end)
+    -- apply highlight to the killer character (safe pcall)
+    pcall(function() applyHighlightToCharacter(killerCharacter) end)
 
     -- choose target part respecting AimHead toggle
     local targetPart = (aimHeadEnabled and killerCharacter:FindFirstChild("Head")) or hrp
     if not targetPart then return end
 
-    -- compute predicted position using your prediction helper (works with either Player or fake wrapper)
+    -- compute predicted position using existing helper
     local tpos = getPredictedPosition(fakeTarget, targetPart) or targetPart.Position
 
     -- rotate the local player's character toward the killer
