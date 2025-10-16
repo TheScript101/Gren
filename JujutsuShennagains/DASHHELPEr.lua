@@ -1,24 +1,37 @@
--- Auto Dash on Animation Detection (with configurable delays & dash distance per animation)
+-- Linear Auto Dash on Animation Detection (override any dash, default distance = 9)
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+-- Robust LocalPlayer resolution (helps with executors)
 local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+    LocalPlayer = Players.LocalPlayer or Players:GetPlayers()[1]
+    local t = 0
+    while not LocalPlayer and t < 5 do
+        task.wait(0.2)
+        LocalPlayer = Players.LocalPlayer or Players:GetPlayers()[1]
+        t = t + 0.2
+    end
+end
+if not LocalPlayer then
+    warn("[AutoLinearDash] LocalPlayer not found; aborting.")
+    return
+end
 
--- Global Settings
-local defaultDashDistance = 6
-local dashTime = 0.125
-local dashDelay = 0.56
+-- Settings
+local defaultDashDistance = 9     -- user requested: normal dash 9
+local dashTime = 0.125            -- duration of dash (seconds)
+local dashDelay = 0.15           -- default trigger delay if not set per animation
 
--- Dash animations (HP-based)
-local dashAnimOver50 = ""
-local dashAnimUnder50 = ""
-
--- Animation IDs with per-animation settings
+-- Animation -> dash config (user requested entries set to 6)
 local targetAnims = {
-    -- Shedletsky
-    ["rbxassetid://110978068388232"] = { 0.05= dashDelay, dashDistance = 6.7},
-    --more if need
+    ["rbxassetid://110978068388232"] = { dashDelay = dashDelay, dashDistance = 7},
+    ["rbxassetid://134581973800784"] = { dashDelay = dashDelay, dashDistance = 6 },
+    ["rbxassetid://117223862448096"] = { dashDelay = dashDelay, dashDistance = 6 },
+    ["rbxassetid://75203303352791"]  = { dashDelay = dashDelay, dashDistance = 6 },
+    -- add other anim mappings here as needed
 }
 
--- Get animation config
 local function getAnimConfig(animId)
     local cfg = targetAnims[animId]
     if cfg then
@@ -30,60 +43,135 @@ local function getAnimConfig(animId)
     return nil
 end
 
--- Dash function (adds HP animation alongside trigger anim)
-local function dash(distance)
+-- Linear dash implementation (overrides any running dash)
+local isDashing = false
+local dashCancel = false
+local currentDashThread = nil
+
+local function clearDashState()
+    dashCancel = true
+    if currentDashThread then
+        -- wait a tiny moment to allow thread to finish cleaning up
+        task.wait(0.01)
+    end
+    isDashing = false
+    dashCancel = false
+    currentDashThread = nil
+end
+
+-- Linear dash: moves HRP smoothly from start -> end over duration
+local function linearDash(distance, duration, override)
+    duration = duration or dashTime
+    distance = distance or defaultDashDistance
+
+    if isDashing and not override then
+        return
+    end
+    if isDashing and override then
+        -- signal current dash to stop
+        dashCancel = true
+        -- allow small window for the thread to exit
+        task.wait(0.01)
+    end
+
     local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
 
-    -- Choose dash animation based on HP
-    local hpRatio = humanoid.Health / humanoid.MaxHealth
-    local dashAnimId = hpRatio > 0.5 and dashAnimOver50 or dashAnimUnder50
-    local anim = Instance.new("Animation")
-    anim.AnimationId = dashAnimId
-    local dashTrack = humanoid:LoadAnimation(anim)
+    isDashing = true
+    dashCancel = false
 
-    -- Override other animations and play faster
-    dashTrack.Priority = Enum.AnimationPriority.Action4 -- Highest priority so it overrides everything
-    dashTrack:Play()
-    dashTrack:AdjustSpeed(2)
+    -- snapshot start state
+    local startPos = hrp.Position
+    local lookVec = hrp.CFrame.LookVector
+    local endPos = startPos + lookVec * distance
+    local t0 = tick()
 
-    -- Apply dash velocity
-    local root = char.HumanoidRootPart
-    local direction = root.CFrame.LookVector
-    local bv = Instance.new("BodyVelocity")
-    bv.Velocity = direction * distance * 10
-    bv.MaxForce = Vector3.new(1e5, 0, 1e5)
-    bv.Parent = root
+    -- try to temporarily disable humanoid controls to avoid input fighting (PlatformStand)
+    local prevPlatformStand = nil
+    if humanoid then
+        prevPlatformStand = humanoid.PlatformStand
+        pcall(function() humanoid.PlatformStand = true end)
+    end
 
-    task.delay(dashTime, function()
-        bv:Destroy()
-        dashTrack:Stop() -- Stop HP dash anim, allowing other anims to resume
+    -- run dash loop synced to RenderStepped for smoothness
+    currentDashThread = task.spawn(function()
+        while true do
+            if dashCancel then break end
+            local elapsed = tick() - t0
+            local alpha = math.clamp(elapsed / duration, 0, 1)
+            local pos = startPos:Lerp(endPos, alpha)
+            -- keep facing the same direction as start (prevent unintended rotation)
+            local cf = CFrame.new(pos, pos + lookVec)
+            pcall(function() hrp.CFrame = cf end)
+
+            if alpha >= 1 then break end
+            RunService.RenderStepped:Wait()
+        end
+
+        -- finalize: move to exact end position if not cancelled
+        if not dashCancel then
+            pcall(function() hrp.CFrame = CFrame.new(endPos, endPos + lookVec) end)
+        end
+
+        -- restore humanoid state
+        if humanoid then
+            pcall(function() humanoid.PlatformStand = prevPlatformStand end)
+        end
+
+        -- clear state
+        isDashing = false
+        dashCancel = false
+        currentDashThread = nil
     end)
 end
 
--- Detect animation playing
+-- Convenience wrapper that forces override behavior
+local function dash(distance)
+    linearDash(distance, dashTime, true)
+end
+
+-- Expose global function so other local code/buttons can call the same dash
+_G.ForceLinearDash = function(distance)
+    dash(distance or defaultDashDistance)
+end
+
+-- Animation detection hookup (safe checks)
 local function setupAnimDetection(char)
-    local humanoid = char:WaitForChild("Humanoid")
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
 
     humanoid.AnimationPlayed:Connect(function(track)
-        local animId = track.Animation.AnimationId
+        if not track then return end
+        local animObj = nil
+        pcall(function() animObj = track.Animation end)
+        if not animObj then return end
+
+        local animId = nil
+        pcall(function() animId = tostring(animObj.AnimationId) end)
+        if not animId or animId == "" then return end
+
         local cfg = getAnimConfig(animId)
-        if cfg then
-            -- Keep trigger anim playing, add dash + HP anim after delay
+        if not cfg then return end
+
+        if cfg.dashDelay and cfg.dashDelay > 0 then
             task.delay(cfg.dashDelay, function()
-                dash(cfg.dashDistance)
+                pcall(function() dash(cfg.dashDistance) end)
             end)
+        else
+            pcall(function() dash(cfg.dashDistance) end)
         end
     end)
 end
 
--- Initial setup
+-- Hook current character + future respawns
 if LocalPlayer.Character then
     setupAnimDetection(LocalPlayer.Character)
 end
-
--- Reconnect on respawn
 LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
+
+-- tiny debug print to confirm script loaded
+print("[AutoLinearDash] loaded — default distance:", defaultDashDistance)
