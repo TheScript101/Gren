@@ -1,4 +1,4 @@
--- Linear Auto Dash on Animation Detection (override any dash, default distance = 9)
+-- Auto Dash on Animation Detection (executor-friendly, override any dash, distance = 8)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -14,131 +14,150 @@ if not LocalPlayer then
     end
 end
 if not LocalPlayer then
-    warn("[AutoLinearDash] LocalPlayer not found; aborting.")
+    warn("[AutoDash] LocalPlayer not found; aborting.")
     return
 end
 
 -- Settings
-local defaultDashDistance = 9     -- user requested: normal dash 9
-local dashTime = 0.125            -- duration of dash (seconds)
-local dashDelay = 0.15           -- default trigger delay if not set per animation
+local defaultDashDistance = 8       -- default distance (you asked for 8)
+local dashTime = 0.125              -- how long the dash force lasts
+local dashDelay = 0.156             -- default trigger delay if not set per animation
 
--- Animation -> dash config (user requested entries set to 6)
+-- Animation IDs with per-animation settings (set distance to 8 here)
 local targetAnims = {
-    ["rbxassetid://110978068388232"] = { dashDelay = dashDelay, dashDistance = 7},
-    ["rbxassetid://134581973800784"] = { dashDelay = dashDelay, dashDistance = 6 },
-    ["rbxassetid://117223862448096"] = { dashDelay = dashDelay, dashDistance = 6 },
-    ["rbxassetid://75203303352791"]  = { dashDelay = dashDelay, dashDistance = 6 },
+    -- Dashes
+    ["rbxassetid://110978068388232"] = { dashDelay = dashDelay, dashDistance = 8.5, Direction = "front" },
+    ["rbxassetid://140597320237985"] = { dashDelay = dashDelay, dashDistance = 8.5, Direction = "front" },
+    ["rbxassetid://130284226842903"] = { dashDelay = dashDelay, dashDistance = 8.5, Direction = "front" },
+    ["rbxassetid://132855702748568"] = { dashDelay = dashDelay, dashDistance = 8.5, Direction = "front" },
+    ["rbxassetid://99451940496871"] = { dashDelay = dashDelay, dashDistance = 8.5, Direction = "front" },
+    ["rbxassetid://134581973800784"] = { dashDelay = dashDelay, dashDistance = 6, Direction = "back" },
+    ["rbxassetid://117223862448096"] = { dashDelay = dashDelay, dashDistance = 6, Direction = "right" },
+    ["rbxassetid://75203303352791"]  = { dashDelay = dashDelay, dashDistance = 6, Direction = "left" },
     -- add other anim mappings here as needed
 }
 
+-- getAnimConfig now returns Direction (default "front")
 local function getAnimConfig(animId)
     local cfg = targetAnims[animId]
     if cfg then
         return {
             dashDelay = cfg.dashDelay or dashDelay,
-            dashDistance = cfg.dashDistance or defaultDashDistance
+            dashDistance = cfg.dashDistance or defaultDashDistance,
+            Direction = cfg.Direction or "front"
         }
     end
     return nil
 end
 
--- Linear dash implementation (overrides any running dash)
+-- DASH IMPLEMENTATION (LinearVelocity preferred, always overrides any running dash)
+local currentDash = nil -- reference to current LinearVelocity (or BodyVelocity) instance
 local isDashing = false
-local dashCancel = false
-local currentDashThread = nil
+local attachName = "__dash_attach"
 
-local function clearDashState()
-    dashCancel = true
-    if currentDashThread then
-        -- wait a tiny moment to allow thread to finish cleaning up
-        task.wait(0.01)
+local function clearCurrentDash()
+    if currentDash then
+        pcall(function()
+            if currentDash.Destroy then currentDash:Destroy() end
+        end)
     end
+    currentDash = nil
     isDashing = false
-    dashCancel = false
-    currentDashThread = nil
 end
 
--- Linear dash: moves HRP smoothly from start -> end over duration
-local function linearDash(distance, duration, override)
-    duration = duration or dashTime
-    distance = distance or defaultDashDistance
+local function createLinearVelocity(hrp, vec)
+    local ok, lv = pcall(function()
+        local attach = hrp:FindFirstChild(attachName)
+        if not attach then
+            attach = Instance.new("Attachment")
+            attach.Name = attachName
+            attach.Parent = hrp
+        end
 
-    if isDashing and not override then
-        return
+        local lv = Instance.new("LinearVelocity")
+        lv.Attachment0 = attach
+        -- world-relative velocity so we use absolute vector
+        lv.RelativeTo = Enum.ActuatorRelativeTo.World
+        lv.MaxForce = math.huge
+        lv.VectorVelocity = vec
+        lv.Parent = hrp
+        return lv
+    end)
+
+    if ok and lv then
+        return lv
     end
+    return nil
+end
+
+local function createBodyVelocityFallback(hrp, vec)
+    local ok, bv = pcall(function()
+        local bv = Instance.new("BodyVelocity")
+        bv.Velocity = vec
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5) -- stronger fallback (affect Y too)
+        bv.P = 1250
+        bv.Parent = hrp
+        return bv
+    end)
+    if ok and bv then return bv end
+    return nil
+end
+
+-- distance is in studs; override parameter forces the new dash even if one is active
+local function dash(distance, override, dir)
+    distance = distance or defaultDashDistance
+    -- if dash running and not override, skip
+    if isDashing and not override then return end
+    -- if override, clear existing dash first
     if isDashing and override then
-        -- signal current dash to stop
-        dashCancel = true
-        -- allow small window for the thread to exit
-        task.wait(0.01)
+        clearCurrentDash()
     end
 
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
 
     isDashing = true
-    dashCancel = false
 
-    -- snapshot start state
-    local startPos = hrp.Position
-    local lookVec = hrp.CFrame.LookVector
-    local endPos = startPos + lookVec * distance
-    local t0 = tick()
-
-    -- try to temporarily disable humanoid controls to avoid input fighting (PlatformStand)
-    local prevPlatformStand = nil
-    if humanoid then
-        prevPlatformStand = humanoid.PlatformStand
-        pcall(function() humanoid.PlatformStand = true end)
+    -- decide direction vector based on dir (defaults to front)
+    local d = (dir and tostring(dir):lower()) or "front"
+    local dirVec = hrp.CFrame.LookVector
+    if d == "back" then
+        dirVec = -hrp.CFrame.LookVector
+    elseif d == "left" then
+        dirVec = hrp.CFrame.RightVector
+    elseif d == "right" then
+        dirVec = -hrp.CFrame.RightVector
+    else
+        dirVec = hrp.CFrame.LookVector
     end
 
-    -- run dash loop synced to RenderStepped for smoothness
-    currentDashThread = task.spawn(function()
-        while true do
-            if dashCancel then break end
-            local elapsed = tick() - t0
-            local alpha = math.clamp(elapsed / duration, 0, 1)
-            local pos = startPos:Lerp(endPos, alpha)
-            -- keep facing the same direction as start (prevent unintended rotation)
-            local cf = CFrame.new(pos, pos + lookVec)
-            pcall(function() hrp.CFrame = cf end)
+    -- compute velocity vector. Multiplier controls "strength" feel; adjust if needed.
+    local strengthMultiplier = 12
+    local vec = dirVec * (distance * strengthMultiplier)
 
-            if alpha >= 1 then break end
-            RunService.RenderStepped:Wait()
-        end
+    -- try LinearVelocity first
+    local lv = createLinearVelocity(hrp, vec)
+    if lv then
+        currentDash = lv
+    else
+        -- fallback to BodyVelocity if LinearVelocity unavailable
+        local bv = createBodyVelocityFallback(hrp, vec)
+        currentDash = bv
+    end
 
-        -- finalize: move to exact end position if not cancelled
-        if not dashCancel then
-            pcall(function() hrp.CFrame = CFrame.new(endPos, endPos + lookVec) end)
-        end
-
-        -- restore humanoid state
-        if humanoid then
-            pcall(function() humanoid.PlatformStand = prevPlatformStand end)
-        end
-
-        -- clear state
-        isDashing = false
-        dashCancel = false
-        currentDashThread = nil
+    -- cleanup after dashTime
+    task.delay(dashTime or 0.125, function()
+        pcall(function()
+            if currentDash and currentDash.Parent then currentDash:Destroy() end
+        end)
+        -- small extra delay to ensure state resets after any external interference
+        task.delay(0.03, clearCurrentDash)
     end)
 end
 
--- Convenience wrapper that forces override behavior
-local function dash(distance)
-    linearDash(distance, dashTime, true)
-end
-
--- Expose global function so other local code/buttons can call the same dash
-_G.ForceLinearDash = function(distance)
-    dash(distance or defaultDashDistance)
-end
-
--- Animation detection hookup (safe checks)
+-- Animation detection hookup (safe checks + immediate/ delayed trigger)
 local function setupAnimDetection(char)
     if not char then return end
     local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
@@ -159,10 +178,10 @@ local function setupAnimDetection(char)
 
         if cfg.dashDelay and cfg.dashDelay > 0 then
             task.delay(cfg.dashDelay, function()
-                pcall(function() dash(cfg.dashDistance) end)
+                pcall(function() dash(cfg.dashDistance, true, cfg.Direction) end) -- force override with direction
             end)
         else
-            pcall(function() dash(cfg.dashDistance) end)
+            pcall(function() dash(cfg.dashDistance, true, cfg.Direction) end) -- immediate override with direction
         end
     end)
 end
@@ -173,5 +192,11 @@ if LocalPlayer.Character then
 end
 LocalPlayer.CharacterAdded:Connect(setupAnimDetection)
 
--- tiny debug print to confirm script loaded
-print("[AutoLinearDash] loaded — default distance:", defaultDashDistance)
+-- Optional: expose a global function so other local/button code can force the same dash
+-- usage: _G.ForceDash(distance, direction) or _G.ForceDash() for default
+_G.ForceDash = function(distance, direction)
+    dash(distance or defaultDashDistance, true, direction or "front")
+end
+
+-- tiny debug print
+print("[AutoDash] loaded — default distance:", defaultDashDistance)
