@@ -1,0 +1,22 @@
+--// Reposition & Resize GameTopbar MouseLock UI
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Safely wait for the hierarchy to exist
+local success, err = pcall(function()
+    local topbar = PlayerGui:WaitForChild("GameTopbar", 10)
+    local container = topbar:WaitForChild("Container", 10)
+    local mouseLock = container:WaitForChild("MouseLock", 10)
+    local ui = mouseLock:WaitForChild("Container", 10)
+
+    -- Apply position and size
+    ui.Position = UDim2.new(12.75, 0, 6.00000048, 0)
+    ui.Size = UDim2.new(1.29999995, 0, 1.39999998, 0)
+end)
+
+if not success then
+    warn("❌ Failed to reposition MouseLock UI:", err)
+else
+    print("✅ MouseLock UI repositioned and resized successfully.")
+end
