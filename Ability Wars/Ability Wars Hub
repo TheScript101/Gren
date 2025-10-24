@@ -1,0 +1,501 @@
+-- Load Orion Library
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
+
+-- Create Window
+local Window = OrionLib:MakeWindow({
+	Name = "Ability Wars Hub",
+	HidePremium = false,
+	SaveConfig = false,
+	ConfigFolder = "AbilityWarsHub"
+})
+
+-- Create Boss Tab
+local BossTab = Window:MakeTab({
+	Name = "Boss",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+-- Dog Toggle
+local DogEnabled = false
+BossTab:AddToggle({
+	Name = "Dog",
+	Default = false,
+	Callback = function(Value)
+		DogEnabled = Value
+		if Value then
+			task.spawn(function()
+				while DogEnabled do
+					local dog = workspace:FindFirstChild("Dog")
+					local dogHead = dog and dog:FindFirstChild("Head")
+					if dog and dogHead then
+						local args = {
+							[1] = 314159265359,
+							[2] = dog,
+							[3] = Vector3.new(15.91653060913086, 26.254539489746094, -10.087822914123535),
+							[4] = 7.15364933013916,
+							[5] = dogHead
+						}
+						game:GetService("ReplicatedStorage"):FindFirstChild("Remote Events").Punch:FireServer(unpack(args))
+					end
+					task.wait(0.1)
+				end
+			end)
+		end
+	end
+})
+
+-- Cat Toggle
+local CatEnabled = false
+BossTab:AddToggle({
+	Name = "Cat",
+	Default = false,
+	Callback = function(Value)
+		CatEnabled = Value
+		if Value then
+			task.spawn(function()
+				while CatEnabled do
+					local cat = workspace:FindFirstChild("Cat")
+					local catLeg = cat and cat:FindFirstChild("Left Leg")
+					if cat and catLeg then
+						local args = {
+							[1] = 314159265359,
+							[2] = cat,
+							[3] = Vector3.new(5.495909690856934, 8.963424682617188, 5.1055402755737305),
+							[4] = 5.897555351257324,
+							[5] = catLeg
+						}
+						game:GetService("ReplicatedStorage"):FindFirstChild("Remote Events").Punch:FireServer(unpack(args))
+					end
+					task.wait(0.1)
+				end
+			end)
+		end
+	end
+})
+
+-- Mushroom King Toggle
+local MushroomKingEnabled = false
+BossTab:AddToggle({
+	Name = "Mushroom King",
+	Default = false,
+	Callback = function(Value)
+		MushroomKingEnabled = Value
+		if Value then
+			task.spawn(function()
+				while MushroomKingEnabled do
+					local king = workspace:FindFirstChild("Mushroom King")
+					local targetPart = king and king:FindFirstChild("Mushroom")
+					if king and targetPart then
+						local args = {
+							[1] = 314159265359,
+							[2] = king,
+							[3] = Vector3.new(40.759498596191406, 12.105201721191406, -6.916821002960205),
+							[4] = 5.169180870056152,
+							[5] = targetPart
+						}
+						game:GetService("ReplicatedStorage"):FindFirstChild("Remote Events").Punch:FireServer(unpack(args))
+					end
+					task.wait(0.1)
+				end
+			end)
+		end
+	end
+})
+
+-- Tree Lord Toggle
+local TreeLordEnabled = false
+BossTab:AddToggle({
+	Name = "Tree Lord",
+	Default = false,
+	Callback = function(Value)
+		TreeLordEnabled = Value
+		if Value then
+			task.spawn(function()
+				while TreeLordEnabled do
+					local lord = workspace:FindFirstChild("Tree Lord")
+					local targetPart = lord and lord:FindFirstChild("Left Leg")
+					if lord and targetPart then
+						local args = {
+							[1] = 314159265359,
+							[2] = lord,
+							[3] = Vector3.new(-4.659146308898926, 7.406352519989014, -4.6057024002075195),
+							[4] = 3.2329492568969727,
+							[5] = targetPart
+						}
+						game:GetService("ReplicatedStorage"):FindFirstChild("Remote Events").Punch:FireServer(unpack(args))
+					end
+					task.wait(0.1)
+				end
+			end)
+		end
+	end
+})
+
+
+
+
+-------------------------------------------------------------------------- --------------------------------------------------------------------------------------------------------------- Combat Tab -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Services
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+-- Configuration
+local TARGET_PART_NAME     = "HumanoidRootPart"
+local DEFAULT_HITBOX_SIZE  = Vector3.new(10, 10, 10)
+local TRANSPARENCY         = 0.5
+
+-- State
+local HitboxToggle     = false
+local NpcHitboxSize    = DEFAULT_HITBOX_SIZE
+local APPLIED          = {}
+local descendantConn   = nil
+local periodicThread   = nil
+
+-- Folders to exclude
+local StartAbilitiesFolder = Workspace:FindFirstChild("Start Abilities")
+local QuestNPCsFolder      = Workspace:FindFirstChild("NPCs")
+
+-- Helpers
+local function isExcluded(model)
+    if StartAbilitiesFolder and model:IsDescendantOf(StartAbilitiesFolder) then
+        return true
+    end
+    if QuestNPCsFolder and model:IsDescendantOf(QuestNPCsFolder) then
+        return true
+    end
+    return false
+end
+
+local function disableCollisions(model)
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function getModelRoot(obj)
+    if obj:IsA("Model") then return obj end
+    return obj:FindFirstAncestorOfClass("Model")
+end
+
+local function applyHitboxIfNPC(obj)
+    if not HitboxToggle then return end
+
+    local model = getModelRoot(obj)
+    if not model or APPLIED[model] then return end
+    if isExcluded(model) then return end
+
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character == model then
+            return
+        end
+    end
+
+    local part = model:FindFirstChild(TARGET_PART_NAME)
+    if part and part:IsA("BasePart") then
+        part.Size        = NpcHitboxSize
+        part.Transparency = TRANSPARENCY
+        part.CanCollide = false
+        part.Material    = Enum.Material.ForceField
+        disableCollisions(model)
+        APPLIED[model] = true
+    end
+end
+
+local function initialScan()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        applyHitboxIfNPC(obj)
+    end
+end
+
+local function startExtender()
+    -- reset state
+    APPLIED = {}
+
+    -- initial pass
+    initialScan()
+
+    -- listen for new descendants
+    descendantConn = Workspace.DescendantAdded:Connect(function(obj)
+        task.wait(0.1)
+        applyHitboxIfNPC(obj)
+    end)
+
+    -- periodic fallback
+    periodicThread = task.spawn(function()
+        while HitboxToggle do
+            task.wait(5)
+            initialScan()
+        end
+    end)
+end  -- ← This `end` was missing
+
+local function stopExtender()
+    HitboxToggle = false
+    if descendantConn then
+        descendantConn:Disconnect()
+        descendantConn = nil
+    end
+end
+
+-- Combat tab
+local CombatTab = Window:MakeTab({
+    Name = "Combat",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Toggle
+CombatTab:AddToggle({
+    Name    = "Enable NPC Hitboxes",
+    Default = false,
+    Callback = function(value)
+        HitboxToggle = value
+        if HitboxToggle then
+            startExtender()
+        else
+            stopExtender()
+        end
+    end
+})
+
+-- Textbox for size input
+CombatTab:AddTextbox({
+    Name         = "Input NPC Hitbox Size",
+    Default      = tostring(DEFAULT_HITBOX_SIZE.X), -- single number default
+    TextDisappear = false,
+    Callback     = function(text)
+        -- If user enters a single number, use it for all axes
+        local num = tonumber(text)
+        if num then
+            NpcHitboxSize = Vector3.new(num, num, num)
+        else
+            -- Try parse x,y,z
+            local x, y, z = text:match("^(%d+)%,%s*(%d+)%,%s*(%d+)$")
+            if x and y and z then
+                NpcHitboxSize = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+            else
+                OrionLib:MakeNotification({
+                    Name    = "Invalid Format",
+                    Content = "Enter a single number or x,y,z",
+                    Duration = 3
+                })
+                return
+            end
+        end
+        if HitboxToggle then
+            -- restart to apply new size immediately
+            stopExtender()
+            HitboxToggle = true
+            startExtender()
+        end
+    end
+})
+
+CombatTab:AddLabel("⚠️ Do not put NPC Hitbox Size to 1 or under.")
+
+--// Default globals
+getgenv().CustomHitboxEnabled = false
+getgenv().CustomHitboxSize = 15
+
+--// TextBox for hitbox size
+CombatTab:AddTextbox({
+    Name = "Hitbox Size",
+    Default = "15",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then
+            getgenv().CustomHitboxSize = num
+        else
+            warn("Hitbox Size must be a number!")
+        end
+    end
+})
+
+--// Toggle to enable/disable enlarged hitboxes
+CombatTab:AddToggle({
+    Name = "Enable Player Hitbox",
+    Default = false,
+    Callback = function(state)
+        getgenv().CustomHitboxEnabled = state
+
+        if state then
+            task.spawn(function()
+                while getgenv().CustomHitboxEnabled do
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= Players.LocalPlayer and plr.Character then
+                            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                pcall(function()
+                                    hrp.Size        = Vector3.new(getgenv().CustomHitboxSize, getgenv().CustomHitboxSize, getgenv().CustomHitboxSize)
+                                    hrp.Transparency = 0.8
+                                    hrp.Material     = Enum.Material.Neon
+                                    hrp.BrickColor   = BrickColor.new("Really black")
+                                    hrp.CanCollide   = false
+                                end)
+                            end
+                        end
+                    end
+                    task.wait(0.1)
+                end
+
+                -- Reset hitboxes
+                for _, plr in ipairs(Players:GetPlayers()) do
+                    if plr ~= Players.LocalPlayer and plr.Character then
+                        local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            pcall(function()
+                                hrp.Size        = Vector3.new(2, 2, 1)
+                                hrp.Transparency = 1
+                                hrp.Material     = Enum.Material.Plastic
+                                hrp.BrickColor   = BrickColor.new("Medium stone grey")
+                                hrp.CanCollide   = false
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- CHARACTER TAB -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--// Character Tab
+local CharacterTab = Window:MakeTab({
+    Name = "Character",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+--// Noclip Toggle
+getgenv().NoclipEnabled = false
+local noclipConnection
+
+CharacterTab:AddToggle({
+    Name = "Noclip",
+    Default = false,
+    Callback = function(state)
+        getgenv().NoclipEnabled = state
+
+        if state then
+            noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+                local char = game.Players.LocalPlayer.Character
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+        end
+    end
+})
+
+--// Infinite Jump Toggle
+getgenv().InfJumpEnabled = false
+local userInput = game:GetService("UserInputService")
+local jumpedConnection
+
+CharacterTab:AddToggle({
+    Name = "Infinite Jump",
+    Default = false,
+    Callback = function(state)
+        getgenv().InfJumpEnabled = state
+
+        if state then
+            jumpedConnection = userInput.JumpRequest:Connect(function()
+                local char = game.Players.LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end)
+        else
+            if jumpedConnection then
+                jumpedConnection:Disconnect()
+                jumpedConnection = nil
+            end
+        end
+    end
+})
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ANTIS -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Assuming OrionLib and Window already exist
+
+-- Antis Tab
+local AntisTab = Window:MakeTab({
+	Name = "Antis",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+local safePosition = Vector3.new(-101, 18, -93)
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local antiVoidEnabled = false
+local connection -- for toggling on/off cleanly
+
+-- Update character when it respawns
+player.CharacterAdded:Connect(function(char)
+	character = char
+end)
+
+-- Anti Void Toggle
+AntisTab:AddToggle({
+	Name = "Anti Void (Teleport)",
+	Default = false,
+	Callback = function(Value)
+		antiVoidEnabled = Value
+
+		-- Disconnect any previous connection
+		if connection then
+			connection:Disconnect()
+			connection = nil
+		end
+
+		if antiVoidEnabled then
+			connection = game:GetService("RunService").RenderStepped:Connect(function()
+				character = player.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					if character.HumanoidRootPart.Position.Y < -24 then
+						character:MoveTo(safePosition)
+					end
+				end
+			end)
+		end
+	end
+})
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ORION UI TOGGLE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "OrionToggleGui"
+toggleGui.ResetOnSpawn = false
+toggleGui.Parent = playerGui
+
+local toggleButton = Instance.new("ImageButton", toggleGui)
+toggleButton.Name = "OrionToggleButton"
+toggleButton.AnchorPoint = Vector2.new(1, 0)
+toggleButton.Position = UDim2.new(1, -70, 0, -15)  -- moved left for larger size
+toggleButton.Size = UDim2.new(0, 50, 0, 50)        -- size increased from 30x30 to 45x45
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.BorderSizePixel = 0
+toggleButton.Image = "rbxthumb://type=Asset&id=12238439034&w=420&h=420"
+
+toggleButton.MouseButton1Click:Connect(function()
+    local orionGui = game.CoreGui:FindFirstChild("Orion")
+    if not orionGui and gethui then
+        orionGui = gethui():FindFirstChild("Orion")
+    end
+    if orionGui then
+        orionGui.Enabled = not orionGui.Enabled
+    end
+end)
