@@ -1,0 +1,43 @@
+-- Halloween Door ESP Script (Executor Safe)
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+-- Path to the HalloweenDoors folder
+local doorFolder = Workspace:WaitForChild("Map"):WaitForChild("Core"):WaitForChild("HalloweenDoors")
+
+-- Function to apply red chams (ESP effect)
+local function applyChams(door)
+	if not door or not door:IsA("Model") then return end
+
+	for _, part in ipairs(door:GetDescendants()) do
+		if part:IsA("BasePart") then
+			-- Avoid duplicating highlights
+			if not part:FindFirstChild("ESPHighlight") then
+				local highlight = Instance.new("Highlight")
+				highlight.Name = "ESPHighlight"
+				highlight.FillColor = Color3.fromRGB(255, 0, 0)
+				highlight.OutlineColor = Color3.fromRGB(255, 100, 100)
+				highlight.FillTransparency = 0.25
+				highlight.OutlineTransparency = 0
+				highlight.Adornee = part
+				highlight.Parent = part
+			end
+		end
+	end
+end
+
+-- Apply chams to all existing doors
+for _, door in ipairs(doorFolder:GetChildren()) do
+	if door.Name == "HalloweenDoor" then
+		applyChams(door)
+	end
+end
+
+-- Detect new doors being added dynamically
+doorFolder.ChildAdded:Connect(function(child)
+	if child.Name == "HalloweenDoor" then
+		applyChams(child)
+	end
+end)
+
+print("[HalloweenDoor ESP] Active - Red chams applied to all doors.")
