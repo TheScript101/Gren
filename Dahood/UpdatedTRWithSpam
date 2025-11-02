@@ -1,0 +1,455 @@
+-- Tool Remover GUI (executor-friendly)
+-- Paste this into your executor (Synapse, Krnl, Flux, etc.)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+
+-- safe get parent for executors
+local function getGuiParent()
+    if type(gethui) == "function" then
+        local ok, g = pcall(gethui)
+        if ok and g then return g end
+    end
+    if (typeof(syn) == "table" and type(syn.protect_gui) == "function") then
+        -- parent to CoreGui then protect
+        return game:GetService("CoreGui")
+    end
+    return game:GetService("CoreGui")
+end
+
+local guiParent = getGuiParent()
+
+-- main ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ToolRemoverExecutor_GUI"
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 9999
+
+-- protect GUI if possible (executor)
+if (typeof(syn) == "table" and type(syn.protect_gui) == "function") then
+    pcall(function() syn.protect_gui(screenGui) end)
+end
+
+screenGui.Parent = guiParent
+
+-- Styling variables
+local BG_COLOR = Color3.fromRGB(28,28,30)
+local ACCENT = Color3.fromRGB(48,196,96)
+local TEXT = Color3.fromRGB(230,230,230)
+local SUBTEXT = Color3.fromRGB(180,180,180)
+
+-- Main frame
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0, 420, 0, 520)
+main.Position = UDim2.new(0.5, -210, 0.5, -260)
+main.AnchorPoint = Vector2.new(0.5,0.5)
+main.BackgroundColor3 = BG_COLOR
+main.BorderSizePixel = 0
+main.Parent = screenGui
+
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0,12)
+
+-- Title
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, -28, 0, 36)
+title.Position = UDim2.new(0,14,0,12)
+title.BackgroundTransparency = 1
+title.Text = "Tools Remover"
+title.TextColor3 = TEXT
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Top separator
+local sepTop = Instance.new("Frame", main)
+sepTop.Size = UDim2.new(1, -28, 0, 2)
+sepTop.Position = UDim2.new(0,14,0,52)
+sepTop.BackgroundColor3 = Color3.fromRGB(60,60,65)
+sepTop.BorderSizePixel = 0
+
+-- Scrolling grid container
+local scroll = Instance.new("ScrollingFrame", main)
+scroll.Name = "ToolsScroll"
+scroll.Position = UDim2.new(0,14,0,66)
+scroll.Size = UDim2.new(1, -28, 0, 320)
+scroll.BackgroundTransparency = 1
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+scroll.ScrollBarThickness = 8
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.VerticalScrollBarInset = Enum.VerticalScrollBarInset.Always
+scroll.Parent = main
+
+local grid = Instance.new("UIGridLayout", scroll)
+grid.CellSize = UDim2.new(0, 84, 0, 84)
+grid.CellPadding = UDim2.new(0, 8, 0, 8)
+grid.FillDirection = Enum.FillDirection.Horizontal
+grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Separator under tools
+local sepBottom = Instance.new("Frame", main)
+sepBottom.Size = UDim2.new(1, -28, 0, 2)
+sepBottom.Position = UDim2.new(0,14,0,66+320+12)
+sepBottom.BackgroundColor3 = Color3.fromRGB(60,60,65)
+sepBottom.BorderSizePixel = 0
+
+-- Text box for selected name
+local textBox = Instance.new("TextBox", main)
+textBox.Name = "SelectedName"
+textBox.Size = UDim2.new(1, -28, 0, 34)
+textBox.Position = UDim2.new(0,14,0,66+320+26)
+textBox.PlaceholderText = "Selected tool name..."
+textBox.ClearTextOnFocus = false
+textBox.BackgroundColor3 = Color3.fromRGB(44,44,46)
+textBox.TextColor3 = TEXT
+textBox.BorderSizePixel = 0
+textBox.Font = Enum.Font.Gotham
+textBox.TextSize = 16
+textBox.Parent = main
+Instance.new("UICorner", textBox).CornerRadius = UDim.new(0,8)
+
+-- Delete button
+local deleteBtn = Instance.new("TextButton", main)
+deleteBtn.Name = "DeleteBtn"
+deleteBtn.Size = UDim2.new(1, -28, 0, 44)
+deleteBtn.Position = UDim2.new(0,14,0,66+320+26+44+8)
+deleteBtn.Text = "Delete"
+deleteBtn.Font = Enum.Font.GothamBold
+deleteBtn.TextSize = 18
+deleteBtn.TextColor3 = Color3.fromRGB(255,255,255)
+deleteBtn.BackgroundColor3 = ACCENT
+deleteBtn.BorderSizePixel = 0
+Instance.new("UICorner", deleteBtn).CornerRadius = UDim.new(0,10)
+
+-- Status label
+local status = Instance.new("TextLabel", main)
+status.Size = UDim2.new(1, -28, 0, 22)
+status.Position = UDim2.new(0,14,0,66+320+26+44+8+54)
+status.BackgroundTransparency = 1
+status.Text = ""
+status.Font = Enum.Font.Gotham
+status.TextSize = 14
+status.TextColor3 = SUBTEXT
+status.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Function: get best icon for a tool (returns string)
+local function getToolIcon(tool)
+    if not tool then return nil end
+    -- try common places
+    local ok, res
+    ok, res = pcall(function() return tostring(tool.TextureId or "") end)
+    if ok and res ~= "" and res ~= "0" then return res end
+
+    local handle = tool:FindFirstChild("Handle")
+    if handle then
+        local decal = handle:FindFirstChildOfClass("Decal")
+        if decal and decal.Texture and decal.Texture ~= "" then
+            return decal.Texture
+        end
+        local special = handle:FindFirstChildOfClass("SpecialMesh")
+        if special and special.TextureId and tostring(special.TextureId) ~= "" then
+            return tostring(special.TextureId)
+        end
+        if handle:IsA("MeshPart") and handle.TextureID and tostring(handle.TextureID) ~= "" then
+            return tostring(handle.TextureID)
+        end
+    end
+
+    -- try child ImageLabels (some tools include)
+    for _, v in ipairs(tool:GetDescendants()) do
+        if v:IsA("Decal") and v.Texture and v.Texture ~= "" then
+            return v.Texture
+        elseif v:IsA("Texture") and v.Texture and v.Texture ~= "" then
+            return v.Texture
+        elseif v:IsA("SpecialMesh") and v.TextureId and tostring(v.TextureId) ~= "" then
+            return tostring(v.TextureId)
+        end
+    end
+
+    return nil
+end
+
+-- bookkeeping
+local toolButtonFor = {} -- [toolInstance] = button
+local selectedTool = nil
+
+local function clearSelection()
+    selectedTool = nil
+    textBox.Text = ""
+    for tool, btn in pairs(toolButtonFor) do
+        local stroke = btn:FindFirstChild("SelectStroke")
+        if stroke then stroke.Enabled = false end
+    end
+end
+
+local function selectTool(tool)
+    selectedTool = tool
+    if tool and tool.Name then
+        textBox.Text = tool.Name
+    end
+    for t, btn in pairs(toolButtonFor) do
+        local stroke = btn:FindFirstChild("SelectStroke")
+        if stroke then stroke.Enabled = (t == tool) end
+    end
+end
+
+local function removeEntry(tool)
+    local btn = toolButtonFor[tool]
+    if btn and btn.Parent then btn:Destroy() end
+    toolButtonFor[tool] = nil
+    if selectedTool == tool then clearSelection() end
+end
+
+local function createEntry(tool)
+    if not tool or not tool.Parent then return end
+    if toolButtonFor[tool] then return end
+
+    local btn = Instance.new("TextButton")
+    btn.Name = "ToolItem"
+    btn.Size = UDim2.new(0, 84, 0, 84)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,42)
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Parent = scroll
+
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0,8)
+
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Name = "SelectStroke"
+    stroke.Color = ACCENT
+    stroke.Thickness = 2
+    stroke.Enabled = false
+
+    local icon = getToolIcon(tool)
+    if icon and icon ~= "" then
+        local img = Instance.new("ImageLabel", btn)
+        img.Size = UDim2.new(1, -12, 0, 52)
+        img.Position = UDim2.new(0,6,0,6)
+        img.BackgroundTransparency = 1
+        img.Image = icon
+        img.ScaleType = Enum.ScaleType.Crop
+        img.Parent = btn
+    else
+        local fallback = Instance.new("TextLabel", btn)
+        fallback.Size = UDim2.new(1, -12, 0, 52)
+        fallback.Position = UDim2.new(0,6,0,6)
+        fallback.BackgroundTransparency = 1
+        fallback.Text = tool.Name or "Tool"
+        fallback.TextWrapped = true
+        fallback.Font = Enum.Font.Gotham
+        fallback.TextSize = 14
+        fallback.TextColor3 = TEXT
+        fallback.Parent = btn
+    end
+
+    local nameLabel = Instance.new("TextLabel", btn)
+    nameLabel.Size = UDim2.new(1, -12, 0, 22)
+    nameLabel.Position = UDim2.new(0,6,0,58)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = tool.Name or "Tool"
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 13
+    nameLabel.TextColor3 = SUBTEXT
+    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+    btn.MouseButton1Click:Connect(function()
+        selectTool(tool)
+    end)
+
+    toolButtonFor[tool] = btn
+end
+
+local function rebuildAll()
+    -- remove current UI entries
+    for t,b in pairs(toolButtonFor) do
+        if b and b.Parent then b:Destroy() end
+    end
+    toolButtonFor = {}
+
+    -- add from Backpack
+    local bp = localPlayer:FindFirstChild("Backpack")
+    if bp then
+        for _, v in ipairs(bp:GetChildren()) do
+            if v:IsA("Tool") then createEntry(v) end
+        end
+    end
+    -- add from Character
+    local char = localPlayer.Character
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") then createEntry(v) end
+        end
+    end
+end
+
+-- hook events for live update
+local function hookBackpack(bp)
+    if not bp then return end
+    bp.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then createEntry(child) end
+    end)
+    bp.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") then removeEntry(child) end
+    end)
+end
+
+local function hookCharacter(ch)
+    if not ch then return end
+    ch.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then createEntry(child) end
+    end)
+    ch.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") then removeEntry(child) end
+    end)
+end
+
+-- initial hook + reconnect on respawn
+if localPlayer:FindFirstChild("Backpack") then
+    hookBackpack(localPlayer.Backpack)
+end
+localPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.05)
+    hookCharacter(char)
+    rebuildAll()
+end)
+-- initial build
+rebuildAll()
+
+-- auto update canvas size when grid changes
+grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    local s = grid.AbsoluteContentSize
+    scroll.CanvasSize = UDim2.new(0, 0, 0, s.Y + 12)
+end)
+
+-- Delete behavior (executor: prefer destroying instance directly)
+local function safeDestroy(obj)
+    if not obj then return false end
+    if not obj.Parent then return false end
+    pcall(function() obj:Destroy() end)
+    return true
+end
+
+deleteBtn.MouseButton1Click:Connect(function()
+    local name = textBox.Text and tostring(textBox.Text) or ""
+    status.Text = "Processing..."
+    -- If a specific instance is selected -> destroy that
+    if selectedTool and selectedTool.Parent then
+        local ok = pcall(function() selectedTool:Destroy() end)
+        if ok then
+            status.Text = "Removed selected tool: "..(selectedTool.Name or "Tool")
+            removeEntry(selectedTool)
+            selectedTool = nil
+            textBox.Text = ""
+        else
+            status.Text = "Failed to remove selected tool."
+        end
+        return
+    end
+
+    -- Otherwise delete by name: remove all matching in Backpack and Character
+    if name == "" then
+        status.Text = "No tool selected or name provided."
+        return
+    end
+    local removed = 0
+    local bp = localPlayer:FindFirstChild("Backpack")
+    if bp then
+        for _, v in ipairs(bp:GetChildren()) do
+            if v:IsA("Tool") and v.Name == name then
+                pcall(function() v:Destroy() end)
+                removed = removed + 1
+                removeEntry(v)
+            end
+        end
+    end
+    local char = localPlayer.Character
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") and v.Name == name then
+                pcall(function() v:Destroy() end)
+                removed = removed + 1
+                removeEntry(v)
+            end
+        end
+    end
+
+    if removed > 0 then
+        status.Text = ("Removed %d tool(s) named '%s'."):format(removed, name)
+    else
+        status.Text = ("No tools named '%s' found."):format(name)
+    end
+
+    -- small refresh
+    task.delay(0.15, rebuildAll)
+end)
+
+-- Done
+status.Text = "Ready — GUI created for executor."
+
+
+-- Right-side toggle button (paste after main & screenGui exist)
+-- Protect it for executors if possible
+if (typeof(syn) == "table" and type(syn.protect_gui) == "function") then
+    pcall(function() syn.protect_gui(screenGui) end)
+end
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToolRemover_Toggle"
+ToggleButton.Size = UDim2.new(0, 36, 0, 110)              -- narrow vertical button
+ToggleButton.Position = UDim2.new(1, -46, 0.5, -55)       -- right side, centered vertically
+ToggleButton.AnchorPoint = Vector2.new(0, 0.5)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40,40,42)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Text = "⟨"                                  -- arrow pointing left when shown
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 22
+ToggleButton.TextColor3 = Color3.fromRGB(230,230,230)
+ToggleButton.AutoButtonColor = true
+ToggleButton.Parent = screenGui
+
+local tbCorner = Instance.new("UICorner", ToggleButton)
+tbCorner.CornerRadius = UDim.new(0, 8)
+
+-- optional small label/help (hover not supported on mobile so keep it simple)
+local hint = Instance.new("TextLabel", ToggleButton)
+hint.Size = UDim2.new(1, -8, 0, 20)
+hint.Position = UDim2.new(0, 4, 1, -24)
+hint.BackgroundTransparency = 1
+hint.Text = "Toggle"
+hint.Font = Enum.Font.Gotham
+hint.TextSize = 12
+hint.TextColor3 = Color3.fromRGB(180,180,180)
+hint.TextWrapped = true
+hint.TextXAlignment = Enum.TextXAlignment.Center
+hint.Visible = false -- hide by default; keep UI clean
+
+-- show/hide state
+local visibleState = true
+
+ToggleButton.MouseEnter:Connect(function()
+    hint.Visible = true
+end)
+ToggleButton.MouseLeave:Connect(function()
+    hint.Visible = false
+end)
+
+ToggleButton.MouseButton1Click:Connect(function()
+    visibleState = not visibleState
+    -- simply toggle visibility
+    main.Visible = visibleState
+
+    -- update arrow (left when shown, right when hidden)
+    ToggleButton.Text = visibleState and "⟨" or "⟩"
+
+    -- optional status feedback (if you have a status label)
+    if status and status:IsA("TextLabel") then
+        status.Text = visibleState and "Ready — GUI visible." or "Ready — GUI hidden."
+    end
+end)
+
+-- Make sure toggle remains on top
+ToggleButton.ZIndex = 9999
