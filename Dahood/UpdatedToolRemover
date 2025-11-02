@@ -40,7 +40,7 @@ local INSET = 12
 -- Main Frame (responsive)
 local main = Instance.new("Frame")
 main.Name = "Main"
-main.Size = UDim2.new(0.92, 0, 0.82, 0)       -- 92% width, 82% height of screen
+main.Size = UDim2.new(0.92, 0, 0.95, 0)       -- 92% width, 82% height of screen
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.BackgroundColor3 = BG
@@ -158,9 +158,9 @@ status.ZIndex = 1
 -- Toggle (flush right edge)
 local toggle = Instance.new("TextButton")
 toggle.Name = "ToolRemover_Toggle"
-toggle.Size = UDim2.new(0, 40, 0, 110)
+toggle.Size = UDim2.new(0, 40, 0, 55)
 toggle.AnchorPoint = Vector2.new(1, 0.5)
-toggle.Position = UDim2.new(1, -2, 0.5, 0)
+toggle.Position = UDim2.new(0.05, -10, 0.5, 0)
 toggle.BackgroundColor3 = Color3.fromRGB(40,40,42)
 toggle.BorderSizePixel = 0
 toggle.Text = "⟨"
@@ -178,7 +178,7 @@ local function refreshPositions()
     local scrollH = math.max(80, math.floor(totalH * 0.55)) -- ensure minimum height
     scroll.Position = UDim2.new(0, INSET, 0, topBarH + 8)
     scroll.Size = UDim2.new(1, - (INSET * 2), 0, scrollH)
-    sepTop.Position = UDim2.new(0, INSET, 0, topBarH + 8)
+    sepTop.Position = UDim2.new(0, INSET, 0, topBarH + 4)
     sepTop.Size = UDim2.new(1, - (INSET * 2), 0, 2)
     sepBottom.Position = UDim2.new(0, INSET, 0, topBarH + 8 + scrollH + 12)
     sepBottom.Size = UDim2.new(1, - (INSET * 2), 0, 2)
@@ -187,11 +187,8 @@ local function refreshPositions()
     textBox.Position = UDim2.new(0, INSET, 0, controlsY)
     textBox.Size = UDim2.new(1, - (INSET * 2), 0, 40)
 
-    deleteBtn.Position = UDim2.new(0, INSET, 0, controlsY + 40 + 10)
+    deleteBtn.Position = UDim2.new(0.25, INSET, 0, controlsY + 40 + 10)
     deleteBtn.Size = UDim2.new(0.48, -INSET, 0, 44)
-
-    closeBtn.Position = UDim2.new(0.52, INSET, 0, controlsY + 40 + 10)
-    closeBtn.Size = UDim2.new(0.48, -INSET, 0, 44)
 
     status.Position = UDim2.new(0, INSET, 0, controlsY + 40 + 10 + 44 + 12)
     status.Size = UDim2.new(1, - (INSET * 2), 0, 20)
