@@ -143,6 +143,7 @@ deleteBtn.TextSize = 18
 deleteBtn.TextColor3 = Color3.fromRGB(255,255,255)
 deleteBtn.BorderSizePixel = 0
 deleteBtn.ZIndex = 1
+
 -- Status label
 local status = Instance.new("TextLabel", main)
 status.Size = UDim2.new(1, - (INSET * 2), 0, 20)
