@@ -1,0 +1,25 @@
+-- Auto Re-Executor for ESP Script
+local espURL = "https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/JujutsuShennagains/Esp"
+local reExecuteDelay = 30 -- seconds
+
+-- Function to safely execute the ESP script
+local function executeESP()
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(espURL))()
+    end)
+
+    if not success then
+        warn("[ESP Re-Executor] Failed to execute ESP:", err)
+    else
+        print("[ESP Re-Executor] ESP script executed successfully!")
+    end
+end
+
+-- Run once immediately
+executeESP()
+
+-- Repeat every 30 seconds
+while true do
+    task.wait(reExecuteDelay)
+    executeESP()
+end
