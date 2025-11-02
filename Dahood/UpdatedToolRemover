@@ -82,8 +82,8 @@ closeBtn.Position = UDim2.new(1, -184, 0, 7)
 closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,52)
 closeBtn.BorderSizePixel = 0
 closeBtn.Text = "Close"
-closdBtn.Font = Enum.Font.Gotham
-closedBtn.TextSize = 14
+closeBtn.Font = Enum.Font.Gotham
+closeBtn.TextSize = 14
 closeBtn.TextColor3 = TXT
 closeBtn.AutoButtonColor = true
 
