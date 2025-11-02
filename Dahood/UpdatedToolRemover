@@ -83,7 +83,7 @@ closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,52)
 closeBtn.BorderSizePixel = 0
 closeBtn.Text = "Close"
 closdBtn.Font = Enum.Font.Gotham
-closdBtn.TextSize = 14
+closedBtn.TextSize = 14
 closeBtn.TextColor3 = TXT
 closeBtn.AutoButtonColor = true
 
