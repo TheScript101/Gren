@@ -474,6 +474,288 @@ AntisTab:AddToggle({
 		end
 	end
 })
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local UPDATE_INTERVAL = 1
+local MAX_DISTANCE = 350
+local ABILITY_LEADERNAME = "Ability"
+
+-- store data per-player: {billboard, label, conns = {conn1, ...}}
+local Tags = {}
+local ESP_ENABLED = false
+
+-- safe getter for leaderstat value
+local function GetAbilityValue(player)
+    if not player then return nil end
+    local ls = player:FindFirstChild("leaderstats")
+    if not ls then return nil end
+    local stat = ls:FindFirstChild(ABILITY_LEADERNAME)
+    if not stat then return nil end
+    local ok, val = pcall(function() return stat.Value end)
+    if ok and val ~= nil then return tostring(val) end
+    return tostring(stat)
+end
+
+local function CreateBillboard(head)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "AbilityTag"
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 200, 0, 48)
+    billboard.MaxDistance = MAX_DISTANCE
+    billboard.LightInfluence = 0
+    billboard.ResetOnSpawn = false
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBlack
+    label.TextSize = 20
+    label.TextScaled = true
+    label.TextWrapped = true
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.Text = ""
+    label.Parent = billboard
+
+    return billboard, label
+end
+
+local function RemovePlayerData(player)
+    local data = Tags[player]
+    if not data then return end
+    -- destroy billboard
+    pcall(function()
+        if data.billboard then data.billboard:Destroy() end
+    end)
+    -- disconnect connections
+    if data.conns then
+        for _,c in ipairs(data.conns) do
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    Tags[player] = nil
+end
+
+local function EnsureTag(player)
+    if not player then return nil end
+    local char = player.Character
+    if not char then return nil end
+    local head = char:FindFirstChild("Head")
+    if not head or not head:IsA("BasePart") then return nil end
+
+    local data = Tags[player]
+    if data and data.billboard and data.billboard.Parent then
+        -- update adornee if head changed
+        if data.billboard.Adornee ~= head then
+            data.billboard.Adornee = head
+        end
+        return data
+    end
+
+    local b, label = CreateBillboard(head)
+    b.Parent = head
+    Tags[player] = {billboard = b, label = label, conns = {}}
+    return Tags[player]
+end
+
+local function UpdateOnePlayer(player)
+    if not ESP_ENABLED then return end
+    if not player or player == LocalPlayer then return end
+
+    -- must have character and head
+    local char = player.Character
+    if not char then
+        RemovePlayerData(player)
+        return
+    end
+    local head = char:FindFirstChild("Head")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not head or not hrp then
+        RemovePlayerData(player)
+        return
+    end
+
+    local ability = GetAbilityValue(player)
+    if not ability or ability == "" or ability == "nil" then
+        local d = Tags[player]
+        if d and d.billboard then d.billboard.Enabled = false end
+        return
+    end
+
+    local d = EnsureTag(player)
+    if not d then return end
+    d.label.Text = tostring(ability)
+    d.billboard.Enabled = true
+    d.billboard.MaxDistance = MAX_DISTANCE
+end
+
+-- called when a player's character spawns
+local function OnCharacterAdded(player, character)
+    -- small wait to ensure Head exists
+    local head = character:WaitForChild("Head", 2)
+    if not head then
+        -- if no head; remove any tag
+        RemovePlayerData(player)
+        return
+    end
+
+    -- immediate update
+    UpdateOnePlayer(player)
+
+    -- ensure Billboard's adornee points to the new head
+    local data = Tags[player]
+    if data and data.billboard then data.billboard.Adornee = head end
+end
+
+-- setup listeners for leaderstats.Ability and CharacterAdded for a player
+local function SetupPlayer(player)
+    -- clean existing data first
+    RemovePlayerData(player)
+
+    -- connect CharacterAdded
+    local connChar = player.CharacterAdded:Connect(function(char) OnCharacterAdded(player, char) end)
+
+    -- if character already exists, call handler now
+    if player.Character then
+        spawn(function() OnCharacterAdded(player, player.Character) end)
+    end
+
+    -- watch for leaderstats appearing
+    local function watchLeaderstats()
+        local ls = player:FindFirstChild("leaderstats")
+        if ls then
+            local stat = ls:FindFirstChild(ABILITY_LEADERNAME)
+            if stat then
+                local conn = stat.Changed:Connect(function() UpdateOnePlayer(player) end)
+                Tags[player] = Tags[player] or {conns = {}}
+                table.insert(Tags[player].conns, conn)
+                -- immediate update if stat exists
+                UpdateOnePlayer(player)
+                return
+            else
+                -- wait for Ability to be added
+                local connAdded
+                connAdded = ls.ChildAdded:Connect(function(child)
+                    if child.Name == ABILITY_LEADERNAME then
+                        if connAdded then connAdded:Disconnect() end
+                        local conn = child.Changed:Connect(function() UpdateOnePlayer(player) end)
+                        Tags[player] = Tags[player] or {conns = {}}
+                        table.insert(Tags[player].conns, conn)
+                        UpdateOnePlayer(player)
+                    end
+                end)
+                Tags[player] = Tags[player] or {conns = {}}
+                table.insert(Tags[player].conns, connAdded)
+                return
+            end
+        else
+            -- leaderstats not present yet: wait a bit and try again, but do not block forever
+            local tries = 0
+            spawn(function()
+                while tries < 6 do
+                    tries = tries + 1
+                    task.wait(0.5)
+                    local ls2 = player:FindFirstChild("leaderstats")
+                    if ls2 then
+                        watchLeaderstats()
+                        return
+                    end
+                end
+            end)
+        end
+    end
+
+    -- store CharacterAdded conn so we can disconnect later
+    Tags[player] = Tags[player] or {conns = {}}
+    table.insert(Tags[player].conns, connChar)
+    -- start watching leaderstats
+    watchLeaderstats()
+end
+
+-- PlayerAdded/Removing
+Players.PlayerAdded:Connect(function(plr)
+    SetupPlayer(plr)
+end)
+Players.PlayerRemoving:Connect(function(plr)
+    RemovePlayerData(plr)
+end)
+
+-- init existing players
+for _,p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        SetupPlayer(p)
+    end
+end
+
+-- periodic fallback updater
+spawn(function()
+    while true do
+        if ESP_ENABLED then
+            for _,p in ipairs(Players:GetPlayers()) do
+                UpdateOnePlayer(p)
+            end
+        end
+        task.wait(UPDATE_INTERVAL)
+    end
+end)
+
+-- Orion UI (toggle)
+local function CleanupAllTags()
+    for plr,_ in pairs(Tags) do
+        RemovePlayerData(plr)
+    end
+end
+
+if Orion then
+    local Tab = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+    Tab:AddToggle({
+        Name = "Ability ESP",
+        Default = false,
+        Callback = function(state)
+            ESP_ENABLED = state
+            if not state then
+                CleanupAllTags()
+            else
+                -- immediate update for all players
+                for _,p in ipairs(Players:GetPlayers()) do
+                    UpdateOnePlayer(p)
+                end
+            end
+        end
+    })
+    Orion:Init()
+else
+    -- simple fallback toggle if Orion failed
+    getgenv().AbilityESP_Toggle = function(on)
+        ESP_ENABLED = on and true or false
+        if not ESP_ENABLED then CleanupAllTags() end
+    end
+    warn("Orion not loaded; call getgenv().AbilityESP_Toggle(true) to enable.")
+end
+
+-- expose API
+getgenv().AbilityESP = {
+    Start = function()
+        if not ESP_ENABLED then
+            ESP_ENABLED = true
+            for _,p in ipairs(Players:GetPlayers()) do UpdateOnePlayer(p) end
+        end
+    end,
+    Stop = function()
+        if ESP_ENABLED then
+            ESP_ENABLED = false
+            CleanupAllTags()
+        end
+    end,
+    ForceUpdate = function() for _,p in ipairs(Players:GetPlayers()) do UpdateOnePlayer(p) end end
+}
+
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ORION UI TOGGLE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 local toggleGui = Instance.new("ScreenGui")
