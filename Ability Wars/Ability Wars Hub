@@ -707,14 +707,14 @@ end)
 
 -- Orion UI (toggle)
 local function CleanupAllTags()
-    for plr,_ in pairs(Tags) do
+    for plr, _ in pairs(Tags) do
         RemovePlayerData(plr)
     end
 end
 
-if Orion then
-    local Tab = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-    Tab:AddToggle({
+if OrionLib then
+    local TabESP = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+    TabESP:AddToggle({
         Name = "Ability ESP",
         Default = false,
         Callback = function(state)
@@ -729,7 +729,7 @@ if Orion then
             end
         end
     })
-    Orion:Init()
+    OrionLib:Init()
 else
     -- simple fallback toggle if Orion failed
     getgenv().AbilityESP_Toggle = function(on)
