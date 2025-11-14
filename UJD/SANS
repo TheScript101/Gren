@@ -1,0 +1,473 @@
+-- LocalScript: Paste into StarterPlayerScripts (or run in executor)
+-- Creates two parts, a UI with Enter/Cancel, and loops teleports/use-tool on target model.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local clientChar = nil
+
+-- Teleport points (also create parts at the top)
+local partA_pos = Vector3.new(-1086.16, 72.42, 1278.3)
+local partA_size = Vector3.new(12, 1, 13)
+
+local partB_pos = Vector3.new(-999.69, 72.92, 1278.37)
+local partB_size = Vector3.new(12, 1, 13)
+
+-- Teleport coordinates used in loop (your requested coordinates)
+local tpA = Vector3.new(-1086.0540771484375, 75.91587829589844, 1278.3065185546875)
+local tpB = Vector3.new(-999.38134765625, 76.41588592529297, 1278.3829345703125)
+
+-- create parts (if not already)
+local function createPlatform(name, pos, size)
+    local existing = Workspace:FindFirstChild(name)
+    if existing and existing:IsA("BasePart") then return existing end
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = size
+    p.Position = pos
+    p.Anchored = true
+    p.CanCollide = true
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    p.Parent = Workspace
+    return p
+end
+
+createPlatform("TPPlatformA", partA_pos, partA_size)
+createPlatform("TPPlatformB", partB_pos, partB_size)
+
+-- -------------------------
+-- Build UI
+-- -------------------------
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SansToolGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 360, 0, 140)
+frame.Position = UDim2.new(0.5, -180, 0.1, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 28)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "Sans Auto-Looper"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+
+local inputBox = Instance.new("TextBox", frame)
+inputBox.Size = UDim2.new(1, -20, 0, 36)
+inputBox.Position = UDim2.new(0, 10, 0, 36)
+inputBox.PlaceholderText = "Enter Sans"
+inputBox.Text = ""
+inputBox.ClearTextOnFocus = false
+inputBox.Font = Enum.Font.SourceSans
+inputBox.TextSize = 18
+inputBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+inputBox.TextColor3 = Color3.fromRGB(255,255,255)
+inputBox.BorderSizePixel = 0
+
+local enterBtn = Instance.new("TextButton", frame)
+enterBtn.Size = UDim2.new(0, 100, 0, 32)
+enterBtn.Position = UDim2.new(0, 12, 0, 80)
+enterBtn.Text = "Enter"
+enterBtn.Font = Enum.Font.SourceSansBold
+enterBtn.TextSize = 18
+enterBtn.BackgroundColor3 = Color3.fromRGB(25, 150, 25)
+enterBtn.TextColor3 = Color3.fromRGB(255,255,255)
+enterBtn.BorderSizePixel = 0
+
+local cancelBtn = Instance.new("TextButton", frame)
+cancelBtn.Size = UDim2.new(0, 100, 0, 32)
+cancelBtn.Position = UDim2.new(0, 130, 0, 80)
+cancelBtn.Text = "Cancel"
+cancelBtn.Font = Enum.Font.SourceSansBold
+cancelBtn.TextSize = 18
+cancelBtn.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+cancelBtn.TextColor3 = Color3.fromRGB(255,255,255)
+cancelBtn.BorderSizePixel = 0
+
+local statusLabel = Instance.new("TextLabel", frame)
+statusLabel.Size = UDim2.new(1, -20, 0, 24)
+statusLabel.Position = UDim2.new(0, 10, 0, 116)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 16
+statusLabel.TextColor3 = Color3.fromRGB(255,255,255)
+statusLabel.Text = "Idle"
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- -------------------------
+-- Helpers
+-- -------------------------
+local function resolvePath(pathStr)
+    -- accepts period separated paths like: workspace.TempFightStuff.PacifistSans
+    if not pathStr or pathStr == "" then return nil end
+    local parts = {}
+    for seg in string.gmatch(pathStr, "[^%.]+") do
+        table.insert(parts, seg)
+    end
+    if #parts == 0 then return nil end
+
+    -- start root
+    local rootName = parts[1]
+    local root = nil
+    if rootName == "workspace" or rootName == "Workspace" then
+        root = Workspace
+    elseif rootName == "game" or rootName == "Game" then
+        root = game
+    elseif rootName == "players" or rootName == "Players" then
+        root = Players
+    else
+        -- assume workspace.rootName...
+        root = Workspace
+    end
+
+    local cur = root
+    local startIndex = 1
+    if cur ~= root then return nil end
+    -- if first segment was root, start at 2
+    if parts[1] == "workspace" or parts[1] == "Workspace" or parts[1] == "game" or parts[1] == "Game" or parts[1] == "players" or parts[1] == "Players" then
+        startIndex = 2
+    else
+        startIndex = 1
+    end
+
+    for i = startIndex, #parts do
+        if not cur then return nil end
+        local child = cur:FindFirstChild(parts[i])
+        if not child then return nil end
+        cur = child
+    end
+    return cur
+end
+
+local function fullPathString(pathStr)
+    -- returns normalized full path string (workspace.Folder.Model)
+    local inst = resolvePath(pathStr)
+    if not inst then return nil end
+    -- build path from root (game->workspace)
+    local parts = {}
+    local cur = inst
+    while cur and cur ~= game do
+        table.insert(parts, 1, cur.Name)
+        cur = cur.Parent
+    end
+    table.insert(parts, 1, "game")
+    -- replace leading "game,workspace" with "workspace"
+    if parts[2] == "workspace" or parts[2] == "Workspace" then
+        table.remove(parts, 1) -- remove "game"
+    end
+    return table.concat(parts, ".")
+end
+
+local function waitForInstance(pathStr, timeout)
+    timeout = timeout or math.huge
+    local start = tick()
+    while tick() - start < timeout do
+        local inst = resolvePath(pathStr)
+        if inst then return inst end
+        task.wait(0.5)
+    end
+    return nil
+end
+
+local function findTool()
+    -- look for RealKnife in Backpack or Character
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        local t = backpack:FindFirstChild("RealKnife")
+        if t then return t end
+    end
+    if player.Character then
+        local t2 = player.Character:FindFirstChild("RealKnife")
+        if t2 then return t2 end
+    end
+    return nil
+end
+
+local function equipTool(tool)
+    if not tool or not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    pcall(function() humanoid:EquipTool(tool) end)
+    return true
+end
+
+local function useTool(tool)
+    if not tool then return end
+    -- try standard activation
+    pcall(function()
+        if tool.Parent == player.Character and tool:FindFirstChildOfClass("Tool") == nil then end
+        if tool.Activate then
+            -- tool:Activate may exist
+            pcall(function() tool:Activate() end)
+        else
+            -- fallback try fire click (some tools listen to RemoteEvents; no universal)
+            if player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    pcall(function() humanoid:EquipTool(tool) end)
+                end
+            end
+        end
+    end)
+end
+
+local function teleportCharacterTo(pos)
+    if not player.Character then return false end
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if hrp then
+        pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)) end)
+        -- reset velocity
+        if hrp:FindFirstChild("BodyVelocity") then hrp.BodyVelocity:Destroy() end
+    end
+    -- small wait to allow physics settle
+    task.wait(0.05)
+    return true
+end
+
+-- -------------------------
+-- Main logic
+-- -------------------------
+local running = false
+local cancelRequested = false
+local touchConns = {}
+
+local function cleanupTouchConns()
+    for _,c in ipairs(touchConns) do
+        pcall(function() c:Disconnect() end)
+    end
+    touchConns = {}
+end
+
+local function startLoopForModel(pathStr)
+    if running then return end
+    running = true
+    cancelRequested = false
+
+    -- resolve normalized path for display
+    local displayPath = pathStr
+    local normalized = fullPathString(pathStr)
+    if normalized then displayPath = normalized end
+
+    -- wait for model to exist
+    statusLabel.Text = "Waiting For Sans To Spawn..."
+    local model = waitForInstance(pathStr, math.huge)
+    if not model or cancelRequested then
+        statusLabel.Text = "Cancelled or model missing."
+        running = false
+        return
+    end
+
+    -- wait for the player to ENTER the model (touch detection)
+    statusLabel.Text = displayPath .. " (spawned). Waiting for you to enter the model..."
+    local entered = false
+
+    -- attach Touched listeners to parts of model
+    cleanupTouchConns()
+    for _,part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local conn = part.Touched:Connect(function(hit)
+                if cancelRequested then return end
+                if not hit or not hit.Parent then return end
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and hit == hrp then
+                    entered = true
+                else
+                    -- sometimes hit is a child piece, check ancestor
+                    if hrp and hit:IsDescendantOf(player.Character) then
+                        entered = true
+                    end
+                end
+            end)
+            table.insert(touchConns, conn)
+        end
+    end
+
+    -- also in-case the player is already within model distance (check proximity)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = player.Character.HumanoidRootPart
+        local mp = model:FindFirstChild("PrimaryPart") or model:FindFirstChild("HumanoidRootPart")
+        if not mp then
+            for _,p in ipairs(model:GetChildren()) do
+                if p:IsA("BasePart") then mp = p; break end
+            end
+        end
+        if mp and (hrp.Position - mp.Position).Magnitude < 6 then
+            entered = true
+        end
+    end
+
+    -- wait until entered or cancelled or model removed
+    while not entered and not cancelRequested and model and model.Parent and model:IsDescendantOf(Workspace) do
+        statusLabel.Text = displayPath .. " (spawned). Waiting For You To Enter..."
+        task.wait(0.4)
+    end
+
+    if cancelRequested then
+        cleanupTouchConns()
+        statusLabel.Text = "Cancelled."
+        running = false
+        return
+    end
+    if not model or not model.Parent or not model:IsDescendantOf(Workspace) then
+        cleanupTouchConns()
+        statusLabel.Text = "Model disappeared."
+        running = false
+        return
+    end
+
+    -- model is targeted now
+    statusLabel.Text = "Target acquired: " .. (displayPath or tostring(model.Name))
+
+    -- loop while model and tool exist and not cancelled
+    while true do
+        if cancelRequested then break end
+        if not model or not model.Parent or not model:IsDescendantOf(Workspace) then
+            statusLabel.Text = "Target removed. Stopping."
+            break
+        end
+
+        -- find tool
+        statusLabel.Text = "Checking for tool..."
+        local tool = findTool()
+        while not tool and not cancelRequested do
+            statusLabel.Text = "Waiting For Tool..."
+            task.wait(0.15)
+            tool = findTool()
+            -- if tool disappeared globally, keep waiting
+        end
+        if cancelRequested then break end
+        if not tool then
+            statusLabel.Text = "Tool gone. Stopping."
+            break
+        end
+
+        -- equip tool
+        statusLabel.Text = "Equipping tool..."
+        equipTool(tool)
+        task.wait(0.06)
+
+        -- teleport to model and use tool
+        local targetPart = model:FindFirstChild("PrimaryPart") or model:FindFirstChild("HumanoidRootPart")
+        if not targetPart then
+            for _,p in ipairs(model:GetChildren()) do
+                if p:IsA("BasePart") then targetPart = p; break end
+            end
+        end
+        if targetPart then
+            statusLabel.Text = "Teleport -> Model and using tool..."
+            teleportCharacterTo(targetPart.Position)
+            task.wait(0.05)
+            useTool(tool)
+        else
+            statusLabel.Text = "Model has no parts to teleport to. Stopping."
+            break
+        end
+
+        -- teleport to TP A, wait 3
+        if cancelRequested then break end
+        statusLabel.Text = "Teleport -> A"
+        teleportCharacterTo(tpA)
+        task.wait(2.5)
+        if cancelRequested then break end
+
+        -- teleport to TP B, wait 3
+        statusLabel.Text = "Teleport -> B"
+        teleportCharacterTo(tpB)
+        task.wait(2.5)
+        if cancelRequested then break end
+
+        -- teleport back to model and use tool
+        if cancelRequested then break end
+        statusLabel.Text = "Return -> Model and use tool..."
+        if targetPart and targetPart.Parent then
+            teleportCharacterTo(targetPart.Position)
+            task.wait(0.05)
+            useTool(tool)
+        else
+            statusLabel.Text = "Target part missing, stopping."
+            break
+        end
+
+        -- check loop termination conditions
+        -- stop if model removed or tool removed
+        if not (model and model.Parent and model:IsDescendantOf(Workspace)) then
+            statusLabel.Text = "Target removed, ending loop."
+            break
+        end
+        if not (tool and (tool.Parent == player.Backpack or tool.Parent == player.Character)) then
+            statusLabel.Text = "Tool missing. Waiting again..."
+            task.wait(0.5)
+            -- continue, will wait for tool next iteration
+        end
+
+        -- short pause before next cycle
+        task.wait(0.2)
+    end
+
+    cleanupTouchConns()
+    running = false
+    if cancelRequested then
+        statusLabel.Text = "Cancelled."
+    else
+        statusLabel.Text = "Stopped."
+    end
+end
+
+-- -------------------------
+-- UI button behavior
+-- -------------------------
+enterBtn.MouseButton1Click:Connect(function()
+    if running then
+        statusLabel.Text = "Already running. Press Cancel to stop."
+        return
+    end
+    local text = inputBox.Text
+    if not text or text == "" then
+        statusLabel.Text = "Enter a path like: workspace.TempFightStuff.PacifistSans"
+        return
+    end
+    -- Validate quickly
+    statusLabel.Text = "Parsing path: " .. text
+    -- Start loop coroutine
+    task.spawn(function()
+        startLoopForModel(text)
+    end)
+end)
+
+cancelBtn.MouseButton1Click:Connect(function()
+    if not running then
+        statusLabel.Text = "Not running."
+        return
+    end
+    -- signal cancel
+    cancelRequested = true
+    -- wait briefly to ensure loops stop
+    task.spawn(function()
+        while running do
+            task.wait(0.1)
+        end
+        -- final cleanup
+        cleanupTouchConns()
+        cancelRequested = false
+        statusLabel.Text = "Cancelled."
+    end)
+end)
+
+-- update clientChar reference if spawned/died
+player.CharacterAdded:Connect(function(char) clientChar = char end)
+if player.Character then clientChar = player.Character end
+
+-- show initial instruction
+statusLabel.Text = "Enter path (ex: workspace.TempFightStuff.PacifistSans) then press Enter"
