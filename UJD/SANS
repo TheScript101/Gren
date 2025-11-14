@@ -1,5 +1,4 @@
 -- LocalScript: Paste into StarterPlayerScripts (or run in executor)
--- Creates two parts, a UI with Enter/Cancel, and loops teleports/use-tool on target model.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -17,6 +16,10 @@ local partB_size = Vector3.new(12, 1, 13)
 -- Teleport coordinates used in loop (your requested coordinates)
 local tpA = Vector3.new(-1086.0540771484375, 75.91587829589844, 1278.3065185546875)
 local tpB = Vector3.new(-999.38134765625, 76.41588592529297, 1278.3829345703125)
+
+-- Attack/behavior tuning
+local BEHIND_OFFSET = 3         -- how many studs behind the target we teleport to while attacking
+local STEP_WAIT = 1.6         -- how long to stay after each main teleport/action
 
 -- create parts (if not already)
 local function createPlatform(name, pos, size)
@@ -109,7 +112,6 @@ statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 -- Helpers
 -- -------------------------
 local function resolvePath(pathStr)
-    -- accepts period separated paths like: workspace.TempFightStuff.PacifistSans
     if not pathStr or pathStr == "" then return nil end
     local parts = {}
     for seg in string.gmatch(pathStr, "[^%.]+") do
@@ -117,7 +119,6 @@ local function resolvePath(pathStr)
     end
     if #parts == 0 then return nil end
 
-    -- start root
     local rootName = parts[1]
     local root = nil
     if rootName == "workspace" or rootName == "Workspace" then
@@ -127,14 +128,11 @@ local function resolvePath(pathStr)
     elseif rootName == "players" or rootName == "Players" then
         root = Players
     else
-        -- assume workspace.rootName...
         root = Workspace
     end
 
     local cur = root
     local startIndex = 1
-    if cur ~= root then return nil end
-    -- if first segment was root, start at 2
     if parts[1] == "workspace" or parts[1] == "Workspace" or parts[1] == "game" or parts[1] == "Game" or parts[1] == "players" or parts[1] == "Players" then
         startIndex = 2
     else
@@ -151,10 +149,8 @@ local function resolvePath(pathStr)
 end
 
 local function fullPathString(pathStr)
-    -- returns normalized full path string (workspace.Folder.Model)
     local inst = resolvePath(pathStr)
     if not inst then return nil end
-    -- build path from root (game->workspace)
     local parts = {}
     local cur = inst
     while cur and cur ~= game do
@@ -162,9 +158,8 @@ local function fullPathString(pathStr)
         cur = cur.Parent
     end
     table.insert(parts, 1, "game")
-    -- replace leading "game,workspace" with "workspace"
     if parts[2] == "workspace" or parts[2] == "Workspace" then
-        table.remove(parts, 1) -- remove "game"
+        table.remove(parts, 1)
     end
     return table.concat(parts, ".")
 end
@@ -181,7 +176,6 @@ local function waitForInstance(pathStr, timeout)
 end
 
 local function findTool()
-    -- look for RealKnife in Backpack or Character
     local backpack = player:FindFirstChild("Backpack")
     if backpack then
         local t = backpack:FindFirstChild("RealKnife")
@@ -204,14 +198,10 @@ end
 
 local function useTool(tool)
     if not tool then return end
-    -- try standard activation
     pcall(function()
-        if tool.Parent == player.Character and tool:FindFirstChildOfClass("Tool") == nil then end
         if tool.Activate then
-            -- tool:Activate may exist
             pcall(function() tool:Activate() end)
         else
-            -- fallback try fire click (some tools listen to RemoteEvents; no universal)
             if player.Character then
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
@@ -225,13 +215,10 @@ end
 local function teleportCharacterTo(pos)
     if not player.Character then return false end
     local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     if hrp then
         pcall(function() hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)) end)
-        -- reset velocity
         if hrp:FindFirstChild("BodyVelocity") then hrp.BodyVelocity:Destroy() end
     end
-    -- small wait to allow physics settle
     task.wait(0.05)
     return true
 end
@@ -255,12 +242,10 @@ local function startLoopForModel(pathStr)
     running = true
     cancelRequested = false
 
-    -- resolve normalized path for display
     local displayPath = pathStr
     local normalized = fullPathString(pathStr)
     if normalized then displayPath = normalized end
 
-    -- wait for model to exist
     statusLabel.Text = "Waiting For Sans To Spawn..."
     local model = waitForInstance(pathStr, math.huge)
     if not model or cancelRequested then
@@ -269,11 +254,9 @@ local function startLoopForModel(pathStr)
         return
     end
 
-    -- wait for the player to ENTER the model (touch detection)
     statusLabel.Text = displayPath .. " (spawned). Waiting for you to enter the model..."
     local entered = false
 
-    -- attach Touched listeners to parts of model
     cleanupTouchConns()
     for _,part in ipairs(model:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -284,7 +267,6 @@ local function startLoopForModel(pathStr)
                 if hrp and hit == hrp then
                     entered = true
                 else
-                    -- sometimes hit is a child piece, check ancestor
                     if hrp and hit:IsDescendantOf(player.Character) then
                         entered = true
                     end
@@ -294,7 +276,6 @@ local function startLoopForModel(pathStr)
         end
     end
 
-    -- also in-case the player is already within model distance (check proximity)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = player.Character.HumanoidRootPart
         local mp = model:FindFirstChild("PrimaryPart") or model:FindFirstChild("HumanoidRootPart")
@@ -308,7 +289,6 @@ local function startLoopForModel(pathStr)
         end
     end
 
-    -- wait until entered or cancelled or model removed
     while not entered and not cancelRequested and model and model.Parent and model:IsDescendantOf(Workspace) do
         statusLabel.Text = displayPath .. " (spawned). Waiting For You To Enter..."
         task.wait(0.4)
@@ -327,10 +307,9 @@ local function startLoopForModel(pathStr)
         return
     end
 
-    -- model is targeted now
     statusLabel.Text = "Target acquired: " .. (displayPath or tostring(model.Name))
 
-    -- loop while model and tool exist and not cancelled
+    -- MAIN CYCLE: behind -> A -> B -> back -> repeat (with waits)
     while true do
         if cancelRequested then break end
         if not model or not model.Parent or not model:IsDescendantOf(Workspace) then
@@ -345,7 +324,6 @@ local function startLoopForModel(pathStr)
             statusLabel.Text = "Waiting For Tool..."
             task.wait(0.15)
             tool = findTool()
-            -- if tool disappeared globally, keep waiting
         end
         if cancelRequested then break end
         if not tool then
@@ -358,62 +336,60 @@ local function startLoopForModel(pathStr)
         equipTool(tool)
         task.wait(0.06)
 
-        -- teleport to model and use tool
+        -- resolve a stable targetPart
         local targetPart = model:FindFirstChild("PrimaryPart") or model:FindFirstChild("HumanoidRootPart")
         if not targetPart then
             for _,p in ipairs(model:GetChildren()) do
                 if p:IsA("BasePart") then targetPart = p; break end
             end
         end
-        if targetPart then
-            statusLabel.Text = "Teleport -> Model and using tool..."
-            teleportCharacterTo(targetPart.Position)
-            task.wait(0.05)
-            useTool(tool)
-        else
-            statusLabel.Text = "Model has no parts to teleport to. Stopping."
+        if not targetPart then
+            statusLabel.Text = "Model has no parts. Stopping."
             break
         end
 
-        -- teleport to TP A, wait 3
+        -- 1) teleport behind once, attack, then WAIT STEP_WAIT secs
+        statusLabel.Text = "Teleport behind target -> attack"
+        local behindPos = targetPart.Position - (targetPart.CFrame.LookVector * BEHIND_OFFSET)
+        teleportCharacterTo(behindPos)
+        task.wait(0.05)
+        useTool(tool)
+        task.wait(STEP_WAIT)
         if cancelRequested then break end
+        if not (model and model.Parent and model:IsDescendantOf(Workspace)) then statusLabel.Text="Target removed."; break end
+
+        -- 2) teleport to TP A and wait
         statusLabel.Text = "Teleport -> A"
         teleportCharacterTo(tpA)
-        task.wait(2.5)
+        task.wait(STEP_WAIT)
         if cancelRequested then break end
 
-        -- teleport to TP B, wait 3
+        -- 3) teleport to TP B and wait
         statusLabel.Text = "Teleport -> B"
         teleportCharacterTo(tpB)
-        task.wait(2.5)
+        task.wait(STEP_WAIT)
         if cancelRequested then break end
 
-        -- teleport back to model and use tool
-        if cancelRequested then break end
+        -- 4) teleport back to model and attack, then wait STEP_WAIT before next cycle
         statusLabel.Text = "Return -> Model and use tool..."
+        -- refresh targetPart reference in case it changed
+        targetPart = model:FindFirstChild("PrimaryPart") or model:FindFirstChild("HumanoidRootPart")
+        if not targetPart then
+            for _,p in ipairs(model:GetChildren()) do
+                if p:IsA("BasePart") then targetPart = p; break end
+            end
+        end
         if targetPart and targetPart.Parent then
             teleportCharacterTo(targetPart.Position)
             task.wait(0.05)
             useTool(tool)
+            task.wait(STEP_WAIT)
         else
             statusLabel.Text = "Target part missing, stopping."
             break
         end
 
-        -- check loop termination conditions
-        -- stop if model removed or tool removed
-        if not (model and model.Parent and model:IsDescendantOf(Workspace)) then
-            statusLabel.Text = "Target removed, ending loop."
-            break
-        end
-        if not (tool and (tool.Parent == player.Backpack or tool.Parent == player.Character)) then
-            statusLabel.Text = "Tool missing. Waiting again..."
-            task.wait(0.5)
-            -- continue, will wait for tool next iteration
-        end
-
-        -- short pause before next cycle
-        task.wait(0.2)
+        -- loop will restart for another cycle (find tool again etc.)
     end
 
     cleanupTouchConns()
@@ -438,9 +414,7 @@ enterBtn.MouseButton1Click:Connect(function()
         statusLabel.Text = "Enter a path like: workspace.TempFightStuff.PacifistSans"
         return
     end
-    -- Validate quickly
     statusLabel.Text = "Parsing path: " .. text
-    -- Start loop coroutine
     task.spawn(function()
         startLoopForModel(text)
     end)
@@ -451,23 +425,18 @@ cancelBtn.MouseButton1Click:Connect(function()
         statusLabel.Text = "Not running."
         return
     end
-    -- signal cancel
     cancelRequested = true
-    -- wait briefly to ensure loops stop
     task.spawn(function()
         while running do
             task.wait(0.1)
         end
-        -- final cleanup
         cleanupTouchConns()
         cancelRequested = false
         statusLabel.Text = "Cancelled."
     end)
 end)
 
--- update clientChar reference if spawned/died
 player.CharacterAdded:Connect(function(char) clientChar = char end)
 if player.Character then clientChar = player.Character end
 
--- show initial instruction
 statusLabel.Text = "Enter path (ex: workspace.TempFightStuff.PacifistSans) then press Enter"
