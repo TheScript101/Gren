@@ -1,0 +1,369 @@
+-- Animation Inspector (Executor Version)
+-- Modified to improve model selection, highlight, and multi-KeyframeSequence UI
+
+--// SERVICES
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+local Char = Player.Character or Player.CharacterAdded:Wait()
+local Hum = Char:WaitForChild("Humanoid")
+
+--// GUI SETUP
+local ScreenGui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "AnimationInspector"
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 350, 0, 280) -- increased a bit for seq panel
+Main.Position = UDim2.new(0.5, -175, 0.5, -140)
+Main.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "Animation Inspector"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+--// BUTTONS
+local SelectModelBtn = Instance.new("TextButton", Main)
+SelectModelBtn.Size = UDim2.new(1, -20, 0, 25)
+SelectModelBtn.Position = UDim2.new(0, 10, 0, 35)
+SelectModelBtn.Text = "Select Model"
+SelectModelBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+SelectModelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local Play = Instance.new("TextButton", Main)
+Play.Size = UDim2.new(0.3, -10, 0, 25)
+Play.Position = UDim2.new(0, 10, 0, 70)
+Play.Text = "Play"
+Play.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+Play.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local Loop = Instance.new("TextButton", Main)
+Loop.Size = UDim2.new(0.3, -10, 0, 25)
+Loop.Position = UDim2.new(0.35, 0, 0, 70)
+Loop.Text = "Loop: OFF"
+Loop.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+Loop.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local Stop = Instance.new("TextButton", Main)
+Stop.Size = UDim2.new(0.3, -10, 0, 25)
+Stop.Position = UDim2.new(0.70, 0, 0, 70)
+Stop.Text = "Stop"
+Stop.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+Stop.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+--// TIMELINE
+local Line = Instance.new("Frame", Main)
+Line.Size = UDim2.new(1, -20, 0, 4)
+Line.Position = UDim2.new(0, 10, 0, 110)
+Line.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+
+local TimeLabel = Instance.new("TextLabel", Main)
+TimeLabel.Size = UDim2.new(1, -20, 0, 25)
+TimeLabel.Position = UDim2.new(0, 10, 0, 205) -- moved down to fit seq panel
+TimeLabel.BackgroundTransparency = 1
+TimeLabel.Text = "Seconds Apart: N/A"
+TimeLabel.Font = Enum.Font.Gotham
+TimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TimeLabel.TextSize = 16
+
+-- small label for "no KeyframeSequence found" messages
+local NoSeqLabel = Instance.new("TextLabel", Main)
+NoSeqLabel.Size = UDim2.new(1, -20, 0, 18)
+NoSeqLabel.Position = UDim2.new(0, 10, 0, 140)
+NoSeqLabel.BackgroundTransparency = 1
+NoSeqLabel.Text = ""
+NoSeqLabel.Font = Enum.Font.Gotham
+NoSeqLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+NoSeqLabel.TextSize = 14
+NoSeqLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+--// SEQUENCE PANEL (hidden until needed)
+local SeqPanel = Instance.new("Frame", Main)
+SeqPanel.Size = UDim2.new(1, -20, 0, 60)
+SeqPanel.Position = UDim2.new(0, 10, 0, 160)
+SeqPanel.BackgroundTransparency = 1
+SeqPanel.Visible = false
+
+local SeqScroll = Instance.new("ScrollingFrame", SeqPanel)
+SeqScroll.Size = UDim2.new(1, 0, 1, 0)
+SeqScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+SeqScroll.ScrollBarThickness = 6
+SeqScroll.BackgroundTransparency = 1
+SeqScroll.BorderSizePixel = 0
+
+local SeqGrid = Instance.new("UIGridLayout", SeqScroll)
+SeqGrid.CellSize = UDim2.new(0, 150, 0, 24)
+SeqGrid.CellPadding = UDim2.new(0, 6, 0, 6)
+SeqGrid.FillDirection = Enum.FillDirection.Horizontal
+
+--// VARIABLES
+local selectingModel = false
+local chosenModel = nil
+local chosenSeq = nil
+local keyframes = {}
+local circles = {}
+local selectedFrames = {}  -- stores up to 2 frames
+local loopEnabled = false
+local currentAnimTrack = nil
+
+local currentHighlight = nil
+
+--// HELPER: CREATE CIRCLE (clickable)
+local function createCircle(xPos, index)
+    local c = Instance.new("TextButton")
+    c.Parent = Main
+    c.Size = UDim2.new(0, 12, 0, 12)
+    c.Position = UDim2.new(0, xPos, 0, 104)
+    c.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    c.BorderSizePixel = 0
+    c.Name = "Circle_"..index
+    c.ZIndex = 10
+    c.Text = ""
+    c.AutoButtonColor = false
+    return c
+end
+
+--// UPDATE FRAME SELECTION COLORS
+local function refreshCircleColors()
+    for i, circle in ipairs(circles) do
+        if selectedFrames[1] == i or selectedFrames[2] == i then
+            circle.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        else
+            circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        end
+    end
+end
+
+--// UPDATE SECONDS APART
+local function updateSecondsApart()
+    if #selectedFrames == 2 then
+        local a = keyframes[selectedFrames[1]].Time
+        local b = keyframes[selectedFrames[2]].Time
+        local diff = math.abs(a - b)
+        TimeLabel.Text = tostring(diff).." seconds apart"
+    else
+        TimeLabel.Text = "Seconds Apart: N/A"
+    end
+end
+
+--// Clear old circles
+local function clearCircles()
+    for i, c in ipairs(circles) do
+        if c and c.Parent then c:Destroy() end
+    end
+    circles = {}
+end
+
+--// LOAD MODEL'S KEYFRAMESEQUENCE (accepts optional seq param)
+local function loadModel(model, seq)
+    if not model then return end
+    local seqToUse = seq
+    if not seqToUse then
+        seqToUse = model:FindFirstChildWhichIsA("KeyframeSequence", true)
+        if not seqToUse then return end
+    end
+
+    chosenModel = model
+    chosenSeq = seqToUse
+    keyframes = {}
+    selectedFrames = {}
+
+    -- destroy old circles
+    clearCircles()
+
+    -- build keyframes list from the KeyframeSequence
+    for _, kf in ipairs(seqToUse:GetChildren()) do
+        if kf:IsA("Keyframe") or kf:IsA("Keyframe") then
+            table.insert(keyframes, {Name = kf.Name, Time = kf.Time})
+        else
+            -- some sequence children might still be Keyframe objects
+            if kf.Time then
+                table.insert(keyframes, {Name = kf.Name, Time = kf.Time or 0})
+            end
+        end
+    end
+
+    table.sort(keyframes, function(a,b) return a.Time < b.Time end)
+
+    for i, data in ipairs(keyframes) do
+        local x = 10 + ((i-1) * 25)
+        circles[i] = createCircle(x, i)
+
+        circles[i].MouseButton1Click:Connect(function()
+            -- deselect if already selected
+            if selectedFrames[1] == i then
+                selectedFrames[1] = nil
+                refreshCircleColors()
+                updateSecondsApart()
+                return
+            elseif selectedFrames[2] == i then
+                selectedFrames[2] = nil
+                refreshCircleColors()
+                updateSecondsApart()
+                return
+            end
+
+            -- selecting new
+            if #selectedFrames >= 2 then
+                selectedFrames[1] = selectedFrames[2]
+                selectedFrames[2] = i
+            else
+                table.insert(selectedFrames, i)
+            end
+
+            refreshCircleColors()
+            updateSecondsApart()
+        end)
+    end
+
+    -- hide seq panel and any no-seq text
+    SeqPanel.Visible = false
+    NoSeqLabel.Text = ""
+end
+
+--// Create or update highlight around a model
+local function highlightModel(model)
+    -- remove old highlight
+    if currentHighlight then
+        pcall(function() currentHighlight:Destroy() end)
+        currentHighlight = nil
+    end
+
+    if not model then return end
+
+    -- use Highlight (works for whole model)
+    local hl = Instance.new("Highlight")
+    hl.Adornee = model
+    hl.Parent = ScreenGui
+    hl.FillTransparency = 1 -- don't fill, just outline
+    hl.OutlineColor = Color3.fromRGB(0, 150, 255)
+    hl.OutlineTransparency = 0
+    currentHighlight = hl
+end
+
+--// MODEL SELECTION MODE
+SelectModelBtn.MouseButton1Click:Connect(function()
+    selectingModel = not selectingModel
+    SelectModelBtn.Text = selectingModel and "Select Model: ON" or "Select Model"
+    SelectModelBtn.BackgroundColor3 = selectingModel and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(90, 90, 90)
+end)
+
+-- Click detector for selecting models in world
+UIS.InputBegan:Connect(function(input)
+    if not selectingModel then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+
+    local camera = workspace.CurrentCamera
+local pos = input.Position -- tap/click position on screen
+
+local unitRay = camera:ScreenPointToRay(pos.X, pos.Y)
+local raycastParams = RaycastParams.new()
+raycastParams.FilterDescendantsInstances = {Char} -- ignore your own character
+raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+local rayResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 1000, raycastParams)
+local target = rayResult and rayResult.Instance
+
+    if not target then return end
+
+    local model = target:FindFirstAncestorOfClass("Model")
+    if not model then
+        -- maybe the target itself is a model (rare) or nothing
+        NoSeqLabel.Text = "No model found!"
+        delay(2, function() NoSeqLabel.Text = "" end)
+        return
+    end
+
+    -- search the whole hierarchy of that model for KeyframeSequence
+    local seqs = {}
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("KeyframeSequence") then
+            table.insert(seqs, desc)
+        end
+    end
+
+    if #seqs == 0 then
+        -- show subtext for a few seconds
+        NoSeqLabel.Text = "No KeyframeSequence found!"
+        delay(2.5, function() NoSeqLabel.Text = "" end)
+        return
+    elseif #seqs == 1 then
+        -- single seq, load immediately and highlight
+        loadModel(model, seqs[1])
+        highlightModel(model)
+    else
+        -- multiple sequences: show scrollable grid to let user choose
+        SeqPanel.Visible = true
+        -- clear previous children except the UIGridLayout
+        for _, child in ipairs(SeqScroll:GetChildren()) do
+            if not child:IsA("UIGridLayout") then child:Destroy() end
+        end
+
+        -- create a button for each sequence
+        for i, s in ipairs(seqs) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 150, 0, 24)
+            btn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            btn.Text = s.Name or ("Sequence "..i)
+            btn.Parent = SeqScroll
+            btn.AutoButtonColor = true
+
+            btn.MouseButton1Click:Connect(function()
+                -- when user picks one, load it and highlight the model
+                loadModel(model, s)
+                highlightModel(model)
+            end)
+        end
+
+        -- update canvas size so scrolling works
+        local gridCells = math.ceil(#seqs / 2) -- approximate rows
+        local cellHeight = SeqGrid.CellSize.Y.Offset + SeqGrid.CellPadding.Y.Offset
+        SeqScroll.CanvasSize = UDim2.new(0, 0, 0, (math.max(1, math.ceil(#seqs / math.floor((SeqPanel.AbsoluteSize.X / SeqGrid.CellSize.X.Offset)))) * cellHeight))
+    end
+
+    -- stop selecting mode automatically after selection attempt
+    selectingModel = false
+    SelectModelBtn.Text = "Select Model"
+    SelectModelBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+end)
+
+--// PLAY ANIMATION
+Play.MouseButton1Click:Connect(function()
+    if not chosenModel then return end
+    if currentAnimTrack then currentAnimTrack:Stop() end
+
+    local seq = chosenSeq or chosenModel:FindFirstChildWhichIsA("KeyframeSequence", true)
+    if not seq then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = seq.AnimationId or ""
+    currentAnimTrack = Hum:LoadAnimation(anim)
+    currentAnimTrack.Looped = loopEnabled
+    currentAnimTrack:Play()
+end)
+
+--// LOOP TOGGLE
+Loop.MouseButton1Click:Connect(function()
+    loopEnabled = not loopEnabled
+    Loop.Text = loopEnabled and "Loop: ON" or "Loop: OFF"
+
+    if currentAnimTrack then
+        currentAnimTrack.Looped = loopEnabled
+    end
+end)
+
+--// STOP
+Stop.MouseButton1Click:Connect(function()
+    if currentAnimTrack then
+        currentAnimTrack:Stop()
+    end
+end)
