@@ -133,7 +133,7 @@ SpawnButton.MouseButton1Click:Connect(function()
             -- Remove Humanoids and unwanted scripts first
             for _, desc in ipairs(model:GetDescendants()) do
                 if desc:IsA("Humanoid") or desc:IsA("Script") or desc:IsA("ModuleScript") then
-                    desc:Destroy()
+                    wait(0.01)
                 end
             end
 
