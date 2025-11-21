@@ -4,6 +4,25 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
+local function colorToRGBInts(color)
+    -- returns three integers 0..255
+    local r = math.floor(color.R * 255 + 0.5)
+    local g = math.floor(color.G * 255 + 0.5)
+    local b = math.floor(color.B * 255 + 0.5)
+    return r, g, b
+end
+
+local function colorToRGBString(color)
+    local r,g,b = colorToRGBInts(color)
+    return string.format("%d, %d, %d", r, g, b)
+end
+
+local function colorToHex(color)
+    local r,g,b = colorToRGBInts(color)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+
 -- Create GUI
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "PartInspectorGui"
@@ -168,7 +187,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 			-- Basic fields
 			posBox.Text = tostring(selectedPart.Position)
 			sizeBox.Text = tostring(selectedPart.Size)
-			colorBox.Text = tostring(selectedPart.Color)
+			colorBox.Text = colorToRGBString(selectedPart.Color) .. "  " .. colorToHex(selectedPart.Color)
 			nameBox.Text = selectedPart.Name
 			materialBox.Text = selectedPart.Material.Name
 			transparencyBox.Text = tostring(selectedPart.Transparency)
