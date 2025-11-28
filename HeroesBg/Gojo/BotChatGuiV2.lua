@@ -119,7 +119,8 @@ local function setupAnimation()
         -- StateChanged: only respond to actual Jumping (ignore Freefall)
         humanoid.StateChanged:Connect(function(oldState, newState)
             if newState == Enum.HumanoidStateType.Jumping then
-                cancelFloat(true)
+                    if isFloating
+                        cancelFloat(true)
             end
         end)
 
