@@ -1,0 +1,302 @@
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+
+-- Player & Character Setup
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local animator = humanoid:FindFirstChildOfClass("Animator")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Float Animation Setup
+local FLOAT_ANIM_ID = "rbxassetid://18526556487"
+local INTERRUPT_ANIMS = {
+    ["rbxassetid://13917336710"] = true,
+    ["rbxassetid://122773650110975"] = true,
+    ["rbxassetid://100087324592640"] = true,
+    ["rbxassetid://101843860692381"] = true,
+}
+
+local isFloating, bodyPos, currentFloatTrack = false, nil, nil
+local floatHeight = 20
+
+-- Helper: stop all playing animations (any animation playing via animator)
+local function stopAllAnimations()
+    animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
+    if animator then
+        for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
+            -- Stop each track safely
+            pcall(function() t:Stop() end)
+        end
+    end
+end
+
+local function cancelFloat(stopAnims)
+    if isFloating then
+        isFloating = false
+        rootPart.Anchored = false
+        if bodyPos then
+            pcall(function() bodyPos:Destroy() end)
+            bodyPos = nil
+        end
+        if currentFloatTrack then
+            pcall(function() currentFloatTrack:AdjustSpeed(1) end)
+            currentFloatTrack = nil
+        end
+        if stopAnims then
+            -- stop any animations playing if caller requested it
+            stopAllAnimations()
+        end
+    end
+end
+
+local function setupAnimation()
+    -- animation played listener
+    animator = humanoid:FindFirstChildOfClass("Animator")
+    if animator then
+        animator.AnimationPlayed:Connect(function(track)
+            local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
+            if not ok or not id then return end
+
+            if id == FLOAT_ANIM_ID then
+                if isFloating then return end
+                isFloating = true
+                currentFloatTrack = track
+
+                task.delay(0.8, function()
+                    if isFloating and track.IsPlaying then
+                        -- slow the animation a bit while rising
+                        pcall(function() track:AdjustSpeed(0.5) end)
+                        if bodyPos then pcall(function() bodyPos:Destroy() end) end
+                        bodyPos = Instance.new("BodyPosition", rootPart)
+                        bodyPos.Name = "FloatUpBP"
+                        bodyPos.MaxForce = Vector3.new(0, math.huge, 0)
+                        bodyPos.P = 10000
+                        bodyPos.D = 1000
+                        bodyPos.Position = rootPart.Position + Vector3.new(0, floatHeight, 0)
+
+                        task.delay(1, function()
+                            if isFloating then
+                                pcall(function() track:AdjustSpeed(1) end)
+                                rootPart.Anchored = true
+                            end
+                        end)
+                    end
+                end)
+            elseif INTERRUPT_ANIMS[id] then
+                -- interrupts should cancel float but not necessarily stop ALL animations
+                cancelFloat(false)
+            end
+        end)
+    end
+
+    -- move direction cancels float (existing)
+    if humanoid then
+        humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+            if isFloating and humanoid.MoveDirection.Magnitude > 0 then
+                cancelFloat(false)
+            end
+        end)
+        -- new: jumping cancels float AND stops any animation playing (user requested)
+        humanoid.Jumping:Connect(function(active)
+            if active then
+                cancelFloat(true) -- stop animations too
+            end
+        end)
+    end
+end
+
+setupAnimation()
+
+player.CharacterAdded:Connect(function()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    animator = humanoid:FindFirstChildOfClass("Animator")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    setupAnimation()
+end)
+
+-- GUI Setup (kept exactly as you had it; unchanged aside from the message content below)
+local gui = Instance.new("ScreenGui", game.CoreGui)
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 120, 0, 30)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.Text = "Toggle Chat"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 350, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -30, 0, 6)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+mainFrame.Visible = true
+
+local msgFrame = Instance.new("ScrollingFrame", mainFrame)
+msgFrame.Size = UDim2.new(1, -20, 1, -100)
+msgFrame.Position = UDim2.new(0, 10, 0, 40)
+msgFrame.BackgroundTransparency = 1
+msgFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+msgFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+msgFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", msgFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 5)
+
+-- Input UI
+local inputBox = Instance.new("TextBox", mainFrame)
+inputBox.Size = UDim2.new(1, -100, 0, 30)
+inputBox.Position = UDim2.new(0, 10, 1, -40)
+inputBox.PlaceholderText = "Enter command..."
+inputBox.Text = ""
+inputBox.ClearTextOnFocus = true
+inputBox.TextColor3 = Color3.new(1, 1, 1)
+inputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+inputBox.Font = Enum.Font.Gotham
+inputBox.TextSize = 16
+inputBox.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
+
+local enterBtn = Instance.new("TextButton", mainFrame)
+enterBtn.Size = UDim2.new(0, 70, 0, 30)
+enterBtn.Position = UDim2.new(1, -80, 1, -40)
+enterBtn.Text = "Enter"
+enterBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 70)
+enterBtn.TextColor3 = Color3.new(1, 1, 1)
+enterBtn.Font = Enum.Font.GothamBold
+enterBtn.TextSize = 16
+Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
+
+-- Message UI (kept same function, but we'll call it with new starter text below)
+local function addMessage(text, isUser)
+    local msgHolder = Instance.new("Frame")
+    msgHolder.Size = UDim2.new(1, 0, 0, 0)
+    msgHolder.BackgroundTransparency = 1
+    msgHolder.AutomaticSize = Enum.AutomaticSize.Y
+
+    local msgBubble = Instance.new("TextLabel", msgHolder)
+    msgBubble.BackgroundColor3 = isUser and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(80, 80, 120)
+    msgBubble.TextColor3 = Color3.new(1, 1, 1)
+    msgBubble.Text = text
+    msgBubble.Font = Enum.Font.Gotham
+    msgBubble.TextSize = 18
+    msgBubble.TextWrapped = true
+    msgBubble.TextXAlignment = Enum.TextXAlignment.Left
+    msgBubble.Position = UDim2.new(isUser and 0.3 or 0, 0, 0, 0)
+    msgBubble.Size = UDim2.new(0.7, -30, 0, 0)
+    msgBubble.AutomaticSize = Enum.AutomaticSize.Y
+    Instance.new("UICorner", msgBubble).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", msgBubble).Color = Color3.fromRGB(100, 100, 100)
+
+    if not isUser then
+        local copyBtn = Instance.new("TextButton", msgBubble)
+        copyBtn.Text = "🔗"
+        copyBtn.Size = UDim2.new(0, 24, 0, 24)
+        copyBtn.Position = UDim2.new(1, -26, 1, -26)
+        copyBtn.BackgroundTransparency = 1
+        copyBtn.TextColor3 = Color3.new(1, 1, 1)
+        copyBtn.Font = Enum.Font.Gotham
+        copyBtn.TextSize = 16
+        copyBtn.MouseButton1Click:Connect(function()
+            pcall(function() setclipboard(text) end)
+        end)
+    end
+
+    msgHolder.Parent = msgFrame
+end
+
+-- Handler for commands (updated per your requests)
+local function handleCommand(msg)
+    local low = msg:lower()
+    -- /e stop
+    if low == "/e stop" then
+        if isFloating then
+            cancelFloat(true) -- stop animations too
+            addMessage("Float and animation has been stopped", false)
+        else
+            addMessage("Your not in the float phase! There's nothing to stop.", false)
+        end
+        return
+    end
+
+    -- /e height <number>
+    local hmatch = low:match("^/e%s*height%s*(%d+)$")
+    if hmatch then
+        local h = tonumber(hmatch)
+        if h then
+            floatHeight = h
+            addMessage("Height Set To " .. tostring(h), false)
+        end
+        return
+    end
+
+    -- /e speech (Gojo speech with requested waits)
+    if low == "/e speech" then
+        addMessage("Sending speech!", false)
+        -- sequence with specified waits
+        task.spawn(function()
+            addMessage("Sorry, Amanai..", false)
+            task.wait(2)
+            addMessage("I'm not even angry over you right now..", false)
+            task.wait(1.5)
+            addMessage("I bear no grudge against anyone..", false)
+            task.wait(2)
+            addMessage("It's just that the world feels so, so wonderful right now...", false)
+            task.wait(1.5)
+            addMessage("Throughout Heaven and Earth,", false)
+            task.wait(1)
+            addMessage("I alone am the honored one..", false)
+        end)
+        return
+    end
+
+    addMessage("Unknown command!", false)
+end
+
+enterBtn.MouseButton1Click:Connect(function()
+    local msg = inputBox.Text
+    if msg ~= "" then
+        addMessage("You: " .. msg, true)
+        handleCommand(msg)
+        inputBox.Text = ""
+    end
+end)
+
+inputBox.FocusLost:Connect(function(enter)
+    if enter then enterBtn:MouseButton1Click() end
+end)
+
+-- Starter message replaced with the exact text you requested
+addMessage("Here's The List Of Commands.\n• /e stop - Makes the animation stop playing along with the floating.\n• /e height (number) - Makes The Height Change On The Honored One Emote. (Set At 20)\n• /e speech - I Send Gojo's Speech In The Chatbox That You Can Copy And Paste.", false)
+
+-- note: original script had an example; replaced above.
+
+-- Ensure the GUI stays scrolled to bottom when new messages arrive (small nicety)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    msgFrame.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
+end)
