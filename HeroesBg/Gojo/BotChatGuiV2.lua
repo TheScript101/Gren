@@ -116,12 +116,20 @@ local function setupAnimation()
             end
         end)
 
-        -- Keep Jumping (still useful)
+        -- StateChanged: only respond to actual Jumping (ignore Freefall)
+        humanoid.StateChanged:Connect(function(oldState, newState)
+            if newState == Enum.HumanoidStateType.Jumping then
+                cancelFloat(true)
+            end
+        end)
+
+        -- Keep Jumping (redundant but fast trigger) — also cancels on jump
         humanoid.Jumping:Connect(function(active)
             if active then
                 cancelFloat(true) -- stop animations too when jump detected
             end
         end)
+    end
 
 setupAnimation()
 
