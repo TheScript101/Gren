@@ -27,34 +27,51 @@ local function stopAllAnimations()
     animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
-            -- Stop each track safely
             pcall(function() t:Stop() end)
         end
     end
 end
 
+-- Improved cancelFloat: force-unanchor, destroy BodyPosition, stop/restore animation safely
 local function cancelFloat(stopAnims)
-    if isFloating then
-        isFloating = false
-        rootPart.Anchored = false
-        if bodyPos then
-            pcall(function() bodyPos:Destroy() end)
-            bodyPos = nil
+    -- always attempt to cancel regardless of isFloating (covers timing edge-cases)
+    isFloating = false
+
+    -- unanchor safely
+    pcall(function()
+        if rootPart then
+            rootPart.Anchored = false
         end
-        if currentFloatTrack then
-            pcall(function() currentFloatTrack:AdjustSpeed(1) end)
-            currentFloatTrack = nil
-        end
-        if stopAnims then
-            -- stop any animations playing if caller requested it
-            stopAllAnimations()
-        end
+    end)
+
+    -- destroy BodyPosition if present
+    if bodyPos then
+        pcall(function()
+            bodyPos:Destroy()
+        end)
+        bodyPos = nil
+    end
+
+    -- restore animation speed / clear current track reference and stop it
+    if currentFloatTrack then
+        pcall(function()
+            currentFloatTrack:AdjustSpeed(1)
+            currentFloatTrack:Stop()
+        end)
+        currentFloatTrack = nil
+    end
+
+    if stopAnims then
+        stopAllAnimations()
     end
 end
 
 local function setupAnimation()
-    -- animation played listener
-    animator = humanoid:FindFirstChildOfClass("Animator")
+    -- refresh references
+    animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
+
+    -- disconnecting previous connections is not strictly necessary here since we reconnect on CharacterAdded,
+    -- but we avoid double-binding AnimationPlayed by only connecting if animator exists
     if animator then
         animator.AnimationPlayed:Connect(function(track)
             local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
@@ -67,7 +84,6 @@ local function setupAnimation()
 
                 task.delay(0.8, function()
                     if isFloating and track.IsPlaying then
-                        -- slow the animation a bit while rising
                         pcall(function() track:AdjustSpeed(0.5) end)
                         if bodyPos then pcall(function() bodyPos:Destroy() end) end
                         bodyPos = Instance.new("BodyPosition", rootPart)
@@ -92,21 +108,20 @@ local function setupAnimation()
         end)
     end
 
-    -- move direction cancels float (existing)
+    -- MoveDirection cancels float (existing)
     if humanoid then
         humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
             if isFloating and humanoid.MoveDirection.Magnitude > 0 then
                 cancelFloat(false)
             end
         end)
-        -- new: jumping cancels float AND stops any animation playing (user requested)
+
+        -- Keep Jumping (still useful)
         humanoid.Jumping:Connect(function(active)
             if active then
-                cancelFloat(true) -- stop animations too
+                cancelFloat(true) -- stop animations too when jump detected
             end
         end)
-    end
-end
 
 setupAnimation()
 
@@ -115,10 +130,14 @@ player.CharacterAdded:Connect(function()
     humanoid = character:WaitForChild("Humanoid")
     animator = humanoid:FindFirstChildOfClass("Animator")
     rootPart = character:WaitForChild("HumanoidRootPart")
+    -- reset float vars to be safe
+    isFloating = false
+    bodyPos = nil
+    currentFloatTrack = nil
     setupAnimation()
 end)
 
--- GUI Setup (kept exactly as you had it; unchanged aside from the message content below)
+-- GUI Setup (kept exactly as you had it)
 local gui = Instance.new("ScreenGui", game.CoreGui)
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 120, 0, 30)
@@ -192,7 +211,7 @@ enterBtn.Font = Enum.Font.GothamBold
 enterBtn.TextSize = 16
 Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
 
--- Message UI (kept same function, but we'll call it with new starter text below)
+-- Message UI
 local function addMessage(text, isUser)
     local msgHolder = Instance.new("Frame")
     msgHolder.Size = UDim2.new(1, 0, 0, 0)
@@ -258,7 +277,6 @@ local function handleCommand(msg)
     -- /e speech (Gojo speech with requested waits)
     if low == "/e speech" then
         addMessage("Sending speech!", false)
-        -- sequence with specified waits
         task.spawn(function()
             addMessage("Sorry, Amanai..", false)
             task.wait(2)
@@ -294,9 +312,7 @@ end)
 -- Starter message replaced with the exact text you requested
 addMessage("Here's The List Of Commands.\n• /e stop - Makes the animation stop playing along with the floating.\n• /e height (number) - Makes The Height Change On The Honored One Emote. (Set At 20)\n• /e speech - I Send Gojo's Speech In The Chatbox That You Can Copy And Paste.", false)
 
--- note: original script had an example; replaced above.
-
--- Ensure the GUI stays scrolled to bottom when new messages arrive (small nicety)
+-- Keep GUI autoscroll behavior
 layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     msgFrame.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
 end)
