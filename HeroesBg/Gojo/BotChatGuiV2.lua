@@ -130,7 +130,7 @@ local function setupAnimation()
             end
         end)
     end
-
+end
 setupAnimation()
 
 player.CharacterAdded:Connect(function()
