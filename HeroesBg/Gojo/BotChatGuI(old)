@@ -1,0 +1,231 @@
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+
+-- Player & Character Setup
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local animator = humanoid:FindFirstChildOfClass("Animator")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Float Animation Setup
+local FLOAT_ANIM_ID = "rbxassetid://18526556487"
+local INTERRUPT_ANIMS = {
+    ["rbxassetid://13917336710"] = true,
+    ["rbxassetid://122773650110975"] = true,
+    ["rbxassetid://100087324592640"] = true,
+    ["rbxassetid://101843860692381"] = true,
+}
+
+local isFloating, bodyPos, currentFloatTrack = false, nil, nil
+local floatHeight = 20
+
+local function cancelFloat()
+    if isFloating then
+        isFloating = false
+        rootPart.Anchored = false
+        if bodyPos then bodyPos:Destroy() end
+        if currentFloatTrack then
+            currentFloatTrack:AdjustSpeed(1)
+            currentFloatTrack = nil
+        end
+    end
+end
+
+local function setupAnimation()
+    animator.AnimationPlayed:Connect(function(track)
+        local id = track.Animation.AnimationId
+        if id == FLOAT_ANIM_ID then
+            if isFloating then return end
+            isFloating = true
+            currentFloatTrack = track
+
+            task.delay(0.8, function()
+                if isFloating and track.IsPlaying then
+                    track:AdjustSpeed(0.5)
+                    if bodyPos then bodyPos:Destroy() end
+                    bodyPos = Instance.new("BodyPosition", rootPart)
+                    bodyPos.Name = "FloatUpBP"
+                    bodyPos.MaxForce = Vector3.new(0, math.huge, 0)
+                    bodyPos.P = 10000
+                    bodyPos.D = 1000
+                    bodyPos.Position = rootPart.Position + Vector3.new(0, floatHeight, 0)
+
+                    task.delay(1, function()
+                        if isFloating then
+                            track:AdjustSpeed(1)
+                            rootPart.Anchored = true
+                        end
+                    end)
+                end
+            end)
+        elseif INTERRUPT_ANIMS[id] then
+            cancelFloat()
+        end
+    end)
+
+    humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+        if isFloating and humanoid.MoveDirection.Magnitude > 0 then
+            cancelFloat()
+        end
+    end)
+end
+
+setupAnimation()
+
+player.CharacterAdded:Connect(function()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    animator = humanoid:FindFirstChildOfClass("Animator")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    setupAnimation()
+end)
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 120, 0, 30)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.Text = "Toggle Chat"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 350, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -30, 0, 6)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
+
+mainFrame.Visible = true
+
+local msgFrame = Instance.new("ScrollingFrame", mainFrame)
+msgFrame.Size = UDim2.new(1, -20, 1, -100)
+msgFrame.Position = UDim2.new(0, 10, 0, 40)
+msgFrame.BackgroundTransparency = 1
+msgFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+msgFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+msgFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", msgFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 5)
+
+-- Input UI
+local inputBox = Instance.new("TextBox", mainFrame)
+inputBox.Size = UDim2.new(1, -100, 0, 30)
+inputBox.Position = UDim2.new(0, 10, 1, -40)
+inputBox.PlaceholderText = "Enter command..."
+inputBox.Text = ""
+inputBox.ClearTextOnFocus = true
+inputBox.TextColor3 = Color3.new(1, 1, 1)
+inputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+inputBox.Font = Enum.Font.Gotham
+inputBox.TextSize = 16
+inputBox.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
+
+local enterBtn = Instance.new("TextButton", mainFrame)
+enterBtn.Size = UDim2.new(0, 70, 0, 30)
+enterBtn.Position = UDim2.new(1, -80, 1, -40)
+enterBtn.Text = "Enter"
+enterBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 70)
+enterBtn.TextColor3 = Color3.new(1, 1, 1)
+enterBtn.Font = Enum.Font.GothamBold
+enterBtn.TextSize = 16
+Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
+
+-- Message UI
+local function addMessage(text, isUser)
+    local msgHolder = Instance.new("Frame")
+    msgHolder.Size = UDim2.new(1, 0, 0, 0)
+    msgHolder.BackgroundTransparency = 1
+    msgHolder.AutomaticSize = Enum.AutomaticSize.Y
+
+    local msgBubble = Instance.new("TextLabel", msgHolder)
+    msgBubble.BackgroundColor3 = isUser and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(80, 80, 120)
+    msgBubble.TextColor3 = Color3.new(1, 1, 1)
+    msgBubble.Text = text
+    msgBubble.Font = Enum.Font.Gotham
+    msgBubble.TextSize = 18
+    msgBubble.TextWrapped = true
+    msgBubble.TextXAlignment = Enum.TextXAlignment.Left
+    msgBubble.Position = UDim2.new(isUser and 0.3 or 0, 0, 0, 0)
+    msgBubble.Size = UDim2.new(0.7, -30, 0, 0)
+    msgBubble.AutomaticSize = Enum.AutomaticSize.Y
+    Instance.new("UICorner", msgBubble).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", msgBubble).Color = Color3.fromRGB(100, 100, 100)
+
+    if not isUser then
+        local copyBtn = Instance.new("TextButton", msgBubble)
+        copyBtn.Text = "🔗"
+        copyBtn.Size = UDim2.new(0, 24, 0, 24)
+        copyBtn.Position = UDim2.new(1, -26, 1, -26)
+        copyBtn.BackgroundTransparency = 1
+        copyBtn.TextColor3 = Color3.new(1, 1, 1)
+        copyBtn.Font = Enum.Font.Gotham
+        copyBtn.TextSize = 16
+        copyBtn.MouseButton1Click:Connect(function()
+            setclipboard(text)
+        end)
+    end
+
+    msgHolder.Parent = msgFrame
+end
+
+local function handleCommand(msg)
+    if msg:lower():match("^/e%s*height%s*(%d+)$") then
+        local h = tonumber(msg:match("%d+"))
+        if h then
+            floatHeight = h
+            addMessage("Set studs height to " .. h .. "!", false)
+        end
+    elseif msg:lower() == "/e speech" then
+        addMessage("Sending speech!", false)
+        task.delay(1, function()
+            addMessage("The world feels so wonderful right now...", false)
+            task.delay(2.5, function()
+                addMessage("Throughout Heaven and Earth, I alone am the honored one...", false)
+            end)
+        end)
+    else
+        addMessage("Unknown command!", false)
+    end
+end
+
+enterBtn.MouseButton1Click:Connect(function()
+    local msg = inputBox.Text
+    if msg ~= "" then
+        addMessage("You: " .. msg, true)
+        handleCommand(msg)
+        inputBox.Text = ""
+    end
+end)
+
+inputBox.FocusLost:Connect(function(enter)
+    if enter then enterBtn:MouseButton1Click() end
+end)
+
+addMessage("Bot: Here are your commands!\n- /e height (number)\nExample: /e height 25\n- /e speech\nExample: /e speech", false)
