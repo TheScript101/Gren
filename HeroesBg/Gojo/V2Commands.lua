@@ -1,7 +1,13 @@
 -- Commands Frame (executor-friendly, square, centered, searchable, wrapped entries)
--- Paste into your executor (Synapse, Krnl, Delta, etc.)
+-- Features:
+--  * removes any old "CommandsFrame_GUI" before creating a new one
+--  * minimize button + minimized bar
+--  * both full GUI and minimized bar are draggable (mouse & touch)
+--  * entries auto-wrap and copy only the command part
+--  * includes /e speech_speed entry in the list
 
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
 -- safe get parent for executors
@@ -18,6 +24,12 @@ end
 
 local parent = getGuiParent()
 
+-- remove old GUI if present
+local old = parent:FindFirstChild("CommandsFrame_GUI")
+if old then
+    pcall(function() old:Destroy() end)
+end
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CommandsFrame_GUI"
 screenGui.ResetOnSpawn = false
@@ -32,10 +44,10 @@ local BG = Color3.fromRGB(30,30,30)          -- grayish-blackish
 local STROKE = Color3.fromRGB(255,255,255)   -- white outline
 local TEXT = Color3.fromRGB(240,240,240)
 
--- Main square frame (centered per your updated position)
+-- MAIN FRAME
 local main = Instance.new("Frame")
 main.Name = "CommandsMain"
-main.Size = UDim2.new(0, 380, 0, 350)              -- height set to 350 as requested
+main.Size = UDim2.new(0, 380, 0, 350)
 main.Position = UDim2.new(0.5, 0, 0.45, 0)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.BackgroundColor3 = BG
@@ -96,10 +108,10 @@ sep.Position = UDim2.new(0,14,0,78)
 sep.BackgroundColor3 = Color3.fromRGB(60,60,60)
 sep.BorderSizePixel = 0
 
--- Scrollable area for commands (height adjusted for main height)
+-- Scrollable area for commands
 local scroll = Instance.new("ScrollingFrame")
 scroll.Parent = main
-scroll.Size = UDim2.new(1, -28, 0, 220) -- fits inside the 350 height
+scroll.Size = UDim2.new(1, -28, 0, 220)
 scroll.Position = UDim2.new(0,14,0,90)
 scroll.CanvasSize = UDim2.new(0,0,0,0)
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -118,7 +130,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scroll.CanvasSize = UDim2.new(0, 0, 0, s.Y + 8)
 end)
 
--- bottom note (positioned near bottom)
+-- bottom note
 local note = Instance.new("TextLabel")
 note.Parent = main
 note.Size = UDim2.new(1, -28, 0, 20)
@@ -130,7 +142,7 @@ note.TextSize = 12
 note.TextColor3 = Color3.fromRGB(180,180,180)
 note.TextXAlignment = Enum.TextXAlignment.Left
 
--- Close (X) button - destroys GUI (top-right)
+-- Close button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Parent = main
 closeBtn.Size = UDim2.new(0, 34, 0, 28)
@@ -147,6 +159,102 @@ closeBtn.MouseButton1Click:Connect(function()
     pcall(function() screenGui:Destroy() end)
 end)
 
+-- Minimize button (left of close)
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Parent = main
+minimizeBtn.Size = UDim2.new(0, 34, 0, 28)
+minimizeBtn.Position = UDim2.new(1, -88, 0, 10)
+minimizeBtn.AnchorPoint = Vector2.new(0,0)
+minimizeBtn.Text = "—"
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 20
+minimizeBtn.TextColor3 = STROKE
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+minimizeBtn.BorderSizePixel = 0
+
+-- MINIMIZED BAR (starts hidden)
+local mini = Instance.new("Frame")
+mini.Name = "CommandsMini"
+mini.Size = UDim2.new(0, 180, 0, 32)
+mini.Position = UDim2.new(0.85, 0, 0.9, 0)
+mini.AnchorPoint = Vector2.new(0.5, 0.5)
+mini.BackgroundColor3 = BG
+mini.BorderSizePixel = 0
+mini.Visible = false
+mini.Parent = screenGui
+
+local miniStroke = Instance.new("UIStroke", mini)
+miniStroke.Color = STROKE
+miniStroke.Thickness = 2
+
+local miniLabel = Instance.new("TextLabel", mini)
+miniLabel.Size = UDim2.new(1, -8, 1, 0)
+miniLabel.Position = UDim2.new(0,4,0,0)
+miniLabel.BackgroundTransparency = 1
+miniLabel.Text = "Commands (minimized)"
+miniLabel.Font = Enum.Font.Gotham
+miniLabel.TextSize = 14
+miniLabel.TextColor3 = TEXT
+miniLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local miniOpenBtn = Instance.new("TextButton", mini)
+miniOpenBtn.Size = UDim2.new(0, 26, 0, 26)
+miniOpenBtn.Position = UDim2.new(1, -32, 0, 3)
+miniOpenBtn.Text = "▢"
+miniOpenBtn.Font = Enum.Font.GothamBold
+miniOpenBtn.TextSize = 14
+miniOpenBtn.TextColor3 = STROKE
+miniOpenBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+miniOpenBtn.BorderSizePixel = 0
+
+-- toggle minimize/restore
+minimizeBtn.MouseButton1Click:Connect(function()
+    main.Visible = false
+    mini.Visible = true
+end)
+miniOpenBtn.MouseButton1Click:Connect(function()
+    main.Visible = true
+    mini.Visible = false
+end)
+
+-- make a frame draggable (works for mouse + touch)
+local function makeDraggable(frame, handle)
+    handle = handle or frame
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    local inputConn, changeConn
+
+    local function onInputBegan(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = inp.Position
+            startPos = frame.Position
+
+            inputConn = UserInputService.InputChanged:Connect(function(changed)
+                if not dragging then return end
+                if changed.UserInputType ~= Enum.UserInputType.MouseMovement and changed.UserInputType ~= Enum.UserInputType.Touch then return end
+                local delta = changed.Position - dragStart
+                frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end)
+
+            changeConn = UserInputService.InputEnded:Connect(function(ended)
+                if ended == inp then
+                    dragging = false
+                    if inputConn then inputConn:Disconnect() inputConn = nil end
+                    if changeConn then changeConn:Disconnect() changeConn = nil end
+                end
+            end)
+        end
+    end
+
+    handle.InputBegan:Connect(onInputBegan)
+end
+
+-- make both main and mini draggable using title/label as handle
+makeDraggable(main, title)
+makeDraggable(mini, miniLabel)
+
 -- Helper: extract just the command part (before " - ")
 local function extractCommandOnly(fullText)
     if not fullText then return "" end
@@ -154,17 +262,15 @@ local function extractCommandOnly(fullText)
     if left and left:find("%S") then
         return (left:gsub("^%s*(.-)%s*$", "%1")) -- trim
     end
-    -- fallback: first token starting with '/'
     local slash = fullText:match("(/%S+)")
     if slash then return slash end
-    -- fallback to full text trimmed
     return (fullText:gsub("^%s*(.-)%s*$", "%1"))
 end
 
 -- store entries for searching
 local entries = {} -- list of {entry = GuiButton, full = fullText, cmd = commandOnly}
 
--- Function to create a command entry (now wraps and auto-sizes)
+-- Function to create a command entry (wraps and auto-sizes)
 local function addCommand(fullText)
     local entry = Instance.new("TextButton")
     entry.Name = "CommandEntry"
@@ -182,7 +288,6 @@ local function addCommand(fullText)
     entry.AutomaticSize = Enum.AutomaticSize.Y -- auto-adjust height to wrapped text
     entry.Parent = scroll
 
-    -- padding inside the button so text doesn't touch edges
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 10)
     pad.PaddingRight = UDim.new(0, 10)
@@ -190,13 +295,11 @@ local function addCommand(fullText)
     pad.PaddingBottom = UDim.new(0, 6)
     pad.Parent = entry
 
-    -- white outline around label
     local stroke = Instance.new("UIStroke")
     stroke.Parent = entry
     stroke.Color = STROKE
     stroke.Thickness = 0.5
 
-    -- simple hover effect
     entry.MouseEnter:Connect(function()
         pcall(function() entry.BackgroundColor3 = Color3.fromRGB(55,55,58) end)
     end)
@@ -204,14 +307,11 @@ local function addCommand(fullText)
         pcall(function() entry.BackgroundColor3 = Color3.fromRGB(45,45,47) end)
     end)
 
-    -- store parsed commandOnly
     local cmdOnly = extractCommandOnly(fullText)
     table.insert(entries, {entry = entry, full = fullText, cmd = cmdOnly})
 
-    -- click copies command only to clipboard
     entry.MouseButton1Click:Connect(function()
         pcall(function() setclipboard(cmdOnly) end)
-        -- small feedback: temporary text change
         local old = entry.Text
         entry.Text = "✔ Copied: "..cmdOnly
         task.delay(0.9, function()
@@ -224,13 +324,14 @@ local function addCommand(fullText)
     return entry
 end
 
--- Commands list (full explanatory lines)
+-- Commands list (includes speech_speed)
 local commandsList = {
     "/e commands - Explains The Commands.",
     "/e stop - Makes The Animation Stop Playing Along With The Floating.",
     "/e height (number) - Makes The Height Change On The Honored One Emote. (Set At 20 On Execute.)",
     "/e speech - I Send Gojo's Speech In The Chat Box That You Can Copy And Paste.",
-    "/e speech_mode (mode) - Changes The Mode Of Speech. Modes are chat And bot. (Set As Bot On Execute. )"
+    "/e speech_mode (mode) - Changes The Mode Of Speech. Modes are chat And bot. (Set As Bot On Execute.)",
+    "/e speech_speed (speed) - Changes when the speech lines are sent. Modes: slow and fast."
 }
 
 -- populate
@@ -254,7 +355,6 @@ local function updateFilter(query)
         end
         info.entry.Visible = match
     end
-    -- update scroll canvas from listLayout absolute size
     local s = listLayout.AbsoluteContentSize
     scroll.CanvasSize = UDim2.new(0, 0, 0, s.Y + 8)
 end
@@ -263,15 +363,10 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
     updateFilter(searchBox.Text)
 end)
 
--- pressing Enter in search focuses nothing (keeps text)
 searchBox.FocusLost:Connect(function(enter)
     if enter then
         updateFilter(searchBox.Text)
     end
-end)
-
--- ensure GUI centered on different resolutions / re-center if parent size changes
-screenGui:GetPropertyChangedSignal("AbsolutePosition"):Connect(function() -- no-op but keeps reactive; safe
 end)
 
 -- done
