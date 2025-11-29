@@ -24,66 +24,79 @@ local isFloating, bodyPos, currentFloatTrack = false, nil, nil
 local floatHeight = 20
 
 -- store previous jump UI states so we can restore them
+-- keys: jumpButtonInstance -> { ImageTransparency = num, Active = bool|nil, Selectable = bool|nil, AutoButtonColor = bool|nil }
 local storedJumpStates = {}
 
--- Collect likely jump UI elements from PlayerGui and CoreGui (heuristic)
-local function collectJumpCandidates()
-    local roots = {}
-    table.insert(roots, PlayerGui)
-    local ok, core = pcall(function() return game:GetService("CoreGui") end)
-    if ok and core then table.insert(roots, core) end
-
-    local found = {}
-    for _, root in ipairs(roots) do
-        if root then
-            for _, obj in ipairs(root:GetDescendants()) do
-                if obj and obj.Visible ~= nil then
-                    local lname = tostring(obj.Name):lower()
-                    -- heuristic matches (common naming patterns)
-                    if lname:find("jump") or lname:find("jumpbtn") or lname:find("jump_button") or lname:find("jumpbutton") or lname:find("mobilejump") or lname:find("jumptouch") then
-                        local ok2, size = pcall(function() return obj.AbsoluteSize end)
-                        if ok2 and size and (size.X > 6 and size.Y > 6) then
-                            table.insert(found, obj)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return found
+-- Direct getter for the specific JumpButton path you gave
+local function getJumpButton()
+    local ok, touchGui = pcall(function() return PlayerGui:FindFirstChild("TouchGui") end)
+    if not ok or not touchGui then return nil end
+    local ok2, touchFrame = pcall(function() return touchGui:FindFirstChild("TouchControlFrame") end)
+    if not ok2 or not touchFrame then return nil end
+    local ok3, jumpBtn = pcall(function() return touchFrame:FindFirstChild("JumpButton") end)
+    if ok3 and jumpBtn then return jumpBtn end
+    return nil
 end
 
+-- Hide the jump button by setting ImageTransparency = 1 and disabling interaction
 local function hideJumpButtons()
-    storedJumpStates = {}
-    local buttons = collectJumpCandidates()
-    for _, b in ipairs(buttons) do
-        pcall(function()
-            -- remember previous state
-            local prev = {}
-            if b:IsA("ScreenGui") then
-                if b.Enabled ~= nil then prev.Enabled = b.Enabled end
-            end
-            if b.Visible ~= nil then prev.Visible = b.Visible end
-            storedJumpStates[b] = prev
+    local jb = getJumpButton()
+    if not jb then return end
+    pcall(function()
+        -- store prior states (only if properties exist)
+        local prev = {}
+        local ok, val
 
-            -- hide/disable appropriately
-            if b:IsA("ScreenGui") then
-                if b.Enabled ~= nil then b.Enabled = false end
-            else
-                if b.Visible ~= nil then b.Visible = false end
-            end
-        end)
-    end
+        ok, val = pcall(function() return jb.ImageTransparency end)
+        if ok then prev.ImageTransparency = val end
+
+        ok, val = pcall(function() return jb.Active end)
+        if ok then prev.Active = val end
+
+        ok, val = pcall(function() return jb.Selectable end)
+        if ok then prev.Selectable = val end
+
+        ok, val = pcall(function() return jb.AutoButtonColor end)
+        if ok then prev.AutoButtonColor = val end
+
+        -- record saved state
+        storedJumpStates[jb] = prev
+
+        -- apply "hidden + non-interactable" state
+        pcall(function() if jb.ImageTransparency ~= nil then jb.ImageTransparency = 1 end end)
+        pcall(function() if jb.Active ~= nil then jb.Active = false end end)
+        pcall(function() if jb.Selectable ~= nil then jb.Selectable = false end end)
+        pcall(function() if jb.AutoButtonColor ~= nil then jb.AutoButtonColor = false end end)
+    end)
 end
 
+-- Restore the jump button to its previous interactive state
 local function showJumpButtons()
-    for b, state in pairs(storedJumpStates) do
-        if b and b.Parent then
+    for btn, state in pairs(storedJumpStates) do
+        if btn and btn.Parent then
             pcall(function()
-                if state.Enabled ~= nil and b:IsA("ScreenGui") then
-                    b.Enabled = state.Enabled
-                elseif state.Visible ~= nil then
-                    b.Visible = state.Visible
+                if state.ImageTransparency ~= nil and btn.ImageTransparency ~= nil then
+                    btn.ImageTransparency = state.ImageTransparency
+                elseif btn.ImageTransparency ~= nil then
+                    btn.ImageTransparency = 0
+                end
+
+                if state.Active ~= nil and btn.Active ~= nil then
+                    btn.Active = state.Active
+                elseif btn.Active ~= nil then
+                    btn.Active = true
+                end
+
+                if state.Selectable ~= nil and btn.Selectable ~= nil then
+                    btn.Selectable = state.Selectable
+                elseif btn.Selectable ~= nil then
+                    btn.Selectable = true
+                end
+
+                if state.AutoButtonColor ~= nil and btn.AutoButtonColor ~= nil then
+                    btn.AutoButtonColor = state.AutoButtonColor
+                elseif btn.AutoButtonColor ~= nil then
+                    btn.AutoButtonColor = true
                 end
             end)
         end
@@ -107,7 +120,7 @@ local function cancelFloat(stopAnims)
     -- mark not floating
     isFloating = false
 
-    -- restore mobile jump UI
+    -- restore mobile jump UI (first thing so player regains control quickly)
     pcall(showJumpButtons)
 
     -- unanchor safely
@@ -143,8 +156,7 @@ local function setupAnimation()
     -- refresh references
     animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
 
-    -- disconnecting previous connections is not strictly necessary here since we reconnect on CharacterAdded,
-    -- but we avoid double-binding AnimationPlayed by only connecting if animator exists
+    -- only connect if animator exists
     if animator then
         animator.AnimationPlayed:Connect(function(track)
             local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
@@ -155,7 +167,7 @@ local function setupAnimation()
                 isFloating = true
                 currentFloatTrack = track
 
-                -- hide mobile jump buttons as soon as float starts
+                -- hide the exact JumpButton path as soon as float starts
                 pcall(hideJumpButtons)
 
                 task.delay(0.8, function()
