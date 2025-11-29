@@ -397,7 +397,7 @@ inputBox.FocusLost:Connect(function(enter)
 end)
 
 -- Starter message replaced with the exact text you requested
-addMessage("Here's The List Of Commands.\n• /e stop - Makes the animation stop playing along with the floating.\n• /e height (number) - Makes The Height Change On The Honored One Emote. (Set At 20)\n• /e speech - I Send Gojo's Speech In The Chatbox That You Can Copy And Paste.", false)
+addMessage("Say /e commands For A List Of Commands.", false)
 
 -- Keep GUI autoscroll behavior
 layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
