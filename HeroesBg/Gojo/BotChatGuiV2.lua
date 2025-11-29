@@ -1,8 +1,13 @@
+-- Full updated script (paste into your executor)
+-- Adds: /play, better normalization (no slash, missing 'e', underscore fixes),
+-- fuzzy suggestion with "yes" confirmation, speech_speed, speech_mode, etc.
+
 -- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 local TextChatService = pcall(function() return game:GetService("TextChatService") end) and game:GetService("TextChatService") or nil
+local UserInputService = game:GetService("UserInputService")
 
 -- Player & Character Setup
 local player = Players.LocalPlayer
@@ -25,16 +30,18 @@ local isFloating, bodyPos, currentFloatTrack = false, nil, nil
 local floatHeight = 20
 
 -- store previous jump UI states so we can restore them
--- keys: jumpButtonInstance -> { ImageTransparency = num, Active = bool|nil, Selectable = bool|nil, AutoButtonColor = bool|nil }
 local storedJumpStates = {}
 
--- Speech mode: "Bot" (default) or "Chat"
-local speechMode = "Bot"
+-- Speech mode & speed
+local speechMode = "Bot"   -- "Bot" or "Chat"
+local speechSpeed = "Fast" -- "Fast" or "Slow"
 
--- Speech speed: "Fast" (default) or "Slow"
-local speechSpeed = "Fast"
+-- Pending confirmation state for fuzzy suggestions
+-- {cmd = "speech_mode", needsArg = true}
+local pendingConfirmation = nil
+local pendingOriginal = nil
 
--- Direct getter for the specific JumpButton path you gave
+-- Direct getter for the specific JumpButton path
 local function getJumpButton()
     local ok, touchGui = pcall(function() return PlayerGui:FindFirstChild("TouchGui") end)
     if not ok or not touchGui then return nil end
@@ -45,31 +52,22 @@ local function getJumpButton()
     return nil
 end
 
--- Hide the jump button by setting ImageTransparency = 1 and disabling interaction
+-- Hide jump button by adjusting ImageTransparency etc.
 local function hideJumpButtons()
     local jb = getJumpButton()
     if not jb then return end
     pcall(function()
-        -- store prior states (only if properties exist)
         local prev = {}
         local ok, val
-
         ok, val = pcall(function() return jb.ImageTransparency end)
         if ok then prev.ImageTransparency = val end
-
         ok, val = pcall(function() return jb.Active end)
         if ok then prev.Active = val end
-
         ok, val = pcall(function() return jb.Selectable end)
         if ok then prev.Selectable = val end
-
         ok, val = pcall(function() return jb.AutoButtonColor end)
         if ok then prev.AutoButtonColor = val end
-
-        -- record saved state
         storedJumpStates[jb] = prev
-
-        -- apply "hidden + non-interactable" state
         pcall(function() if jb.ImageTransparency ~= nil then jb.ImageTransparency = 1 end end)
         pcall(function() if jb.Active ~= nil then jb.Active = false end end)
         pcall(function() if jb.Selectable ~= nil then jb.Selectable = false end end)
@@ -77,7 +75,6 @@ local function hideJumpButtons()
     end)
 end
 
--- Restore the jump button to its previous interactive state
 local function showJumpButtons()
     for btn, state in pairs(storedJumpStates) do
         if btn and btn.Parent then
@@ -87,19 +84,16 @@ local function showJumpButtons()
                 elseif btn.ImageTransparency ~= nil then
                     btn.ImageTransparency = 0
                 end
-
                 if state.Active ~= nil and btn.Active ~= nil then
                     btn.Active = state.Active
                 elseif btn.Active ~= nil then
                     btn.Active = true
                 end
-
                 if state.Selectable ~= nil and btn.Selectable ~= nil then
                     btn.Selectable = state.Selectable
                 elseif btn.Selectable ~= nil then
                     btn.Selectable = true
                 end
-
                 if state.AutoButtonColor ~= nil and btn.AutoButtonColor ~= nil then
                     btn.AutoButtonColor = state.AutoButtonColor
                 elseif btn.AutoButtonColor ~= nil then
@@ -111,7 +105,7 @@ local function showJumpButtons()
     storedJumpStates = {}
 end
 
--- Helper: stop all playing animations (any animation playing via animator)
+-- Helper: stop all playing animations
 local function stopAllAnimations()
     animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
     if animator then
@@ -121,39 +115,20 @@ local function stopAllAnimations()
     end
 end
 
--- Improved cancelFloat: force-unanchor, destroy BodyPosition, stop/restore animation safely
--- Also restore jump buttons when float stops
+-- Improved cancelFloat: unanchor, remove BodyPosition, stop anims (optionally) and restore jump UI
 local function cancelFloat(stopAnims)
-    -- mark not floating
     isFloating = false
-
-    -- restore mobile jump UI (first thing so player regains control quickly)
     pcall(showJumpButtons)
-
-    -- unanchor safely
-    pcall(function()
-        if rootPart then
-            rootPart.Anchored = false
-        end
-    end)
-
-    -- destroy BodyPosition if present
+    pcall(function() if rootPart then rootPart.Anchored = false end end)
     if bodyPos then
-        pcall(function()
-            bodyPos:Destroy()
-        end)
+        pcall(function() bodyPos:Destroy() end)
         bodyPos = nil
     end
-
-    -- restore animation speed / clear current track reference and stop it
     if currentFloatTrack then
-        pcall(function()
-            currentFloatTrack:AdjustSpeed(1)
-            currentFloatTrack:Stop()
-        end)
+        pcall(function() currentFloatTrack:AdjustSpeed(1) end)
+        pcall(function() currentFloatTrack:Stop() end)
         currentFloatTrack = nil
     end
-
     if stopAnims then
         stopAllAnimations()
     end
@@ -175,8 +150,7 @@ local function sendChatMessage(message)
     return false, err
 end
 
--- Helper to run speech sequence either in private bot chat (GUI) or send to general chat
--- Uses global speechSpeed ("Fast" or "Slow")
+-- Speech sequences
 local function runSpeechSequence(asChat)
     local fastSequence = {
         {"Sorry, Amanai..", 2},
@@ -199,13 +173,13 @@ local function runSpeechSequence(asChat)
     local seq = (speechSpeed and tostring(speechSpeed):lower() == "slow") and slowSequence or fastSequence
 
     if asChat then
-        for i, item in ipairs(seq) do
+        for _, item in ipairs(seq) do
             local line, waitTime = item[1], item[2]
             pcall(function() sendChatMessage(line) end)
             if waitTime and waitTime > 0 then task.wait(waitTime) end
         end
     else
-        for i, item in ipairs(seq) do
+        for _, item in ipairs(seq) do
             local line, waitTime = item[1], item[2]
             addMessage(line, false)
             if waitTime and waitTime > 0 then task.wait(waitTime) end
@@ -213,10 +187,7 @@ local function runSpeechSequence(asChat)
     end
 end
 
--- setupAnimation function (declared later; needs addMessage defined to use runSpeechSequence)
-local function setupAnimation() end
-
--- GUI Setup (kept exactly as you had it)
+-- GUI Setup (kept same as yours)
 local gui = Instance.new("ScreenGui", game.CoreGui)
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 120, 0, 30)
@@ -290,7 +261,7 @@ enterBtn.Font = Enum.Font.GothamBold
 enterBtn.TextSize = 16
 Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
 
--- Message UI function (added earlier reference used by runSpeechSequence)
+-- Message UI function
 function addMessage(text, isUser)
     local msgHolder = Instance.new("Frame")
     msgHolder.Size = UDim2.new(1, 0, 0, 0)
@@ -328,181 +299,166 @@ function addMessage(text, isUser)
     msgHolder.Parent = msgFrame
 end
 
--- Handler for commands (updated with /e commands and /e speech_mode and /e speech_speed)
-local function getStarterMessage()
-    return "Say /e commands For A List Of Commands.", false
+-- COMMAND HELPERS & FUZZY MATCHING --
+
+-- known commands (keys are canonical names)
+local knownCommands = {
+    commands = {needsArg = false},
+    stop = {needsArg = false},
+    height = {needsArg = true},
+    speech = {needsArg = false},
+    speech_mode = {needsArg = true},
+    speech_speed = {needsArg = true},
+    play = {needsArg = false}
+}
+
+-- simple Levenshtein distance
+local function levenshtein(a, b)
+    a = tostring(a or ""):lower()
+    b = tostring(b or ""):lower()
+    local la, lb = #a, #b
+    if la == 0 then return lb end
+    if lb == 0 then return la end
+    local matrix = {}
+    for i = 0, la do
+        matrix[i] = {}
+        matrix[i][0] = i
+    end
+    for j = 0, lb do matrix[0][j] = j end
+    for i = 1, la do
+        for j = 1, lb do
+            local cost = (a:sub(i,i) == b:sub(j,j)) and 0 or 1
+            matrix[i][j] = math.min(
+                matrix[i-1][j] + 1,
+                matrix[i][j-1] + 1,
+                matrix[i-1][j-1] + cost
+            )
+        end
+    end
+    return matrix[la][lb]
 end
 
+-- attempt to canonicalize tokens like "speech mode" or "speechmode" -> "speech_mode"
+local function canonicalizeToken(tok)
+    if not tok then return tok end
+    local s = tok:lower()
+    s = s:gsub("%s+", "") -- remove spaces for comparison
+    if s == "speechmode" or s == "speechmode" then return "speech_mode" end
+    if s == "speechspeed" or s == "speechspeed" then return "speech_speed" end
+    return tok:gsub("%s+", "_")
+end
 
-
-
-
--- Normalize user input so "/commands" -> "/e commands", "/height 25" -> "/e height 25"
+-- normalize user input so many variants map to "/e <command> <args>"
 local function normalizeCommand(raw)
     if not raw then return "" end
     local msg = tostring(raw)
-    -- trim both ends
     msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "" then return "" end
 
-    -- if it doesn't start with slash, leave it untouched (your handler expects /e ...)
-    if msg:sub(1,1) ~= "/" then
-        return msg
-    end
-
-    -- get body after '/'
-    local body = msg:sub(2)
-    body = body:gsub("^%s+", "") -- remove leading spaces
-
-    if body == "" then
-        -- user only typed "/" -> treat as-is
-        return msg
-    end
-
-    local first = body:sub(1,1):lower()
-
-    if first == "e" then
-        -- already has e: make sure there's a space after e
-        if body:match("^e%s") then
-            return "/" .. body -- already "/e something"
-        else
-            -- handle "/ecommands" -> "/e commands"
-            return "/e " .. body:sub(2):gsub("^%s+", "")
-        end
+    -- If input does not start with slash, allow "height 25" or "speech mode slow" etc.
+    local startsWithSlash = (msg:sub(1,1) == "/")
+    local body
+    if startsWithSlash then
+        body = msg:sub(2)
     else
-        -- no 'e' present: insert it -> "/commands" -> "/e commands"
-        return "/e " .. body
+        body = msg
+    end
+    body = body:gsub("^%s+", "")
+
+    -- split first token and rest
+    local firstToken, rest = body:match("^(%S+)%s*(.*)$")
+    if not firstToken then return msg end
+    firstToken = firstToken:lower()
+
+    -- if firstToken is 'e' then the rest is the real command
+    if firstToken == "e" then
+        -- make sure there is a space after e; rest might be "commands" or "commands something"
+        rest = rest or ""
+        rest = rest:gsub("^%s+", "")
+        -- handle the case "/ecommands" (no space) where body is like "ecommands"
+        if rest == "" and body:len() > 1 then
+            -- body might be "ecommands" -> take from 2nd char onward
+            local possible = body:sub(2)
+            possible = possible:gsub("^%s+", "")
+            if possible ~= "" then
+                -- reconstruct
+                rest = possible
+            end
+        end
+        -- if rest starts with combined words like "speechmode" or "speech mode", canonicalize
+        -- split command token and arguments
+        local cmdTok, args = rest:match("^(%S+)%s*(.*)$")
+        if not cmdTok then cmdTok = rest; args = "" end
+        cmdTok = canonicalizeToken(cmdTok)
+        if args and args ~= "" then
+            return "/e " .. cmdTok .. " " .. args
+        else
+            return "/e " .. cmdTok
+        end
+    end
+
+    -- firstToken is not 'e' -> treat as direct command (user forgot slash or forgot e)
+    -- canonicalize multi-word token (e.g., "speech mode", "speechmode")
+    -- check if the body begins with any of the multiword commands
+    local loweredBody = body:lower()
+
+    -- attempt to find if the body already begins with a known command (with optional underscores/spaces)
+    for cmdName, _ in pairs(knownCommands) do
+        -- try variants: exact, spaces instead of underscore, no underscore
+        local unders = cmdName
+        local spaced = cmdName:gsub("_", " ")
+        local nospace = cmdName:gsub("_", "")
+        if loweredBody:sub(1, #unders) == unders
+           or loweredBody:sub(1, #spaced) == spaced
+           or loweredBody:sub(1, #nospace) == nospace
+        then
+            -- found a starting command
+            local after = body:sub(1 + math.max(#unders, #spaced, #nospace))
+            after = after:gsub("^%s+", "")
+            return "/e " .. cmdName .. (after ~= "" and (" " .. after) or "")
+        end
+    end
+
+    -- fallback: just insert /e before body and then try to canonicalize first token
+    local cmdTok, args = body:match("^(%S+)%s*(.*)$")
+    if not cmdTok then cmdTok = body; args = "" end
+    cmdTok = canonicalizeToken(cmdTok)
+    if args and args ~= "" then
+        return "/e " .. cmdTok .. " " .. args
+    else
+        return "/e " .. cmdTok
     end
 end
 
-
-
-
-
-local function handleCommand(msg)
-    -- normalize possible missing 'e' variants before processing
-    local normalized = normalizeCommand(msg)
-    local low = (normalized or ""):lower()
-
-
-    -- /e commands -> load remote commands script
-    if low == "/e commands" then
-        pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
-        end)
-        addMessage("Command Gui Loaded.", false)
-        return
-    end
-
-    -- /e stop
-    if low == "/e stop" then
-        if isFloating then
-            cancelFloat(true) -- stop animations too
-            addMessage("Float and animation has been stopped", false)
-        else
-            addMessage("Your not in the float phase! There's nothing to stop.", false)
+-- find best known command match for a token (returns name, distance)
+local function findBestMatch(token)
+    token = tostring(token or ""):lower()
+    local best, bestDist = nil, math.huge
+    for name, _ in pairs(knownCommands) do
+        local d = levenshtein(token, name)
+        if d < bestDist then
+            bestDist = d
+            best = name
         end
-        return
     end
-
-    -- /e height <number>
-    local hmatch = low:match("^/e%s*height%s*(%d+)$")
-    if hmatch then
-        local h = tonumber(hmatch)
-        if h then
-            floatHeight = h
-            addMessage("Height Set To " .. tostring(h), false)
-        end
-        return
-    end
-
-    -- /e speech_mode <mode>
-    local smatch = low:match("^/e%s*speech_mode%s*(%w+)$")
-    if smatch then
-        local mode = smatch:lower()
-        if mode == "chat" or mode == "bot" then
-            -- normalize display
-            speechMode = (mode == "chat") and "Chat" or "Bot"
-            addMessage("Speech mode set to " .. speechMode, false)
-        else
-            addMessage("Invalid speech mode. Use 'chat' or 'bot'.", false)
-        end
-        return
-    end
-
-    -- /e speech_speed <speed> (slow or fast)
-    local spmatch = low:match("^/e%s*speech_speed%s*(%w+)$")
-    if spmatch then
-        local s = spmatch:lower()
-        if s == "slow" or s == "fast" then
-            speechSpeed = (s == "slow") and "Slow" or "Fast"
-            addMessage("Speech speed set to " .. speechSpeed, false)
-        else
-            addMessage("Invalid speech speed. Use 'slow' or 'fast'.", false)
-        end
-        return
-    end
-
-    -- /e speech (Gojo speech)
-    if low == "/e speech" then
-        addMessage("Sending speech!", false)
-        if speechMode:lower() == "chat" then
-            -- send to chat
-            task.spawn(function()
-                runSpeechSequence(true)
-            end)
-        else
-            -- bot/private GUI
-            task.spawn(function()
-                runSpeechSequence(false)
-            end)
-        end
-        return
-    end
-
-    addMessage("Unknown command!", false)
+    return best, bestDist
 end
 
-enterBtn.MouseButton1Click:Connect(function()
-    local msg = inputBox.Text
-    if msg ~= "" then
-        addMessage("You: " .. msg, true)
-        handleCommand(msg)
-        inputBox.Text = ""
-    end
-end)
-
-inputBox.FocusLost:Connect(function(enter)
-    if enter then enterBtn:MouseButton1Click() end
-end)
-
--- Starter message replaced with the exact text you requested (shows current mode & speed)
-addMessage(getStarterMessage(), false)
-
--- Keep GUI autoscroll behavior
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    msgFrame.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
-end)
-
--- Now that addMessage exists, define setupAnimation (uses addMessage/runSpeechSequence)
-setupAnimation = function()
-    -- refresh references
+-- setupAnimation will post the "Started Honored One Animation." message when float animation begins
+local function setupAnimation()
     animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
-
-    -- only connect if animator exists
     if animator then
         animator.AnimationPlayed:Connect(function(track)
             local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
             if not ok or not id then return end
-
             if id == FLOAT_ANIM_ID then
                 if isFloating then return end
                 isFloating = true
                 currentFloatTrack = track
-
-                -- hide the exact JumpButton path as soon as float starts
+                -- announce start
+                pcall(function() addMessage("Started Honored One Animation.", false) end)
+                -- hide jump
                 pcall(hideJumpButtons)
-
                 task.delay(0.8, function()
                     if isFloating and track.IsPlaying then
                         pcall(function() track:AdjustSpeed(0.5) end)
@@ -513,7 +469,6 @@ setupAnimation = function()
                         bodyPos.P = 10000
                         bodyPos.D = 1000
                         bodyPos.Position = rootPart.Position + Vector3.new(0, floatHeight, 0)
-
                         task.delay(1, function()
                             if isFloating then
                                 pcall(function() track:AdjustSpeed(1) end)
@@ -523,32 +478,203 @@ setupAnimation = function()
                     end
                 end)
             elseif INTERRUPT_ANIMS[id] then
-                -- interrupts should cancel float but not necessarily stop ALL animations
                 cancelFloat(false)
             end
         end)
     end
 
-    -- MoveDirection cancels float (existing)
     if humanoid then
         humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
             if isFloating and humanoid.MoveDirection.Magnitude > 0 then
                 cancelFloat(false)
             end
         end)
-
-        -- NOTE: Jump detection removed per request.
-        -- We do NOT listen to humanoid.Jumping or humanoid.StateChanged anymore.
     end
 end
 
--- Finalize: connect CharacterAdded to resetup on respawn
+-- HANDLE COMMANDS w/ normalization, fuzzy suggest + yes confirmation, and /play
+local function executeCommandByName(cmdName, arg)
+    cmdName = tostring(cmdName or ""):lower()
+    if cmdName == "commands" then
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
+        end)
+        addMessage("Command Gui Loaded.", false)
+        return
+    elseif cmdName == "stop" then
+        if isFloating then
+            cancelFloat(true)
+            addMessage("Float and animation has been stopped", false)
+        else
+            addMessage("Your not in the float phase! There's nothing to stop.", false)
+        end
+        return
+    elseif cmdName == "height" then
+        local h = tonumber(arg)
+        if h then
+            floatHeight = h
+            addMessage("Height Set To " .. tostring(h), false)
+        else
+            addMessage("Invalid height. Usage: /e height <number>", false)
+        end
+        return
+    elseif cmdName == "speech_mode" then
+        local mode = tostring(arg or ""):lower()
+        if mode == "chat" or mode == "bot" then
+            speechMode = (mode == "chat") and "Chat" or "Bot"
+            addMessage("Speech mode set to " .. speechMode, false)
+        else
+            addMessage("Invalid speech mode. Use 'chat' or 'bot'.", false)
+        end
+        return
+    elseif cmdName == "speech_speed" then
+        local s = tostring(arg or ""):lower()
+        if s == "slow" or s == "fast" then
+            speechSpeed = (s == "slow") and "Slow" or "Fast"
+            addMessage("Speech speed set to " .. speechSpeed, false)
+        else
+            addMessage("Invalid speech speed. Use 'slow' or 'fast'.", false)
+        end
+        return
+    elseif cmdName == "speech" then
+        addMessage("Sending speech!", false)
+        if speechMode:lower() == "chat" then
+            task.spawn(function() runSpeechSequence(true) end)
+        else
+            task.spawn(function() runSpeechSequence(false) end)
+        end
+        return
+    elseif cmdName == "play" then
+        -- play the float animation directly
+        pcall(function()
+            local anim = Instance.new("Animation")
+            anim.Name = "HonoredOnePlay"
+            anim.AnimationId = FLOAT_ANIM_ID
+            local track
+            if animator then
+                track = animator:LoadAnimation(anim)
+                track:Play()
+            else
+                -- fallback: use humanoid:LoadAnimation
+                local hAnim = Instance.new("Animation")
+                hAnim.AnimationId = FLOAT_ANIM_ID
+                local humTrack = humanoid:LoadAnimation(hAnim)
+                humTrack:Play()
+            end
+        end)
+        return
+    else
+        addMessage("Unknown built-in command: "..tostring(cmdName), false)
+        return
+    end
+end
+
+-- the main handler
+local function handleCommand(rawMsg)
+    -- First, handle pendingConfirmation (user replies "yes" to suggestion)
+    local inputRaw = tostring(rawMsg or "")
+    local inputTrim = inputRaw:gsub("^%s+", ""):gsub("%s+$", "")
+    local lowerTrim = inputTrim:lower()
+
+    if pendingConfirmation then
+        -- check if user typed "yes" or "yes <arg>"
+        if lowerTrim:match("^yes%s*$") then
+            -- confirm without argument
+            local cmd = pendingConfirmation.cmd
+            local needsArg = pendingConfirmation.needsArg
+            if needsArg then
+                addMessage("That command needs an argument. Reply with: yes <argument>", false)
+                return
+            else
+                executeCommandByName(cmd, nil)
+                pendingConfirmation = nil
+                pendingOriginal = nil
+                return
+            end
+        end
+        local yarg = lowerTrim:match("^yes%s+(.+)$")
+        if yarg then
+            local cmd = pendingConfirmation.cmd
+            executeCommandByName(cmd, yarg)
+            pendingConfirmation = nil
+            pendingOriginal = nil
+            return
+        end
+        -- If not a yes, continue to normal processing (they typed something else)
+    end
+
+    -- Normalize variants into "/e cmd args"
+    local normalized = normalizeCommand(inputTrim)
+    local low = (normalized or ""):lower()
+
+    -- Now parse command name and argument
+    local cmdTok, arg = low:match("^/e%s*(%S+)%s*(.*)$")
+    if not cmdTok then
+        addMessage("Unknown command format.", false)
+        return
+    end
+
+    -- canonicalize underscores/spaces
+    cmdTok = canonicalizeToken(cmdTok)
+
+    -- if exact known command -> execute
+    if knownCommands[cmdTok] then
+        -- direct execution
+        if knownCommands[cmdTok].needsArg then
+            if arg == "" or arg == nil then
+                addMessage("That command needs an argument. Provide one (e.g. '/e "..cmdTok.." <arg>').", false)
+                return
+            end
+            executeCommandByName(cmdTok, arg)
+            return
+        else
+            executeCommandByName(cmdTok, arg)
+            return
+        end
+    end
+
+    -- Not an exact match -> attempt fuzzy suggestion on cmdTok
+    local best, dist = findBestMatch(cmdTok)
+    -- threshold: allow suggestions up to distance 3 or <= 40% of length
+    local threshold = math.max(3, math.floor(#cmdTok * 0.4))
+    if best and dist <= threshold then
+        -- suggest
+        local needsArg = knownCommands[best] and knownCommands[best].needsArg or false
+        addMessage(('Unknown Command. Did You Mean "%s"? If So, Say "yes" and if needed, add the argument (e.g. `yes 20` or `yes slow`). Otherwise ignore.'):format(best), false)
+        pendingConfirmation = {cmd = best, needsArg = needsArg}
+        pendingOriginal = inputTrim
+        return
+    end
+
+    -- no suggestion found
+    addMessage("Unknown command!", false)
+end
+
+-- connect input submit
+enterBtn.MouseButton1Click:Connect(function()
+    local msg = inputBox.Text
+    if msg ~= "" then
+        addMessage("You: " .. msg, true)
+        handleCommand(msg)
+        inputBox.Text = ""
+    end
+end)
+inputBox.FocusLost:Connect(function(enter)
+    if enter then enterBtn:MouseButton1Click() end
+end)
+
+-- Starter message
+local function getStarterMessage()
+    return "Say /e commands For A List Of Commands."
+end
+addMessage(getStarterMessage(), false)
+
+-- Connect CharacterAdded for animation re-setup
 player.CharacterAdded:Connect(function()
     character = player.Character or player.CharacterAdded:Wait()
     humanoid = character:WaitForChild("Humanoid")
     animator = humanoid:FindFirstChildOfClass("Animator")
     rootPart = character:WaitForChild("HumanoidRootPart")
-    -- reset float vars to be safe
     isFloating = false
     bodyPos = nil
     currentFloatTrack = nil
