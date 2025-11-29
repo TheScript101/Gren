@@ -320,7 +320,7 @@ end
 
 -- Handler for commands (updated with /e commands and /e speech_mode)
 local function getStarterMessage()
-    return "Say /e commands For A List Of Commands.")
+    return "Say /e commands For A List Of Commands."
 end
 
 local function handleCommand(msg)
