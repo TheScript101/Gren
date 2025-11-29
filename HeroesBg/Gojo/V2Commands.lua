@@ -331,7 +331,8 @@ local commandsList = {
     "/e height (number) - Makes The Height Change On The Honored One Emote. (Set At 20 On Execute.)",
     "/e speech - I Send Gojo's Speech In The Chat Box That You Can Copy And Paste.",
     "/e speech_mode (mode) - Changes The Mode Of Speech. Modes are chat And bot. (Set As Bot On Execute.)",
-    "/e speech_speed (speed) - Changes when the speech lines are sent. Modes: slow and fast."
+    "/e speech_speed (speed) - Changes when the speech lines are sent. Modes: slow and fast.",
+    "/e play - Makes The Honored One Animation Start Playing."
 }
 
 -- populate
