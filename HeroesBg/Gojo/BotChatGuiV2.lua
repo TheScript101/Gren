@@ -1,6 +1,7 @@
 -- Full updated script (paste into your executor)
 -- Adds: /play, better normalization (no slash, missing 'e', underscore fixes),
 -- fuzzy suggestion with "yes" confirmation, speech_speed, speech_mode, etc.
+-- + Hollow Purple system (red/blue alts, automatic/manual, activate/release)
 
 -- Services
 local Players = game:GetService("Players")
@@ -8,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 local TextChatService = pcall(function() return game:GetService("TextChatService") end) and game:GetService("TextChatService") or nil
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- Player & Character Setup
 local player = Players.LocalPlayer
@@ -40,6 +42,15 @@ local speechSpeed = "Fast" -- "Fast" or "Slow"
 -- {cmd = "speech_mode", needsArg = true}
 local pendingConfirmation = nil
 local pendingOriginal = nil
+
+-- Hollow Purple state
+local redAltName = nil
+local blueAltName = nil
+local hollow_state = "none" -- "none", "ready", "activated", "combined"
+local hollow_auto_running = false
+local followHandles = {} -- to store follow coroutines per alt (so we can stop)
+local hollow_combined_pos = nil
+local hollow_combined_part = nil
 
 -- Direct getter for the specific JumpButton path
 local function getJumpButton()
@@ -148,6 +159,11 @@ local function sendChatMessage(message)
     end)
     if success then return true end
     return false, err
+end
+
+-- Convenience wrapper to add messages to your GUI and also attempt TextChatService (safe/polite)
+local function announce(msg)
+    pcall(function() addMessage(msg, false) end)
 end
 
 -- Speech sequences
@@ -309,7 +325,16 @@ local knownCommands = {
     speech = {needsArg = false},
     speech_mode = {needsArg = true},
     speech_speed = {needsArg = true},
-    play = {needsArg = false}
+    play = {needsArg = false},
+
+    -- Hollow Purple related
+    red = {needsArg = true},
+    blue = {needsArg = true},
+    hollow_purple = {needsArg = false},
+    automatic_hollow_purple = {needsArg = false},
+    activate = {needsArg = false},
+    release = {needsArg = false},
+    automatic = {needsArg = false} -- to support "/e automatic hollow purple"
 }
 
 -- simple Levenshtein distance
@@ -492,9 +517,416 @@ local function setupAnimation()
     end
 end
 
+-- UTIL: find player by name (case-insensitive search fallback)
+local function findPlayerByName(name)
+    if not name or name == "" then return nil end
+    local direct = Players:FindFirstChild(name)
+    if direct then return direct end
+    local lname = name:lower()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower() == lname then return p end
+        if p.DisplayName and p.DisplayName:lower() == lname then return p end
+    end
+    return nil
+end
+
+-- UTIL: get HumanoidRootPart for player's character safely
+local function getHRPForPlayer(p)
+    if not p or not p.Character then return nil end
+    return p.Character:FindFirstChild("HumanoidRootPart")
+end
+
+-- UTIL: safe tween of a part to target CFrame
+local function tweenPartTo(part, targetCFrame, duration, easingStyle, easingDirection)
+    if not part or not part:IsA("BasePart") then return false end
+    duration = duration or 0.5
+    easingStyle = easingStyle or Enum.EasingStyle.Quad
+    easingDirection = easingDirection or Enum.EasingDirection.Out
+    local ok, tween = pcall(function()
+        return TweenService:Create(part, TweenInfo.new(duration, easingStyle, easingDirection), {CFrame = targetCFrame})
+    end)
+    if not ok or not tween then
+        pcall(function() part.CFrame = targetCFrame end)
+        return false
+    end
+    local suc = pcall(function() tween:Play() end)
+    if not suc then
+        pcall(function() part.CFrame = targetCFrame end)
+        return false
+    end
+    return tween
+end
+
+-- Follow coroutine: keeps an alt at an offset relative to main for a duration (updates every frame)
+local function startFollowAlt(altPlayer, offsetVector)
+    if not altPlayer or not offsetVector then return nil end
+    local id = altPlayer.UserId .. "_" .. tostring(offsetVector)
+    if followHandles[id] then return id end
+    local running = true
+    followHandles[id] = {running = true}
+    spawn(function()
+        local startT = tick()
+        while followHandles[id] and followHandles[id].running do
+            local hrp = getHRPForPlayer(altPlayer)
+            if hrp and rootPart and rootPart.Parent then
+                local rootC = rootPart.CFrame
+                local targetPos = rootC.Position + (rootC.RightVector * offsetVector.X) + Vector3.new(0, offsetVector.Y, 0) + (rootC.LookVector * offsetVector.Z)
+                local lookAt = rootC.Position
+                local targetCFrame = CFrame.new(targetPos, lookAt)
+                pcall(function()
+                    hrp.CFrame = targetCFrame
+                    hrp.Anchored = true
+                end)
+            end
+            task.wait(0.03)
+        end
+        -- cleanup anchored hold if possible
+        local hrp2 = getHRPForPlayer(altPlayer)
+        if hrp2 then
+            pcall(function() hrp2.Anchored = false end)
+        end
+        followHandles[id] = nil
+    end)
+    return id
+end
+
+local function stopFollowAltById(id)
+    if not id then return end
+    if followHandles[id] then
+        followHandles[id].running = false
+        followHandles[id] = nil
+    end
+end
+
+local function stopAllFollows()
+    for id, _ in pairs(followHandles) do
+        stopFollowAltById(id)
+    end
+    followHandles = {}
+end
+
+-- Play animation on a player's humanoid (best-effort)
+local function playAnimationOnPlayer(p, animId, loop, stopAfter)
+    pcall(function()
+        if not p or not p.Character then return end
+        local hum = p.Character:FindFirstChild("Humanoid")
+        if not hum then return end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = animId
+        local track
+        local ok, err = pcall(function()
+            local a = hum:FindFirstChildOfClass("Animator")
+            if a then
+                track = a:LoadAnimation(anim)
+            else
+                track = hum:LoadAnimation(anim)
+            end
+        end)
+        if track then
+            track.Looped = (loop == true)
+            track:Play()
+            if stopAfter and stopAfter > 0 then
+                task.delay(stopAfter, function()
+                    pcall(function() track:Stop() end)
+                end)
+            end
+            return track
+        end
+    end)
+    return nil
+end
+
+-- HANDLE HOLLOW PURPLE SEQUENCES --
+
+-- Helper to verify both alt players exist
+local function getAlts()
+    local r = redAltName and findPlayerByName(redAltName) or nil
+    local b = blueAltName and findPlayerByName(blueAltName) or nil
+    return r, b
+end
+
+local function haveBothAlts()
+    local r, b = getAlts()
+    return (r ~= nil) and (b ~= nil)
+end
+
+-- Automatic full sequence
+local function runAutomaticHollowPurple()
+    if hollow_auto_running then
+        announce("Hollow Purple already running.")
+        return
+    end
+
+    local r, b = getAlts()
+    if not r or not b then
+        announce("No Red Or Blue! Can't create Hollow Purple.")
+        return
+    end
+
+    hollow_auto_running = true
+    hollow_state = "none"
+    announce("Creating Hollow Purple..")
+
+    -- play the fusion animation on main for 3 seconds
+    local fusionAnimId = "rbxassetid://48138189"
+    local releaseAnimId = "rbxassetid://193307200"
+    local fusionTrack = nil
+    pcall(function() fusionTrack = playAnimationOnPlayer(player, fusionAnimId, false, 4) end)
+
+    -- initial positioning: 5 studs behind main, then left 10 and right 10
+    if not rootPart then
+        rootPart = character:FindFirstChild("HumanoidRootPart")
+    end
+    local rootC = rootPart and rootPart.CFrame or CFrame.new(0,0,0)
+    local behindOffset = -rootC.LookVector * 5
+    local leftOffset = behindOffset + (-rootC.RightVector) * 10
+    local rightOffset = behindOffset + (rootC.RightVector) * 10
+
+    -- start follow anchors (so they rotate with you) using offsetVector as Vector3 (X=right, Y=up, Z=forward)
+    -- We'll pass Vector3(rightOffsetX, 0, -5) etc, but our follow uses right/look vectors; easiest is compute offsets in local coordinate form
+    local leftLocal = Vector3.new(-10, 0, 5) -- right:-10, forward:5 (behind positive Z in our follow logic)
+    local rightLocal = Vector3.new(10, 0, 5) -- right:10, forward:5
+
+    -- stop any previous follows
+    stopAllFollows()
+    local leftFollowId, rightFollowId
+    leftFollowId = startFollowAlt(r, leftLocal)
+    rightFollowId = startFollowAlt(b, rightLocal)
+
+    -- Wait 3 seconds anchored following
+    task.wait(3)
+
+    -- Slowly move towards center near each other (we'll tween their HRPs to near-center positions)
+    -- Center offsets (closer together)
+    local centerOffsetLeft = Vector3.new(-1.5, 0, 3) -- small left, a bit behind/in front depending on orientation
+    local centerOffsetRight = Vector3.new(1.5, 0, 3)
+
+    -- Stop follow so tweening can take over
+    stopFollowAltById(leftFollowId)
+    stopFollowAltById(rightFollowId)
+
+    -- Tween to center positions relative to root
+    local rhrp = getHRPForPlayer(r)
+    local bhrp = getHRPForPlayer(b)
+    if rhrp and bhrp and rootPart then
+        local rootC2 = rootPart.CFrame
+        local targetLeftPos = rootC2.Position + rootC2.RightVector * centerOffsetLeft.X + (rootC2.UpVector * centerOffsetLeft.Y) + rootC2.LookVector * centerOffsetLeft.Z
+        local targetRightPos = rootC2.Position + rootC2.RightVector * centerOffsetRight.X + (rootC2.UpVector * centerOffsetRight.Y) + rootC2.LookVector * centerOffsetRight.Z
+        local leftCF = CFrame.new(targetLeftPos, rootC2.Position)
+        local rightCF = CFrame.new(targetRightPos, rootC2.Position)
+        -- unanchor and tween
+        pcall(function() rhrp.Anchored = false end)
+        pcall(function() bhrp.Anchored = false end)
+        local tw1 = tweenPartTo(rhrp, leftCF, 1.5)
+        local tw2 = tweenPartTo(bhrp, rightCF, 1.5)
+        task.wait(1.6)
+    end
+
+    -- Combine: teleport both to 5 studs in front of you (combined position)
+    local combinedPos
+    if rootPart then
+        combinedPos = rootPart.CFrame.Position + rootPart.CFrame.LookVector * 5
+    else
+        combinedPos = Vector3.new(0,5,0)
+    end
+    hollow_combined_pos = combinedPos
+    local combinedCF = CFrame.new(combinedPos, combinedPos + (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1)))
+
+    -- Teleport both instantly to the combinedCF and anchor
+    if rhrp then
+        pcall(function() rhrp.CFrame = combinedCF; rhrp.Anchored = true end)
+    end
+    if bhrp then
+        pcall(function() bhrp.CFrame = combinedCF; bhrp.Anchored = true end)
+    end
+
+    hollow_state = "combined"
+
+    -- Wait 4 seconds before release
+    task.wait(4)
+
+    -- Play release animation on main
+    pcall(function() playAnimationOnPlayer(player, releaseAnimId, false, 2) end)
+
+    -- Release: move both forward fast (use large forward delta)
+    local forwardDelta = (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1)) * 300
+    local releaseTarget = combinedPos + forwardDelta
+    local fakePart = Instance.new("Part")
+    fakePart.Anchored = true
+    fakePart.CanCollide = false
+    fakePart.Transparency = 1
+    fakePart.CFrame = CFrame.new(releaseTarget)
+    -- Tween combined HRPs to forward quickly
+    if rhrp then
+        pcall(function() rhrp.Anchored = false end)
+        tweenPartTo(rhrp, CFrame.new(releaseTarget, releaseTarget + (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1))), 0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    end
+    if bhrp then
+        pcall(function() bhrp.Anchored = false end)
+        tweenPartTo(bhrp, CFrame.new(releaseTarget, releaseTarget + (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1))), 0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    end
+
+    task.wait(0.7)
+    -- cleanup
+    pcall(function() if fakePart and fakePart.Parent then fakePart:Destroy() end end)
+    hollow_state = "none"
+    hollow_auto_running = false
+    announce("Hollow Purple finished.")
+end
+
+-- Manual prepare (/e hollow_purple)
+local function prepareHollowPurpleManual()
+    if not haveBothAlts() then
+        announce("No Red Or Blue! Can't create Hollow Purple.")
+        return
+    end
+    announce("Creating Hollow Purple.. (Your Commands: /e activate - make alts combine, /e release - release after activate)")
+
+    stopAllFollows()
+    hollow_state = "ready"
+
+    -- Place them in initial anchored positions and start follow so they rotate with you for the waiting period
+    local r, b = getAlts()
+    if not rootPart then rootPart = character:FindFirstChild("HumanoidRootPart") end
+    local rootC = rootPart and rootPart.CFrame or CFrame.new(0,0,0)
+    local leftLocal = Vector3.new(-10, 0, 5)
+    local rightLocal = Vector3.new(10, 0, 5)
+    startFollowAlt(r, leftLocal)
+    startFollowAlt(b, rightLocal)
+
+    -- Play the fusion animation on main while waiting for activation (stop after 6s just in case)
+    pcall(function() playAnimationOnPlayer(player, "rbxassetid://48138189", false, 6) end)
+end
+
+-- Manual activate: move alts to each other (combine position 5 studs in front)
+local function activateHollowManual()
+    if hollow_state ~= "ready" then
+        if hollow_state == "none" then
+            announce("Use /e hollow_purple to be able to use these commands.")
+            return
+        elseif hollow_state == "activated" or hollow_state == "combined" then
+            announce("Already activated.")
+            return
+        else
+            announce("Not Ready. Use /e hollow_purple first.")
+            return
+        end
+    end
+
+    -- Stop follow anchors
+    stopAllFollows()
+
+    local r, b = getAlts()
+    if not r or not b then
+        announce("No Red Or Blue! Can't activate.")
+        hollow_state = "none"
+        return
+    end
+
+    -- compute combined position and tween both to that combined position (5 studs in front)
+    if not rootPart then rootPart = character:FindFirstChild("HumanoidRootPart") end
+    local combinedPos = rootPart.CFrame.Position + rootPart.CFrame.LookVector * 5
+    hollow_combined_pos = combinedPos
+    local combinedCF = CFrame.new(combinedPos, combinedPos + rootPart.CFrame.LookVector)
+
+    -- Tween both towards each other then teleport to combined and anchor
+    local rhrp = getHRPForPlayer(r)
+    local bhrp = getHRPForPlayer(b)
+    if rhrp and bhrp then
+        -- Do small tween to center over 1.2s
+        pcall(function() rhrp.Anchored = false end)
+        pcall(function() bhrp.Anchored = false end)
+        tweenPartTo(rhrp, combinedCF * CFrame.new(-1,0,0), 1.2)
+        tweenPartTo(bhrp, combinedCF * CFrame.new(1,0,0), 1.2)
+        task.wait(1.25)
+        -- Teleport both to exact same combined spot and anchor (visual combine)
+        pcall(function() rhrp.CFrame = combinedCF; rhrp.Anchored = true end)
+        pcall(function() bhrp.CFrame = combinedCF; bhrp.Anchored = true end)
+    end
+
+    hollow_state = "combined"
+    announce("Alts combined. Use /e release to release the Hollow Purple.")
+end
+
+-- Manual release: after activated/combined
+local function releaseHollowManual()
+    if hollow_state ~= "combined" then
+        if hollow_state == "ready" then
+            announce("Not Yet! Type /e activate to make your alts go inside each other.")
+            return
+        else
+            announce("Use /e hollow_purple to be able to use these commands.")
+            return
+        end
+    end
+
+    -- perform release: play animation and move them forward fast
+    local releaseAnimId = "rbxassetid://193307200"
+    pcall(function() playAnimationOnPlayer(player, releaseAnimId, false, 2) end)
+
+    if not hollow_combined_pos then
+        hollow_combined_pos = (rootPart and rootPart.CFrame.Position + rootPart.CFrame.LookVector * 5) or Vector3.new(0,0,0)
+    end
+    local forwardDelta = (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1)) * 300
+    local releaseTarget = hollow_combined_pos + forwardDelta
+
+    local r, b = getAlts()
+    local rhrp = getHRPForPlayer(r)
+    local bhrp = getHRPForPlayer(b)
+
+    if rhrp then
+        pcall(function() rhrp.Anchored = false end)
+        tweenPartTo(rhrp, CFrame.new(releaseTarget, releaseTarget + (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1))), 0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    end
+    if bhrp then
+        pcall(function() bhrp.Anchored = false end)
+        tweenPartTo(bhrp, CFrame.new(releaseTarget, releaseTarget + (rootPart and rootPart.CFrame.LookVector or Vector3.new(0,0,1))), 0.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    end
+
+    task.wait(0.7)
+    hollow_state = "none"
+    announce("Released Hollow Purple.")
+end
+
 -- HANDLE COMMANDS w/ normalization, fuzzy suggest + yes confirmation, and /play
 local function executeCommandByName(cmdName, arg)
     cmdName = tostring(cmdName or ""):lower()
+
+    -- Hollow Purple branches
+    if cmdName == "red" then
+        if not arg or arg == "" then
+            addMessage("Usage: /e red <username>", false)
+            return
+        end
+        redAltName = arg:gsub("^%s+", ""):gsub("%s+$", "")
+        addMessage("Red set to " .. redAltName, false)
+        return
+    elseif cmdName == "blue" then
+        if not arg or arg == "" then
+            addMessage("Usage: /e blue <username>", false)
+            return
+        end
+        blueAltName = arg:gsub("^%s+", ""):gsub("%s+$", "")
+        addMessage("Blue set to " .. blueAltName, false)
+        return
+    elseif cmdName == "automatic_hollow_purple" or (cmdName == "automatic" and arg and arg:lower():match("hollow")) then
+        -- run automatic sequence async
+        spawn(function()
+            runAutomaticHollowPurple()
+        end)
+        return
+    elseif cmdName == "hollow_purple" then
+        prepareHollowPurpleManual()
+        return
+    elseif cmdName == "activate" then
+        activateHollowManual()
+        return
+    elseif cmdName == "release" then
+        releaseHollowManual()
+        return
+    end
+
+    -- Existing built-in commands
     if cmdName == "commands" then
         pcall(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
@@ -625,7 +1057,11 @@ local function handleCommand(rawMsg)
                 addMessage("That command needs an argument. Provide one (e.g. '/e "..cmdTok.." <arg>').", false)
                 return
             end
-            executeCommandByName(cmdTok, arg)
+            -- For red/blue we want the raw username (case preserved)
+            -- Extract original argument preserving case from inputTrim:
+            local origArg = inputTrim:match("^/?.*%s+"..cmdTok.."%s+(.+)$") or arg
+            -- fallback plain arg
+            executeCommandByName(cmdTok, origArg)
             return
         else
             executeCommandByName(cmdTok, arg)
