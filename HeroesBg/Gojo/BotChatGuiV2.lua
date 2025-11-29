@@ -329,6 +329,7 @@ local function handleCommand(msg)
 -- /e commands -> Commands
 if low == "/e commands" then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
+        addMessage("Command Gui Made.", false)
     return
 end
 
