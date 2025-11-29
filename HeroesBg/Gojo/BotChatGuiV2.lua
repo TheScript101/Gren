@@ -5,6 +5,7 @@ local TextService = game:GetService("TextService")
 
 -- Player & Character Setup
 local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local animator = humanoid:FindFirstChildOfClass("Animator")
@@ -22,6 +23,74 @@ local INTERRUPT_ANIMS = {
 local isFloating, bodyPos, currentFloatTrack = false, nil, nil
 local floatHeight = 20
 
+-- store previous jump UI states so we can restore them
+local storedJumpStates = {}
+
+-- Collect likely jump UI elements from PlayerGui and CoreGui (heuristic)
+local function collectJumpCandidates()
+    local roots = {}
+    table.insert(roots, PlayerGui)
+    local ok, core = pcall(function() return game:GetService("CoreGui") end)
+    if ok and core then table.insert(roots, core) end
+
+    local found = {}
+    for _, root in ipairs(roots) do
+        if root then
+            for _, obj in ipairs(root:GetDescendants()) do
+                if obj and obj.Visible ~= nil then
+                    local lname = tostring(obj.Name):lower()
+                    -- heuristic matches (common naming patterns)
+                    if lname:find("jump") or lname:find("jumpbtn") or lname:find("jump_button") or lname:find("jumpbutton") or lname:find("mobilejump") or lname:find("jumptouch") then
+                        local ok2, size = pcall(function() return obj.AbsoluteSize end)
+                        if ok2 and size and (size.X > 6 and size.Y > 6) then
+                            table.insert(found, obj)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return found
+end
+
+local function hideJumpButtons()
+    storedJumpStates = {}
+    local buttons = collectJumpCandidates()
+    for _, b in ipairs(buttons) do
+        pcall(function()
+            -- remember previous state
+            local prev = {}
+            if b:IsA("ScreenGui") then
+                if b.Enabled ~= nil then prev.Enabled = b.Enabled end
+            end
+            if b.Visible ~= nil then prev.Visible = b.Visible end
+            storedJumpStates[b] = prev
+
+            -- hide/disable appropriately
+            if b:IsA("ScreenGui") then
+                if b.Enabled ~= nil then b.Enabled = false end
+            else
+                if b.Visible ~= nil then b.Visible = false end
+            end
+        end)
+    end
+end
+
+local function showJumpButtons()
+    for b, state in pairs(storedJumpStates) do
+        if b and b.Parent then
+            pcall(function()
+                if state.Enabled ~= nil and b:IsA("ScreenGui") then
+                    b.Enabled = state.Enabled
+                elseif state.Visible ~= nil then
+                    b.Visible = state.Visible
+                end
+            end)
+        end
+    end
+    storedJumpStates = {}
+end
+
 -- Helper: stop all playing animations (any animation playing via animator)
 local function stopAllAnimations()
     animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
@@ -33,9 +102,13 @@ local function stopAllAnimations()
 end
 
 -- Improved cancelFloat: force-unanchor, destroy BodyPosition, stop/restore animation safely
+-- Also restore jump buttons when float stops
 local function cancelFloat(stopAnims)
-    -- always attempt to cancel regardless of isFloating (covers timing edge-cases)
+    -- mark not floating
     isFloating = false
+
+    -- restore mobile jump UI
+    pcall(showJumpButtons)
 
     -- unanchor safely
     pcall(function()
@@ -82,6 +155,9 @@ local function setupAnimation()
                 isFloating = true
                 currentFloatTrack = track
 
+                -- hide mobile jump buttons as soon as float starts
+                pcall(hideJumpButtons)
+
                 task.delay(0.8, function()
                     if isFloating and track.IsPlaying then
                         pcall(function() track:AdjustSpeed(0.5) end)
@@ -116,22 +192,11 @@ local function setupAnimation()
             end
         end)
 
-        -- StateChanged: only respond to actual Jumping (ignore Freefall)
-        humanoid.StateChanged:Connect(function(oldState, newState)
-            if newState == Enum.HumanoidStateType.Jumping then
-                    if isFloating
-                        cancelFloat(true)
-            end
-        end)
-
-        -- Keep Jumping (redundant but fast trigger) — also cancels on jump
-        humanoid.Jumping:Connect(function(active)
-            if active then
-                cancelFloat(true) -- stop animations too when jump detected
-            end
-        end)
+        -- NOTE: Jump detection removed per request.
+        -- We do NOT listen to humanoid.Jumping or humanoid.StateChanged anymore.
     end
 end
+
 setupAnimation()
 
 player.CharacterAdded:Connect(function()
@@ -143,6 +208,7 @@ player.CharacterAdded:Connect(function()
     isFloating = false
     bodyPos = nil
     currentFloatTrack = nil
+    storedJumpStates = {}
     setupAnimation()
 end)
 
@@ -175,7 +241,7 @@ closeBtn.TextSize = 14
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
 closeBtn.MouseButton1Click:Connect(function()
-    gui:Destroy()
+    mainFrame.Visible = false
 end)
 
 toggleBtn.MouseButton1Click:Connect(function()
