@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
+local TextChatService = pcall(function() return game:GetService("TextChatService") end) and game:GetService("TextChatService") or nil
 
 -- Player & Character Setup
 local player = Players.LocalPlayer
@@ -26,6 +27,9 @@ local floatHeight = 20
 -- store previous jump UI states so we can restore them
 -- keys: jumpButtonInstance -> { ImageTransparency = num, Active = bool|nil, Selectable = bool|nil, AutoButtonColor = bool|nil }
 local storedJumpStates = {}
+
+-- Speech mode: "Bot" (default) or "Chat"
+local speechMode = "Bot"
 
 -- Direct getter for the specific JumpButton path you gave
 local function getJumpButton()
@@ -152,77 +156,55 @@ local function cancelFloat(stopAnims)
     end
 end
 
-local function setupAnimation()
-    -- refresh references
-    animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
-
-    -- only connect if animator exists
-    if animator then
-        animator.AnimationPlayed:Connect(function(track)
-            local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
-            if not ok or not id then return end
-
-            if id == FLOAT_ANIM_ID then
-                if isFloating then return end
-                isFloating = true
-                currentFloatTrack = track
-
-                -- hide the exact JumpButton path as soon as float starts
-                pcall(hideJumpButtons)
-
-                task.delay(0.8, function()
-                    if isFloating and track.IsPlaying then
-                        pcall(function() track:AdjustSpeed(0.5) end)
-                        if bodyPos then pcall(function() bodyPos:Destroy() end) end
-                        bodyPos = Instance.new("BodyPosition", rootPart)
-                        bodyPos.Name = "FloatUpBP"
-                        bodyPos.MaxForce = Vector3.new(0, math.huge, 0)
-                        bodyPos.P = 10000
-                        bodyPos.D = 1000
-                        bodyPos.Position = rootPart.Position + Vector3.new(0, floatHeight, 0)
-
-                        task.delay(1, function()
-                            if isFloating then
-                                pcall(function() track:AdjustSpeed(1) end)
-                                rootPart.Anchored = true
-                            end
-                        end)
-                    end
-                end)
-            elseif INTERRUPT_ANIMS[id] then
-                -- interrupts should cancel float but not necessarily stop ALL animations
-                cancelFloat(false)
-            end
-        end)
+-- Send chat message to RBXGeneral channel (wrapped safely)
+local function sendChatMessage(message)
+    if not TextChatService then
+        return false, "TextChatService not available"
     end
+    local success, err = pcall(function()
+        local channels = TextChatService:FindFirstChild("TextChannels")
+        if not channels then error("TextChannels missing") end
+        local defaultChannel = channels:FindFirstChild("RBXGeneral")
+        if not defaultChannel then error("RBXGeneral channel not found") end
+        defaultChannel:SendAsync(message)
+    end)
+    if success then return true end
+    return false, err
+end
 
-    -- MoveDirection cancels float (existing)
-    if humanoid then
-        humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
-            if isFloating and humanoid.MoveDirection.Magnitude > 0 then
-                cancelFloat(false)
-            end
-        end)
-
-        -- NOTE: Jump detection removed per request.
-        -- We do NOT listen to humanoid.Jumping or humanoid.StateChanged anymore.
+-- Helper to run speech sequence either in private bot chat (GUI) or send to general chat
+local function runSpeechSequence(asChat)
+    if asChat then
+        -- send lines to in-game chat
+        pcall(function() sendChatMessage("Sorry, Amanai..") end)
+        task.wait(2)
+        pcall(function() sendChatMessage("I'm not even angry over you right now..") end)
+        task.wait(1.5)
+        pcall(function() sendChatMessage("I bear no grudge against anyone..") end)
+        task.wait(2)
+        pcall(function() sendChatMessage("It's just that the world feels so, so wonderful right now...") end)
+        task.wait(1.5)
+        pcall(function() sendChatMessage("Throughout Heaven and Earth,") end)
+        task.wait(1)
+        pcall(function() sendChatMessage("I alone am the honored one..") end)
+    else
+        -- show in private GUI chat (bot mode)
+        addMessage("Sorry, Amanai..", false)
+        task.wait(2)
+        addMessage("I'm not even angry over you right now..", false)
+        task.wait(1.5)
+        addMessage("I bear no grudge against anyone..", false)
+        task.wait(2)
+        addMessage("It's just that the world feels so, so wonderful right now...", false)
+        task.wait(1.5)
+        addMessage("Throughout Heaven and Earth,", false)
+        task.wait(1)
+        addMessage("I alone am the honored one..", false)
     end
 end
 
-setupAnimation()
-
-player.CharacterAdded:Connect(function()
-    character = player.Character or player.CharacterAdded:Wait()
-    humanoid = character:WaitForChild("Humanoid")
-    animator = humanoid:FindFirstChildOfClass("Animator")
-    rootPart = character:WaitForChild("HumanoidRootPart")
-    -- reset float vars to be safe
-    isFloating = false
-    bodyPos = nil
-    currentFloatTrack = nil
-    storedJumpStates = {}
-    setupAnimation()
-end)
+-- setupAnimation function (declared later; needs addMessage defined to use runSpeechSequence)
+local function setupAnimation() end
 
 -- GUI Setup (kept exactly as you had it)
 local gui = Instance.new("ScreenGui", game.CoreGui)
@@ -298,8 +280,8 @@ enterBtn.Font = Enum.Font.GothamBold
 enterBtn.TextSize = 16
 Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
 
--- Message UI
-local function addMessage(text, isUser)
+-- Message UI function (added earlier reference used by runSpeechSequence)
+function addMessage(text, isUser)
     local msgHolder = Instance.new("Frame")
     msgHolder.Size = UDim2.new(1, 0, 0, 0)
     msgHolder.BackgroundTransparency = 1
@@ -336,9 +318,21 @@ local function addMessage(text, isUser)
     msgHolder.Parent = msgFrame
 end
 
--- Handler for commands (updated per your requests)
+-- Handler for commands (updated with /e commands and /e speech_mode)
+local function getStarterMessage()
+    return "Say /e commands For A List Of Commands.")
+end
+
 local function handleCommand(msg)
     local low = msg:lower()
+
+-- /e commands -> Commands
+if low == "/e commands" then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
+    return
+end
+
+
     -- /e stop
     if low == "/e stop" then
         if isFloating then
@@ -361,22 +355,34 @@ local function handleCommand(msg)
         return
     end
 
-    -- /e speech (Gojo speech with requested waits)
+    -- /e speech_mode <mode>
+    local smatch = low:match("^/e%s*speech_mode%s*(%w+)$")
+    if smatch then
+        local mode = smatch:lower()
+        if mode == "chat" or mode == "bot" then
+            -- normalize display
+            speechMode = (mode == "chat") and "Chat" or "Bot"
+            addMessage("Speech mode set to " .. speechMode, false)
+        else
+            addMessage("Invalid speech mode. Use 'chat' or 'bot'.", false)
+        end
+        return
+    end
+
+    -- /e speech (Gojo speech)
     if low == "/e speech" then
         addMessage("Sending speech!", false)
-        task.spawn(function()
-            addMessage("Sorry, Amanai..", false)
-            task.wait(2)
-            addMessage("I'm not even angry over you right now..", false)
-            task.wait(1.5)
-            addMessage("I bear no grudge against anyone..", false)
-            task.wait(2)
-            addMessage("It's just that the world feels so, so wonderful right now...", false)
-            task.wait(1.5)
-            addMessage("Throughout Heaven and Earth,", false)
-            task.wait(1)
-            addMessage("I alone am the honored one..", false)
-        end)
+        if speechMode:lower() == "chat" then
+            -- send to chat
+            task.spawn(function()
+                runSpeechSequence(true)
+            end)
+        else
+            -- bot/private GUI
+            task.spawn(function()
+                runSpeechSequence(false)
+            end)
+        end
         return
     end
 
@@ -396,10 +402,85 @@ inputBox.FocusLost:Connect(function(enter)
     if enter then enterBtn:MouseButton1Click() end
 end)
 
--- Starter message replaced with the exact text you requested
-addMessage("Say /e commands For A List Of Commands.", false)
+-- Starter message replaced with the exact text you requested (shows current mode)
+addMessage(getStarterMessage(), false)
 
 -- Keep GUI autoscroll behavior
 layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     msgFrame.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
 end)
+
+-- Now that addMessage exists, define setupAnimation (uses addMessage/runSpeechSequence)
+setupAnimation = function()
+    -- refresh references
+    animator = humanoid and humanoid:FindFirstChildOfClass("Animator") or animator
+
+    -- only connect if animator exists
+    if animator then
+        animator.AnimationPlayed:Connect(function(track)
+            local ok, id = pcall(function() return track.Animation and track.Animation.AnimationId end)
+            if not ok or not id then return end
+
+            if id == FLOAT_ANIM_ID then
+                if isFloating then return end
+                isFloating = true
+                currentFloatTrack = track
+
+                -- hide the exact JumpButton path as soon as float starts
+                pcall(hideJumpButtons)
+
+                task.delay(0.8, function()
+                    if isFloating and track.IsPlaying then
+                        pcall(function() track:AdjustSpeed(0.5) end)
+                        if bodyPos then pcall(function() bodyPos:Destroy() end) end
+                        bodyPos = Instance.new("BodyPosition", rootPart)
+                        bodyPos.Name = "FloatUpBP"
+                        bodyPos.MaxForce = Vector3.new(0, math.huge, 0)
+                        bodyPos.P = 10000
+                        bodyPos.D = 1000
+                        bodyPos.Position = rootPart.Position + Vector3.new(0, floatHeight, 0)
+
+                        task.delay(1, function()
+                            if isFloating then
+                                pcall(function() track:AdjustSpeed(1) end)
+                                rootPart.Anchored = true
+                            end
+                        end)
+                    end
+                end)
+            elseif INTERRUPT_ANIMS[id] then
+                -- interrupts should cancel float but not necessarily stop ALL animations
+                cancelFloat(false)
+            end
+        end)
+    end
+
+    -- MoveDirection cancels float (existing)
+    if humanoid then
+        humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+            if isFloating and humanoid.MoveDirection.Magnitude > 0 then
+                cancelFloat(false)
+            end
+        end)
+
+        -- NOTE: Jump detection removed per request.
+        -- We do NOT listen to humanoid.Jumping or humanoid.StateChanged anymore.
+    end
+end
+
+-- Finalize: connect CharacterAdded to resetup on respawn
+player.CharacterAdded:Connect(function()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    animator = humanoid:FindFirstChildOfClass("Animator")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    -- reset float vars to be safe
+    isFloating = false
+    bodyPos = nil
+    currentFloatTrack = nil
+    storedJumpStates = {}
+    setupAnimation()
+end)
+
+-- initial setup call
+setupAnimation()
