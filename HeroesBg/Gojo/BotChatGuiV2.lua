@@ -333,8 +333,57 @@ local function getStarterMessage()
     return "Say /e commands For A List Of Commands.", false
 end
 
+
+
+
+
+-- Normalize user input so "/commands" -> "/e commands", "/height 25" -> "/e height 25"
+local function normalizeCommand(raw)
+    if not raw then return "" end
+    local msg = tostring(raw)
+    -- trim both ends
+    msg = msg:gsub("^%s+", ""):gsub("%s+$", "")
+    if msg == "" then return "" end
+
+    -- if it doesn't start with slash, leave it untouched (your handler expects /e ...)
+    if msg:sub(1,1) ~= "/" then
+        return msg
+    end
+
+    -- get body after '/'
+    local body = msg:sub(2)
+    body = body:gsub("^%s+", "") -- remove leading spaces
+
+    if body == "" then
+        -- user only typed "/" -> treat as-is
+        return msg
+    end
+
+    local first = body:sub(1,1):lower()
+
+    if first == "e" then
+        -- already has e: make sure there's a space after e
+        if body:match("^e%s") then
+            return "/" .. body -- already "/e something"
+        else
+            -- handle "/ecommands" -> "/e commands"
+            return "/e " .. body:sub(2):gsub("^%s+", "")
+        end
+    else
+        -- no 'e' present: insert it -> "/commands" -> "/e commands"
+        return "/e " .. body
+    end
+end
+
+
+
+
+
 local function handleCommand(msg)
-    local low = msg:lower()
+    -- normalize possible missing 'e' variants before processing
+    local normalized = normalizeCommand(msg)
+    local low = (normalized or ""):lower()
+
 
     -- /e commands -> load remote commands script
     if low == "/e commands" then
