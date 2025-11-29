@@ -31,6 +31,9 @@ local storedJumpStates = {}
 -- Speech mode: "Bot" (default) or "Chat"
 local speechMode = "Bot"
 
+-- Speech speed: "Fast" (default) or "Slow"
+local speechSpeed = "Fast"
+
 -- Direct getter for the specific JumpButton path you gave
 local function getJumpButton()
     local ok, touchGui = pcall(function() return PlayerGui:FindFirstChild("TouchGui") end)
@@ -173,33 +176,40 @@ local function sendChatMessage(message)
 end
 
 -- Helper to run speech sequence either in private bot chat (GUI) or send to general chat
+-- Uses global speechSpeed ("Fast" or "Slow")
 local function runSpeechSequence(asChat)
+    local fastSequence = {
+        {"Sorry, Amanai..", 2},
+        {"I'm not even angry over you right now..", 1.5},
+        {"I bear no grudge against anyone..", 2},
+        {"It's just that the world feels so, so wonderful right now...", 1.5},
+        {"Throughout Heaven and Earth,", 1},
+        {"I alone am the honored one..", 0}
+    }
+
+    local slowSequence = {
+        {"Sorry, Amanai..", 2.5},
+        {"I'm not even angry over you right now..", 3},
+        {"I bear no grudge against anyone..", 4},
+        {"It's just that the world feels so, so wonderful right now...", 3},
+        {"Throughout Heaven and Earth,", 3},
+        {"I alone am the honored one..", 0}
+    }
+
+    local seq = (speechSpeed and tostring(speechSpeed):lower() == "slow") and slowSequence or fastSequence
+
     if asChat then
-        -- send lines to in-game chat
-        pcall(function() sendChatMessage("Sorry, Amanai..") end)
-        task.wait(2)
-        pcall(function() sendChatMessage("I'm not even angry over you right now..") end)
-        task.wait(1.5)
-        pcall(function() sendChatMessage("I bear no grudge against anyone..") end)
-        task.wait(2)
-        pcall(function() sendChatMessage("It's just that the world feels so, so wonderful right now...") end)
-        task.wait(1.5)
-        pcall(function() sendChatMessage("Throughout Heaven and Earth,") end)
-        task.wait(1)
-        pcall(function() sendChatMessage("I alone am the honored one..") end)
+        for i, item in ipairs(seq) do
+            local line, waitTime = item[1], item[2]
+            pcall(function() sendChatMessage(line) end)
+            if waitTime and waitTime > 0 then task.wait(waitTime) end
+        end
     else
-        -- show in private GUI chat (bot mode)
-        addMessage("Sorry, Amanai..", false)
-        task.wait(2)
-        addMessage("I'm not even angry over you right now..", false)
-        task.wait(1.5)
-        addMessage("I bear no grudge against anyone..", false)
-        task.wait(2)
-        addMessage("It's just that the world feels so, so wonderful right now...", false)
-        task.wait(1.5)
-        addMessage("Throughout Heaven and Earth,", false)
-        task.wait(1)
-        addMessage("I alone am the honored one..", false)
+        for i, item in ipairs(seq) do
+            local line, waitTime = item[1], item[2]
+            addMessage(line, false)
+            if waitTime and waitTime > 0 then task.wait(waitTime) end
+        end
     end
 end
 
@@ -318,21 +328,22 @@ function addMessage(text, isUser)
     msgHolder.Parent = msgFrame
 end
 
--- Handler for commands (updated with /e commands and /e speech_mode)
+-- Handler for commands (updated with /e commands and /e speech_mode and /e speech_speed)
 local function getStarterMessage()
-    return "Say /e commands For A List Of Commands."
+    return "Say /e commands For A List Of Commands.", false
 end
 
 local function handleCommand(msg)
     local low = msg:lower()
 
--- /e commands -> Commands
-if low == "/e commands" then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
-        addMessage("Command Gui Made.", false)
-    return
-end
-
+    -- /e commands -> load remote commands script
+    if low == "/e commands" then
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/HeroesBg/Gojo/V2Commands.lua"))()
+        end)
+        addMessage("Command Gui Loaded.", false)
+        return
+    end
 
     -- /e stop
     if low == "/e stop" then
@@ -370,6 +381,19 @@ end
         return
     end
 
+    -- /e speech_speed <speed> (slow or fast)
+    local spmatch = low:match("^/e%s*speech_speed%s*(%w+)$")
+    if spmatch then
+        local s = spmatch:lower()
+        if s == "slow" or s == "fast" then
+            speechSpeed = (s == "slow") and "Slow" or "Fast"
+            addMessage("Speech speed set to " .. speechSpeed, false)
+        else
+            addMessage("Invalid speech speed. Use 'slow' or 'fast'.", false)
+        end
+        return
+    end
+
     -- /e speech (Gojo speech)
     if low == "/e speech" then
         addMessage("Sending speech!", false)
@@ -403,7 +427,7 @@ inputBox.FocusLost:Connect(function(enter)
     if enter then enterBtn:MouseButton1Click() end
 end)
 
--- Starter message replaced with the exact text you requested (shows current mode)
+-- Starter message replaced with the exact text you requested (shows current mode & speed)
 addMessage(getStarterMessage(), false)
 
 -- Keep GUI autoscroll behavior
