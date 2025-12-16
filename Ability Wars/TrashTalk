@@ -1,0 +1,41 @@
+local TextChatService = game:GetService("TextChatService")
+
+local Phrase_Chat = {
+    "you are no match for my skill, go cry to your daddy about losing",
+    "you're useless and loud clown.",
+    "bozo with a big mouth and no skills.",
+    "you are trash, just quit and go touch grass.",
+    "ez, you are so bad that you make me want to cry.",
+    "call an admin to ban me bozo",
+    "so ez, you are losing with advantages and youre gonna report me just because you cant beat me",
+    "you cant beat me even with good abilities, noob",
+    "you lost, stop crying.",
+    "try harder, even a toddler could win against you.",
+    "is that all you got? pathetic.",
+    "face it, you are just feeding me punches.",
+    "keep practicing, maybe one day you won’t embarrass yourself.",
+    "I didn’t even need to try and you still lost.",
+    "quit now, save yourself the humiliation.",
+    "Your trash.",
+    "my grandma plays better than you.",
+    "I could beat you blindfolded bozo",
+    "you bring shame to your family, stop existing.",
+    "wow, dying this hard must hurt, huh?",
+}
+
+local RBXGeneral = TextChatService.TextChannels.RBXGeneral
+
+-- simple loop without any flags
+spawn(function()
+    local index = 1
+    while true do
+        if RBXGeneral then
+            RBXGeneral:SendAsync(Phrase_Chat[index])
+            index = index + 1
+            if index > #Phrase_Chat then
+                index = 1
+            end
+        end
+        wait(30)
+    end
+end)
