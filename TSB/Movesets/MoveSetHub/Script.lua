@@ -22,7 +22,7 @@ local SaitamaTab = Window:CreateTab("Saitama", 17761220757)
 SaitamaTab:CreateButton({
     Name = "Kars Moveset",
     Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/OfficialAposty/RBLX-Scripts/refs/heads/main/UltimateLifeForm.lua"))()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Kars.txt"))()
       wait(1)
         Rayfield:Notify({
             Title = "Button Pressed",
