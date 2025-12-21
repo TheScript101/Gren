@@ -18,7 +18,7 @@ local Window = Rayfield:CreateWindow({
 -- Create Saitama Tab with Image Icon
 local SaitamaTab = Window:CreateTab(
     "Saitama",
-    "17761388375"
+    "rbxassetid://17761220757"
 )
 
 -- Kars Button
