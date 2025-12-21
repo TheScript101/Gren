@@ -18,7 +18,7 @@ local Window = Rayfield:CreateWindow({
 -- Create Saitama Tab with Image Icon
 local SaitamaTab = Window:CreateTab("Saitama", 17761220757)
 
--- Example Button
+-- Kars Button
 SaitamaTab:CreateButton({
     Name = "Kars Moveset",
     Callback = function()
@@ -31,3 +31,19 @@ SaitamaTab:CreateButton({
         })
     end
 })
+
+-- Sukuna Button
+SaitamaTab:CreateButton({
+    Name = "Sukuna Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Kars.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
+
