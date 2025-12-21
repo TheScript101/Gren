@@ -26,8 +26,8 @@ SaitamaTab:CreateButton({
       wait(1)
         Rayfield:Notify({
             Title = "Button Pressed",
-            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)"
-            Duration = 2
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
         })
     end
 })
