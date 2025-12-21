@@ -36,7 +36,7 @@ SaitamaTab:CreateButton({
 SaitamaTab:CreateButton({
     Name = "Sukuna Moveset",
     Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Kars.txt"))()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Sukuna.txt"))()
       wait(1)
         Rayfield:Notify({
             Title = "Button Pressed",
