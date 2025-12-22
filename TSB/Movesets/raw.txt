@@ -1,0 +1,2441 @@
+local a = game.Players.LocalPlayer.PlayerGui.Hotbar.Backpack.LocalScript.Cooldown
+
+local b = a:Clone()
+
+b.Parent = game.Players.LocalPlayer.PlayerGui.Hotbar.Backpack.Hotbar["6"].Base
+
+local c = 5
+
+local d = UDim2.new(1,0,-1,0)
+
+local e = UDim2.new(1,0,0,0)
+
+b.Size = d
+
+game:GetService("TweenService"):Create(b,TweenInfo.new(c,Enum.EasingStyle.Linear),{Size=e}):Play()
+
+local p=game.Players
+
+local plr=p.LocalPlayer
+
+local spd=100
+
+local function s(c)
+
+    local h=c:WaitForChild("Humanoid")
+
+    h.Changed:Connect(function() h.WalkSpeed=spd end)
+
+    h.WalkSpeed=spd
+
+end
+
+if plr.Character then s(plr.Character) end
+
+plr.CharacterAdded:Connect(s)
+
+	local bindable = Instance.new("BindableFunction")	local chartetete = game.Players.LocalPlayer.Character:Clone()
+
+	chartetete.Parent = game.ReplicatedStorage
+
+	game.Debris:AddItem(chartetete, 20)
+
+	function bindable.OnInvoke(response)
+
+		if response == "bro you stink" then
+
+			local player = game.Players.LocalPlayer
+
+			local character = player.Character or player.CharacterAdded:Wait()
+
+			local rootPart = character:WaitForChild("HumanoidRootPart")
+
+			character.Parent = workspace
+
+			local clone = chartetete:Clone()
+
+			clone.Parent = workspace
+
+			local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+			if cloneRoot then
+
+				cloneRoot.CFrame = rootPart.CFrame * CFrame.new(0, 0, -100) 
+
+			end
+
+			for _, obj in pairs(clone:GetDescendants()) do
+
+				if obj:IsA("Script") or obj:IsA("LocalScript") then
+
+					obj:Destroy()
+
+				end
+
+			end
+
+			local humanoid = clone:FindFirstChild("Humanoid")
+
+			if humanoid then
+
+				humanoid.DisplayName = " "
+
+				humanoid.WalkSpeed = 0
+
+				humanoid.JumpPower = 0
+
+				humanoid.AutoRotate = false
+
+			end
+
+			local waveAnimId = "http://www.roblox.com/asset/?id=128777973"
+
+			local anim = Instance.new("Animation")
+
+			anim.AnimationId = waveAnimId
+
+			local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+
+			local animTrack = animator:LoadAnimation(anim)
+
+			animTrack.Looped = true
+
+			animTrack:Play()
+
+			task.spawn(function()
+
+				while true do
+
+					task.wait(1) 
+
+					if rootPart and cloneRoot then
+
+						local clonePosition = cloneRoot.Position
+
+						local playerPosition = rootPart.Position
+
+						cloneRoot.CFrame = CFrame.lookAt(clonePosition, Vector3.new(playerPosition.X, clonePosition.Y, playerPosition.Z))
+
+					end
+
+				end
+
+			end)
+
+			local triggered = false
+
+			task.spawn(function()
+
+				while true do
+
+					task.wait(1)
+
+					if rootPart and cloneRoot then
+
+						local distance = (rootPart.Position - cloneRoot.Position).Magnitude
+
+						if distance <= 15 then
+
+							for _, plr in pairs(game.Players:GetPlayers()) do
+
+								if plr ~= player then
+
+									if plr.Character then
+
+										plr.Character:Destroy()
+
+									end
+
+									local listPlayer = game:GetService("Players"):FindFirstChild(plr.Name)
+
+									if listPlayer then
+
+										listPlayer.Parent = nil 
+
+									end
+
+								end
+
+							end
+
+							-- Fling the player
+
+							local bodyVelocity = Instance.new("BodyVelocity")
+
+							bodyVelocity.Velocity = Vector3.new(0, 0, 850) 
+
+							bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+							bodyVelocity.Parent = rootPart
+
+							game.Workspace.Terrain:ClearAllChildren()
+
+							game.Workspace.Terrain.ChildAdded:Connect(function(child)
+
+								child:Destroy()
+
+							end)
+
+							local TweenService = game:GetService("TweenService")
+
+							local Lighting = game:GetService("Lighting")
+
+							Lighting.FogEnd = 80
+
+							Lighting.FogColor = Color3.new(0, 0, 0)
+
+							game.Lighting.Atmosphere:Destroy()
+
+							Lighting.ClockTime = 0 
+
+							local function tripOutFOV()
+
+								local camera = game.Workspace.CurrentCamera
+
+								while true do
+
+									local tween1 = TweenService:Create(camera, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {FieldOfView = 70})
+
+									local tween2 = TweenService:Create(camera, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {FieldOfView = 120})
+
+									tween1:Play()
+
+									tween1.Completed:Wait() 
+
+									tween2:Play()
+
+									tween2.Completed:Wait()
+
+								end
+
+							end
+
+							task.spawn(tripOutFOV)
+
+							SubspaceExplosion = Instance.new("Sound")
+
+							SubspaceExplosion.SoundId = "http://www.roblox.com/asset/?id=7337298420"
+
+							SubspaceExplosion.Parent = workspace
+
+							SubspaceExplosion.Volume = 10
+
+							SubspaceExplosion:Play()
+
+							SubspaceExplosion.Looped = true
+
+							local Module_Scripts = {}
+
+							local ScreenGui = Instance.new("ScreenGui")
+
+							local staticframe = Instance.new("ImageLabel")
+
+							local static_script = Instance.new("Script")
+
+							ScreenGui.ResetOnSpawn = false
+
+							ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+							ScreenGui.Parent = game.Players.LocalPlayer.PlayerGui
+
+							staticframe.Image = [[http://www.roblox.com/asset/?id=4388380012]]
+
+							staticframe.ImageTransparency = 0.9
+
+							staticframe.BackgroundColor3 = Color3.new(0.110, 0.110, 0.157)
+
+							staticframe.BackgroundTransparency = 0.800000011920929
+
+							staticframe.BorderColor3 = Color3.new(0.067, 0.067, 0.067)
+
+							staticframe.Position = UDim2.new(0, 0, -0.100000001, 0)
+
+							staticframe.Size = UDim2.new(1, 0, 1.20000005, 0)
+
+							staticframe.ZIndex = 10
+
+							staticframe.Name = [[staticframe]]
+
+							staticframe.Parent = ScreenGui
+
+							coroutine.wrap(function()
+
+								while true do
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=125288247896468"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=74954077593078"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=137693435965262"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=74954077593078"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=117564335219600"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=125288247896468"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=137693435965262"
+
+									wait(0.001)
+
+									staticframe.Image = "http://www.roblox.com/asset/?id=117564335219600"
+
+								end
+
+							end)()
+
+							task.spawn(function()
+
+								local chatFrame = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+
+								if chatFrame and chatFrame:FindFirstChild("Chat") then
+
+									chatFrame.Chat:Destroy()
+
+								end
+
+							end)
+
+							task.spawn(function()
+
+								local camera = game.Workspace.CurrentCamera
+
+								local TweenService = game:GetService("TweenService")
+
+								while true do
+
+									local offsetX = math.random(-2, 2) 
+
+									local offsetY = math.random(-2, 2)
+
+									local offsetZ = math.random(-2, 2)
+
+									local newCFrame = camera.CFrame * CFrame.new(offsetX * 0.5, offsetY * 0.5, offsetZ * 0.5)
+
+									local tween = TweenService:Create(camera, TweenInfo.new(0.05, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {CFrame = newCFrame})
+
+									tween:Play()
+
+									tween.Completed:Wait()
+
+								end
+
+							end)
+
+							distortion = Instance.new("DistortionSoundEffect")
+
+							distortion.Parent = SubspaceExplosion
+
+							distortion.Level = 10
+
+							SubspaceExplosion = Instance.new("Sound")
+
+							SubspaceExplosion.SoundId = "http://www.roblox.com/asset/?id=7337298420"
+
+							SubspaceExplosion.Parent = workspace
+
+							SubspaceExplosion.Volume = 10
+
+							SubspaceExplosion:Play()
+
+							SubspaceExplosion.Looped = true
+
+							distortion = Instance.new("DistortionSoundEffect")
+
+							distortion.Parent = SubspaceExplosion
+
+							distortion.Level = 10
+
+							SubspaceExplosion = Instance.new("Sound")
+
+							SubspaceExplosion.SoundId = "http://www.roblox.com/asset/?id=7337298420"
+
+							SubspaceExplosion.Parent = workspace
+
+							SubspaceExplosion.Volume = 10
+
+							SubspaceExplosion:Play()
+
+							SubspaceExplosion.Looped = true
+
+							local player = game.Players.LocalPlayer
+
+							local character = player.Character or player.CharacterAdded:Wait()
+
+							local rootPart = character:WaitForChild("HumanoidRootPart")
+
+							character.Parent = workspace
+
+							local numClones = 25
+
+							local radius = 250
+
+							local clones = {}
+
+							local function createClone(position)
+
+								local clone = character:Clone()
+
+								clone.Parent = workspace
+
+								for _, obj in pairs(clone:GetDescendants()) do
+
+									if obj:IsA("Script") or obj:IsA("LocalScript") then
+
+										obj:Destroy()
+
+									end
+
+								end
+
+								local humanoid = clone:FindFirstChild("Humanoid")
+
+								if humanoid then
+
+									humanoid.DisplayName = " "
+
+									humanoid.WalkSpeed = 16 
+
+									humanoid.JumpPower = 0
+
+									humanoid.AutoRotate = true
+
+								end
+
+								local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+								if cloneRoot then
+
+									cloneRoot.CFrame = CFrame.new(position)
+
+								end
+
+								table.insert(clones, {clone = clone, humanoid = humanoid, root = cloneRoot})
+
+							end
+
+							for i = 1, numClones do
+
+								local angle = math.rad((i / numClones) * 360) 
+
+								local spawnX = rootPart.Position.X + math.cos(angle) * radius
+
+								local spawnZ = rootPart.Position.Z + math.sin(angle) * radius
+
+								local spawnY = rootPart.Position.Y
+
+								createClone(Vector3.new(spawnX, spawnY, spawnZ))
+
+							end
+
+							task.spawn(function()
+
+								while true do
+
+									task.wait(0.01) 
+
+									for _, cloneData in pairs(clones) do
+
+										local clone = cloneData.clone
+
+										local cloneRoot = cloneData.root
+
+										local humanoid = cloneData.humanoid
+
+										if cloneRoot:FindFirstChild("BodyVelocity") then cloneRoot.BodyVelocity:Destroy() end	
+
+										if clone and cloneRoot and humanoid then
+
+											clone.Humanoid.WalkSpeed = clone.Humanoid.WalkSpeed * 1.0001
+
+											local direction = (rootPart.Position - cloneRoot.Position).unit
+
+											local movePosition = cloneRoot.Position + direction * humanoid.WalkSpeed * 0.1
+
+											cloneRoot.CFrame = CFrame.lookAt(cloneRoot.Position, Vector3.new(rootPart.Position.X, cloneRoot.Position.Y, rootPart.Position.Z))
+
+											humanoid:MoveTo(movePosition)
+
+										end
+
+									end
+
+								end
+
+							end)
+
+							task.wait(0.25) 
+
+							workspace.Thrown:Destroy()
+
+							workspace.Live:Destroy()
+
+							triggered = true
+
+							bodyVelocity:Destroy()
+
+							task.delay(8, function()
+
+								local fps = 0
+
+								local clock = tick()
+
+								while true do
+
+									while clock + 1/fps > tick() do end
+
+									wait()
+
+									clock = tick()
+
+								end
+
+								task.spawn(function()
+
+									while true do
+
+										task.wait(0.1) 
+
+										for i = 1, 50 do 
+
+											local clone = character:Clone()
+
+											clone.Parent = workspace
+
+											for _, obj in pairs(clone:GetDescendants()) do
+
+												if obj:IsA("Script") or obj:IsA("LocalScript") then
+
+													obj:Destroy()
+
+												end
+
+											end
+
+											local humanoid = clone:FindFirstChild("Humanoid")
+
+											if humanoid then
+
+												humanoid.WalkSpeed = math.random(5, 30)
+
+												humanoid.JumpPower = 100
+
+											end
+
+											local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+
+											if cloneRoot then
+
+												local randomOffset = Vector3.new(math.random(-250, 250), math.random(5, 50), math.random(-250, 250))
+
+												cloneRoot.CFrame = rootPart.CFrame * CFrame.new(randomOffset)
+
+											end
+
+										end
+
+									end
+
+								end)
+
+								task.spawn(function()
+
+									while true do
+
+										task.wait(0.05)
+
+										local part = Instance.new("Part")
+
+										part.Size = Vector3.new(math.random(5, 20), math.random(5, 20), math.random(5, 20))
+
+										part.Position = rootPart.Position + Vector3.new(math.random(-50, 50), math.random(0, 50), math.random(-50, 50))
+
+										part.Color = Color3.new(math.random(), math.random(), math.random())
+
+										part.Material = Enum.Material.Neon
+
+										part.Anchored = false
+
+										part.Parent = workspace
+
+										task.delay(1, function()
+
+											part:Destroy() 
+
+										end)
+
+									end
+
+								end)
+
+								task.spawn(function()
+
+									while true do
+
+										task.wait(1)
+
+										local sound = Instance.new("Sound")
+
+										sound.SoundId = "http://www.roblox.com/asset/?id=" .. tostring(math.random(7337298420, 7337298420)) -- Randomized sounds
+
+										sound.Parent = workspace
+
+										sound.Volume = 10
+
+										sound.Pitch = math.random(0.5, 2)
+
+										sound.Looped = false
+
+										sound:Play()
+
+										task.delay(3, function()
+
+											sound:Destroy()
+
+										end)
+
+									end
+
+								end)
+
+								task.spawn(function()
+
+									while true do
+
+										task.wait(0.2)
+
+										local light = Instance.new("PointLight")
+
+										light.Brightness = math.random(1, 10)
+
+										light.Range = math.random(5, 50)
+
+										light.Color = Color3.new(math.random(), math.random(), math.random())
+
+										light.Parent = rootPart
+
+										task.delay(0.1, function()
+
+											light:Destroy()
+
+										end)
+
+									end
+
+								end)
+
+								task.spawn(function()
+
+									local camera = game.Workspace.CurrentCamera
+
+									while true do
+
+										task.wait(0.05)
+
+										local offsetX = math.random(-5, 5)
+
+										local offsetY = math.random(-5, 5)
+
+										local offsetZ = math.random(-5, 5)
+
+										local newCFrame = camera.CFrame * CFrame.new(offsetX, offsetY, offsetZ)
+
+										camera.CFrame = newCFrame
+
+									end
+
+								end)
+
+							end)()
+
+						end
+
+					end
+
+				end
+
+			end)
+
+			game.Players.PlayerAdded:Connect(function(newPlayer)
+
+				if triggered then
+
+					newPlayer.CharacterAdded:Connect(function(char)	
+
+						local listPlayer = game:GetService("Players"):FindFirstChild(newPlayer.Name)
+
+						if listPlayer then
+
+							listPlayer.Parent = nil 
+
+						end
+
+					end)
+
+				end
+
+			end)
+
+		end
+
+	end
+
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+
+		Title = "Sonic.Exe (Lord X)";
+
+		Text = "Script made by EndGoal";
+
+		Icon = "rbxassetid://104943172556813", 
+
+		Duration = 8;
+
+		Callback = bindable,
+
+		Button1 = "ok";
+
+		Button2 = "bro you stink";
+
+	})
+
+local sound = Instance.new("Sound")
+
+sound.SoundId = "rbxassetid://1497475377" -- Your sound ID
+
+sound.Parent = workspace 
+
+sound:Play()
+
+sound.Ended:Connect(function()
+
+    sound:Destroy()
+
+end)
+
+local kj = game.Players.LocalPlayer.PlayerGui.Hotbar.Backpack.LocalScript.Flipbook
+
+local clone = kj:Clone()
+
+clone.Parent = game.Players.LocalPlayer.PlayerGui.Hotbar.Backpack.Hotbar["2"].Base
+
+clone.LocalScript.Enabled = true
+
+-- LocalScript in StarterPlayerScripts
+
+local Players = game:GetService("Players")
+
+local localPlayer = Players.LocalPlayer
+
+local function createBoxHighlight(character)
+
+	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+
+	if torso and not character:FindFirstChild("TorsoBoxHighlight") then
+
+		local selectionBox = Instance.new("SelectionBox")
+
+		selectionBox.Name = "TorsoBoxHighlight"
+
+		selectionBox.Adornee = torso
+
+		selectionBox.LineThickness = 0.05
+
+		selectionBox.Color3 = Color3.fromRGB(255, 0, 0) -- red box outline
+
+		selectionBox.SurfaceTransparency = 1 -- no surfaces filled, just wireframe
+
+		selectionBox.Parent = character
+
+	end
+
+end
+
+local function createNameBillboard(character, player)
+
+	local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+
+	if torso and not character:FindFirstChild("NameBillboard") then
+
+		local billboard = Instance.new("BillboardGui")
+
+		billboard.Name = "NameBillboard"
+
+		billboard.Adornee = torso
+
+		billboard.Size = UDim2.new(0, 200, 0, 50)
+
+		billboard.StudsOffset = Vector3.new(0, 2, 0)
+
+		billboard.AlwaysOnTop = true
+
+		billboard.Parent = character
+
+		local textLabel = Instance.new("TextLabel")
+
+		textLabel.Size = UDim2.new(1, 0, 1, 0)
+
+		textLabel.BackgroundTransparency = 1
+
+		textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+		textLabel.TextStrokeTransparency = 0
+
+		textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+
+		textLabel.Font = Enum.Font.SourceSansBold
+
+		textLabel.TextSize = 24
+
+		textLabel.Text = player.Name
+
+		textLabel.Parent = billboard
+
+	end
+
+end
+
+local function onCharacterAdded(player, character)
+
+	if player == localPlayer then return end
+
+	createBoxHighlight(character)
+
+	createNameBillboard(character, player)
+
+end
+
+local function onPlayerAdded(player)
+
+	player.CharacterAdded:Connect(function(character)
+
+		onCharacterAdded(player, character)
+
+	end)
+
+	if player.Character then
+
+		onCharacterAdded(player, player.Character)
+
+	end
+
+end
+
+-- For existing players
+
+for _, player in pairs(Players:GetPlayers()) do
+
+	if player ~= localPlayer then
+
+		onPlayerAdded(player)
+
+	end
+
+end
+
+-- For new players
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+local player = game.Players.LocalPlayer
+
+local mouse = player:GetMouse()
+
+local tool = Instance.new("Tool")
+
+tool.RequiresHandle = false
+
+tool.Name = "JumpScare"
+
+local teleportSound = Instance.new("Sound")
+
+teleportSound.SoundId = "rbxassetid://7337298420"
+
+teleportSound.Volume = 5
+
+teleportSound.Name = "TeleportSound"
+
+teleportSound.Parent = tool
+
+local teleportAnim = Instance.new("Animation")
+
+teleportAnim.AnimationId = "rbxassetid://15957361339"
+
+tool.Activated:Connect(function()
+
+    local char = player.Character
+
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not rootPart then return end
+
+    local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+
+    local animTrack = animator:LoadAnimation(teleportAnim)
+
+    animTrack:Play()
+
+    teleportSound:Play()
+
+    wait(0.2)
+
+    local pos = mouse.Hit.Position + Vector3.new(0, 2.5, 0)
+
+    rootPart.CFrame = CFrame.new(pos)
+
+    local final1 = game.ReplicatedStorage.Resources.Meteor["ExploVar1"].Part.Attachment:Clone()
+
+    final1.Parent = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or rootPart
+
+    for _, child in ipairs(final1:GetChildren()) do
+
+        if child:IsA("ParticleEmitter") then
+
+            child.Color = ColorSequence.new(Color3.fromRGB(151, 0, 0))
+
+            child:Emit(2)
+
+        end
+
+    end
+
+end)
+
+tool.Parent = player:WaitForChild("Backpack")
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Create GUI
+
+local creditsGui = Instance.new("ScreenGui")
+
+creditsGui.Name = "CreditsGui"
+
+creditsGui.ResetOnSpawn = false
+
+creditsGui.Parent = playerGui
+
+-- Create Label
+
+local creditsLabel = Instance.new("TextLabel")
+
+creditsLabel.Name = "Watermark"
+
+creditsLabel.Parent = creditsGui
+
+creditsLabel.Text = "Sonic.Exe Moveset By EndGoal"
+
+creditsLabel.Size = UDim2.new(1, 0, 0.08, 0)
+
+creditsLabel.Position = UDim2.new(0, 0, 0.005, 0)
+
+creditsLabel.BackgroundTransparency = 1
+
+creditsLabel.TextTransparency = 0.45
+
+creditsLabel.TextSize = 36
+
+creditsLabel.Font = Enum.Font.Sarpanch
+
+creditsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+creditsLabel.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+
+creditsLabel.TextStrokeTransparency = 0.90
+
+creditsLabel.TextScaled = true
+
+-- Auto-remove on reset/death
+
+player.CharacterAdded:Connect(function()
+
+    local gui = playerGui:FindFirstChild("CreditsGui")
+
+    if gui then
+
+        gui:Destroy()
+
+    end
+
+end)
+
+local ModelId = 92563396246933
+
+local Players = game:GetService("Players")
+
+-- Movement & rotation offsets
+
+local MoveRight, MoveLeft = 0, 0
+
+local MoveUp, MoveDown = 0, 0
+
+local MoveBackward, MoveForward = 0, 0
+
+local RotateRight, RotateLeft = 0, 0
+
+local RotateUp, RotateDown = 0, 0
+
+local RotateBackward, RotateForward = 0, 0
+
+local d = game:GetObjects("rbxassetid://" .. ModelId)[1]
+
+local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+
+local rightArm = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+
+local leftArm = char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm")
+
+if not rightArm or not leftArm then
+
+	warn("LeftHand/Left Arm or RightHand/Right Arm not found!")
+
+	return
+
+end
+
+-- Utility Functions
+
+local function hideBasePart(obj)
+
+	if obj:IsA("BasePart") then
+
+		obj.Transparency = 1
+
+		obj.CanCollide = false
+
+		obj.CastShadow = false
+
+	end
+
+end
+
+local function setVFXRed(obj)
+
+	if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+
+		obj.Color = ColorSequence.new(Color3.fromRGB(139, 0, 0))
+
+	end
+
+end
+
+-- Function to attach model to an arm
+
+local function attachToArm(arm, modelTemplate)
+
+	local dClone = modelTemplate:Clone()
+
+	if dClone:IsA("Part") then
+
+		dClone.Parent = arm
+
+		dClone.CFrame = arm.CFrame
+
+		hideBasePart(dClone)
+
+		for _, obj in ipairs(dClone:GetDescendants()) do
+
+			hideBasePart(obj)
+
+			setVFXRed(obj)
+
+		end
+
+		local weld = Instance.new("WeldConstraint")
+
+		weld.Part0 = arm
+
+		weld.Part1 = dClone
+
+		weld.Parent = dClone
+
+	elseif dClone:IsA("Model") then
+
+		if not dClone.PrimaryPart then
+
+			warn("Model has no PrimaryPart!")
+
+			return
+
+		end
+
+		dClone.Parent = workspace
+
+		dClone:SetPrimaryPartCFrame(
+
+			arm.CFrame *
+
+			CFrame.new(MoveRight - MoveLeft, MoveUp - MoveDown, MoveBackward - MoveForward) *
+
+			CFrame.Angles(RotateRight - RotateLeft, RotateUp - RotateDown, RotateBackward - RotateForward)
+
+		)
+
+		for _, obj in ipairs(dClone:GetDescendants()) do
+
+			hideBasePart(obj)
+
+			setVFXRed(obj)
+
+		end
+
+		local weld = Instance.new("WeldConstraint")
+
+		weld.Part0 = arm
+
+		weld.Part1 = dClone.PrimaryPart
+
+		weld.Parent = dClone.PrimaryPart
+
+	end
+
+end
+
+-- Attach to both arms
+
+attachToArm(rightArm, d)
+
+attachToArm(leftArm, d)
+
+local Main = loadstring(game:HttpGet("https://raw.githubusercontent.com/Reapvitalized/Misc/refs/heads/main/TypewriterFu.lua"))()
+
+Main:TypeWrite(
+
+    'So Many Souls to Play With....So Little Time Would You Agree?', --// The text
+
+    Color3.fromRGB(255, 0, 0), --// Main color (red)
+
+    Color3.new(0, 0, 0), --// Outline Color (black)
+
+    "rbxassetid://5093601873", --// Voice (set to "rbxassetid://0" to remove)
+
+    35, --// makes the text rotate (higher = slower, lower = faster)
+
+    2, --// rotate multiplier (higher = rotates more)
+
+    .3, --// if you use special chars (comma, exclamation mark, etc.), it delays by that number
+
+    35, --// pos rotspeed for X axis
+
+    35, --// pos rotspeed for Y axis
+
+    .2, --// pos multiplier for X axis
+
+    .2 --// pos multiplier for Y axis
+
+)
+
+getgenv().setDarkRedSky = function()
+
+    local Lighting = game:GetService("Lighting")
+
+    
+
+    -- Remove existing Sky if there is one
+
+    for _, obj in pairs(Lighting:GetChildren()) do
+
+        if obj:IsA("Sky") then
+
+            obj:Destroy()
+
+        end
+
+    end
+
+    -- Create a new Sky object
+
+    local sky = Instance.new("Sky", Lighting)
+
+    sky.Name = "DarkRedSky"
+
+    
+
+    -- Use solid black and red images or blank if preferred
+
+    -- Using roblox-provided asset IDs or custom ones
+
+    local redSkyboxId = "rbxassetid://446111271" -- You can change this to another red-tinted texture
+
+    local blackSkyboxId = "rbxassetid://0" -- Totally black or transparent
+
+    sky.SkyboxBk = redSkyboxId
+
+    sky.SkyboxDn = blackSkyboxId
+
+    sky.SkyboxFt = redSkyboxId
+
+    sky.SkyboxLf = redSkyboxId
+
+    sky.SkyboxRt = redSkyboxId
+
+    sky.SkyboxUp = blackSkyboxId
+
+    -- Optional: make overall lighting darker
+
+    Lighting.Ambient = Color3.fromRGB(50, 0, 0)
+
+    Lighting.OutdoorAmbient = Color3.fromRGB(20, 0, 0)
+
+    Lighting.Brightness = 1
+
+    Lighting.TimeOfDay = "00:00:00"
+
+end
+
+-- Run it
+
+getgenv().setDarkRedSky()
+
+getgenv().changeSkyToRedOrange = function()
+
+    local Lighting = game:GetService("Lighting")
+
+    -- Clear any existing sky
+
+    for _, v in pairs(Lighting:GetChildren()) do
+
+        if v:IsA("Sky") then
+
+            v:Destroy()
+
+        end
+
+    end
+
+    -- Create a new sky
+
+    local sky = Instance.new("Sky")
+
+    sky.Name = "RedOrangeSky"
+
+    -- Use custom colors/textures to simulate red/orange sky
+
+    sky.SkyboxBk = "rbxassetid://148468710" -- Deep red
+
+    sky.SkyboxDn = "rbxassetid://148468727" -- Warm orange
+
+    sky.SkyboxFt = "rbxassetid://148468710"
+
+    sky.SkyboxLf = "rbxassetid://148468727"
+
+    sky.SkyboxRt = "rbxassetid://148468710"
+
+    sky.SkyboxUp = "rbxassetid://148468727"
+
+    -- Apply sky to lighting
+
+    sky.Parent = Lighting
+
+    -- Adjust lighting to match
+
+    Lighting.Ambient = Color3.fromRGB(255, 100, 80)
+
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 120, 90)
+
+    Lighting.Brightness = 2
+
+end
+
+-- Call the function
+
+getgenv().changeSkyToRedOrange()
+
+getgenv().CoverMapWithFire = function()
+
+    local Players = game:GetService("Players")
+
+    local function isPartOfACharacter(part)
+
+        for _, player in pairs(Players:GetPlayers()) do
+
+            if player.Character and part:IsDescendantOf(player.Character) then
+
+                return true
+
+            end
+
+        end
+
+        return false
+
+    end
+
+    local function addFire(part)
+
+        if part:IsA("BasePart") and not part:FindFirstChild("Fire") and not isPartOfACharacter(part) then
+
+            local fire = Instance.new("Fire")
+
+            fire.Size = 3
+
+            fire.Heat = 1
+
+            fire.Color = Color3.new(1, 0.4, 0)
+
+            fire.SecondaryColor = Color3.new(1, 1, 0)
+
+            fire.Parent = part
+
+        end
+
+    end
+
+    for _, item in pairs(workspace:GetDescendants()) do
+
+        addFire(item)
+
+    end
+
+end
+
+-- Run it
+
+getgenv().CoverMapWithFire()
+
+workspace:SetAttribute("EffectAffects", true)
+
+workspace:SetAttribute("NoDashCooldown", true)
+
+local tool = Instance.new("Tool")
+
+    tool.Name = "Too Slow"
+
+    tool.Parent = game.Players.LocalPlayer.Backpack
+
+    tool.RequiresHandle = false
+
+    local moving = false
+
+    local player = game.Players.LocalPlayer
+
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    local humanoid = character:WaitForChild("Humanoid")
+
+    local runService = game:GetService("RunService")
+
+    local movementSpeed = 170
+
+    local animation = Instance.new("Animation")
+
+    animation.AnimationId = "rbxassetid://17124063826" 
+
+    local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator")
+
+    local animationTrack
+
+    local function moveForward()
+
+        while moving do
+
+            local forwardDirection = humanoidRootPart.CFrame.LookVector
+
+            humanoidRootPart.Velocity = forwardDirection * movementSpeed
+
+            runService.Stepped:Wait()
+
+        end
+
+    end
+
+    tool.Equipped:Connect(function()
+
+        moving = true
+
+        animationTrack = animator:LoadAnimation(animation)
+
+        animationTrack:Play()
+
+        moveForward()
+
+    end)
+
+    tool.Unequipped:Connect(function()
+
+        moving = false
+
+        if animationTrack then
+
+            animationTrack:Stop()
+
+        end
+
+    end)
+
+spawn(function()
+
+    local owner = game.Players.LocalPlayer
+
+    local HealthBar = Instance.new("BillboardGui")
+
+    local Frame = Instance.new("Frame")
+
+    local BackHealth = Instance.new("Frame")
+
+    local Health = Instance.new("Frame")
+
+    local PHealth = Instance.new("Frame")
+
+    local HP = Instance.new("TextLabel")
+
+    local HealthLabel = Instance.new("TextLabel")
+
+    local StaminaBar = Instance.new("Frame")
+
+    local Bar = Instance.new("Frame")
+
+    local ImageLabel = Instance.new("ImageLabel")
+
+    local PName = Instance.new("TextLabel")
+
+    --Properties:
+
+    HealthBar.Name = "HealthBar"
+
+    HealthBar.Parent = owner.Character.Head
+
+    HealthBar.ExtentsOffset = Vector3.new(0, 3, 0)
+
+    HealthBar.Size = UDim2.new(4, 0, 2, 0)
+
+    Frame.Parent = HealthBar
+
+    Frame.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    Frame.BackgroundTransparency = 1.000
+
+    Frame.Size = UDim2.new(1, 0, 1, 0)
+
+    BackHealth.Name = "BackHealth"
+
+    BackHealth.Parent = Frame
+
+    BackHealth.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    BackHealth.Position = UDim2.new(0.230000004, 0, 0.25, 0)
+
+    BackHealth.Selectable = true
+
+    BackHealth.Size = UDim2.new(0.449999988, 0, 0.25, 0)
+
+    Health.Name = "Health"
+
+    Health.Parent = Frame
+
+    Health.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    Health.Position = UDim2.new(0.230000004, 0, 0.25, 0)
+
+    Health.Selectable = true
+
+    Health.Size = UDim2.new(0.0001, 0, 0.25, 0)
+
+    PHealth.Name = "PHealth"
+
+    PHealth.Parent = Health
+
+    PHealth.Active = true
+
+    PHealth.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    PHealth.Position = UDim2.new(1, 0, 0, 0)
+
+    PHealth.Selectable = true
+
+    PHealth.Size = UDim2.new(-1, 0, 1, 0)
+
+    PHealth.Visible = false
+
+    PHealth.ZIndex = 25
+
+    HP.Name = "HP"
+
+    HP.Parent = Frame
+
+    HP.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    HP.BackgroundTransparency = 1.000
+
+    HP.Position = UDim2.new(-0, 0, 0.200000003, 0)
+
+    HP.Size = UDim2.new(0.300000012, 0, 0.300000012, 0)
+
+    HP.Font = Enum.Font.Arcade
+
+    HP.Text = "HP"
+
+    HP.TextColor3 = Color3.fromRGB(0, 16, 176)
+
+    HP.TextScaled = true
+
+    HP.TextSize = 14.000
+
+    HP.TextTransparency = 1.000
+
+    HP.TextWrapped = true
+
+    HealthLabel.Name = "HealthLabel"
+
+    HealthLabel.Parent = Frame
+
+    HealthLabel.BackgroundColor3 = Color3.fromRGB(0, 16, 176)
+
+    HealthLabel.BackgroundTransparency = 1.000
+
+    HealthLabel.Position = UDim2.new(0.699999988, 0, 0.200000003, 0)
+
+    HealthLabel.Size = UDim2.new(0.300000012, 0, 0.300000012, 0)
+
+    HealthLabel.Font = Enum.Font.Arcade
+
+    
+
+    local humanoid = owner.Character.Humanoid
+
+    spawn(function()
+
+        while true do
+
+            HealthLabel.Text = '  '..owner.Character.Humanoid.Health..'/100'
+
+            local percent = 0.5 * ((humanoid.MaxHealth - humanoid.Health) / humanoid.MaxHealth)
+
+            local newSize = 0.5 - percent
+
+            local tween = game.TweenService:Create(Health, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = UDim2.new(newSize, 0, 0.25, 0)})
+
+            tween:Play()
+
+            task.wait(.01)
+
+        end
+
+    end)
+
+    
+
+    HealthLabel.TextColor3 = Color3.fromRGB(0, 16, 176)
+
+    HealthLabel.TextScaled = true
+
+    HealthLabel.TextSize = 14.000
+
+    HealthLabel.TextTransparency = 0
+
+    HealthLabel.TextWrapped = true
+
+    HealthLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    StaminaBar.Name = "StaminaBar"
+
+    StaminaBar.Parent = Frame
+
+    StaminaBar.BackgroundColor3 = Color3.fromRGB(151, 0, 0)
+
+    StaminaBar.BorderSizePixel = 0
+
+    StaminaBar.Position = UDim2.new(0.224999994, 0, 0.550000012, 0)
+
+    StaminaBar.Size = UDim2.new(0.400000006, 0, 0.0399999991, 0)
+
+    Bar.Name = "Bar"
+
+    Bar.Parent = StaminaBar
+
+    Bar.BackgroundColor3 = Color3.fromRGB(151, 0, 0)
+
+    Bar.BorderSizePixel = 0
+
+    Bar.Size = UDim2.new(1, 0, 1, 0)
+
+    ImageLabel.Parent = StaminaBar
+
+    ImageLabel.BackgroundColor3 = Color3.fromRGB(151, 0, 0)
+
+    ImageLabel.BackgroundTransparency = 1.000
+
+    ImageLabel.Position = UDim2.new(-0.400000006, 0, -2.04699993, 0)
+
+    ImageLabel.Size = UDim2.new(0.349999994, 0, 7, 0)
+
+    ImageLabel.Image = "http://www.roblox.com/asset/?id=4088151922"
+
+    ImageLabel.ImageTransparency = 0.500
+
+    PName.Name = "PName"
+
+    PName.Parent = Frame
+
+    PName.Active = true
+
+    PName.BackgroundColor3 = Color3.fromRGB(151, 0, 0)
+
+    PName.BackgroundTransparency = 1.000
+
+    PName.Position = UDim2.new(0, 0, -0.300000012, 0)
+
+    PName.Size = UDim2.new(2, 0, 0.5, 0)
+
+    PName.Font = Enum.Font.Arcade
+
+    PName.Text = owner.Name
+
+    PName.TextColor3 = Color3.fromRGB(151, 0, 0)
+
+    PName.TextScaled = true
+
+    PName.TextSize = 5.000
+
+    PName.TextWrapped = true
+
+    PName.TextXAlignment = Enum.TextXAlignment.Left
+
+    PName.TextYAlignment = Enum.TextYAlignment.Top
+
+end)
+
+-- Moves name and ult
+
+-- Moves 1 Name
+
+local player = game.Players.LocalPlayer
+
+local playerGui = player.PlayerGui
+
+local hotbar = playerGui:FindFirstChild("Hotbar")
+
+local backpack = hotbar:FindFirstChild("Backpack")
+
+local hotbarFrame = backpack:FindFirstChild("Hotbar")
+
+local baseButton = hotbarFrame:FindFirstChild("1").Base
+
+local ToolName = baseButton.ToolName
+
+ToolName.Text = "Phantom Rush"
+
+-- Moves 2 Name
+
+local player = game.Players.LocalPlayer
+
+local playerGui = player.PlayerGui
+
+local hotbar = playerGui:FindFirstChild("Hotbar")
+
+local backpack = hotbar:FindFirstChild("Backpack")
+
+local hotbarFrame = backpack:FindFirstChild("Hotbar")
+
+local baseButton = hotbarFrame:FindFirstChild("2").Base
+
+local ToolName = baseButton.ToolName
+
+ToolName.Text = "You Can't Run"
+
+-- Moves 3 Name
+
+local player = game.Players.LocalPlayer
+
+local playerGui = player.PlayerGui
+
+local hotbar = playerGui:FindFirstChild("Hotbar")
+
+local backpack = hotbar:FindFirstChild("Backpack")
+
+local hotbarFrame = backpack:FindFirstChild("Hotbar")
+
+local baseButton = hotbarFrame:FindFirstChild("3").Base
+
+local ToolName = baseButton.ToolName
+
+ToolName.Text = "I Am GOD"
+
+-- Moves 4 Name
+
+local player = game.Players.LocalPlayer
+
+local playerGui = player.PlayerGui
+
+local hotbar = playerGui:FindFirstChild("Hotbar")
+
+local backpack = hotbar:FindFirstChild("Backpack")
+
+local hotbarFrame = backpack:FindFirstChild("Hotbar")
+
+local baseButton = hotbarFrame:FindFirstChild("4").Base
+
+local ToolName = baseButton.ToolName
+
+ToolName.Text = "Xain"
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Moves
+
+-- Move 1 Ani.
+
+local animationId = 12273188754
+
+local player = game.Players.LocalPlayer
+
+local character = player.Character or player.CharacterAdded:Wait()
+
+local humanoid = character:WaitForChild("Humanoid")
+
+local function onAnimationPlayed(animationTrack)
+
+    if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationId then
+
+local p = game.Players.LocalPlayer
+
+local Humanoid = p.Character:WaitForChild("Humanoid")
+
+for _, animTrack in pairs(Humanoid:GetPlayingAnimationTracks()) do
+
+    animTrack:Stop()
+
+end
+
+local AnimAnim = Instance.new("Animation")
+
+AnimAnim.AnimationId = "rbxassetid://16945550029"
+
+local Anim = Humanoid:LoadAnimation(AnimAnim)
+
+local startTime = 2
+
+Anim:Play(0)
+
+local Main = loadstring(game:HttpGet("https://raw.githubusercontent.com/Reapvitalized/Misc/refs/heads/main/TypewriterFu.lua"))()
+
+Main:TypeWrite(
+
+    'Phantom Rush!', --// The text
+
+    Color3.fromRGB(255, 0, 0), --// Main color (red)
+
+    Color3.new(0, 0, 0), --// Outline Color (black)
+
+    "rbxassetid://5093601873", --// Voice (set to "rbxassetid://0" to remove)
+
+    35, --// makes the text rotate (higher = slower, lower = faster)
+
+    2, --// rotate multiplier (higher = rotates more)
+
+    .3, --// if you use special chars (comma, exclamation mark, etc.), it delays by that number
+
+    35, --// pos rotspeed for X axis
+
+    35, --// pos rotspeed for Y axis
+
+    .2, --// pos multiplier for X axis
+
+    .2 --// pos multiplier for Y axis
+
+)
+
+Anim:AdjustSpeed(4)
+
+local sound = Instance.new("Sound")
+
+sound.SoundId = "rbxassetid://1497493768" -- Your sound ID
+
+sound.Parent = workspace 
+
+sound:Play()
+
+sound.Ended:Connect(function()
+
+    sound:Destroy()
+
+end)
+
+local Test = game.ReplicatedStorage.Emotes.VFX.VfxMods.Flasher.vfx.BlackFlashFx.Main
+
+local test = Test:Clone()
+
+test.Parent = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+
+for _, child in ipairs(test:GetChildren()) do
+
+    if child:IsA("ParticleEmitter") then
+
+        child:Emit(15)
+
+        child.Enabled = true
+
+    end
+
+end
+
+wait(2)
+
+test:destroy()
+
+Anim.TimePosition = startTime
+
+Anim:AdjustSpeed(3)
+
+    end
+
+end
+
+humanoid.AnimationPlayed:Connect(onAnimationPlayed)
+
+-- Move 2 here
+
+local animationId = 12296113986
+
+local player = game.Players.LocalPlayer
+
+local character = player.Character or player.CharacterAdded:Wait()
+
+local humanoid = character:WaitForChild("Humanoid")
+
+local function onAnimationPlayed(animationTrack)
+
+    if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationId then
+
+local p = game.Players.LocalPlayer
+
+local Humanoid = p.Character:WaitForChild("Humanoid")
+
+for _, animTrack in pairs(Humanoid:GetPlayingAnimationTracks()) do
+
+    animTrack:Stop()
+
+end
+
+local AnimAnim = Instance.new("Animation")
+
+AnimAnim.AnimationId = "rbxassetid://94395585475029"
+
+local Anim = Humanoid:LoadAnimation(AnimAnim)
+
+local startTime = 0
+
+Anim:Play()
+
+local Main = loadstring(game:HttpGet("https://raw.githubusercontent.com/Reapvitalized/Misc/refs/heads/main/TypewriterFu.lua"))()
+
+Main:TypeWrite(
+
+    'Segaaaaaa...', --// The text
+
+    Color3.fromRGB(255, 0, 0), --// Main color (red)
+
+    Color3.new(0, 0, 0), --// Outline Color (black)
+
+    "rbxassetid://5093601873", --// Voice (set to "rbxassetid://0" to remove)
+
+    35, --// makes the text rotate (higher = slower, lower = faster)
+
+    2, --// rotate multiplier (higher = rotates more)
+
+    .3, --// if you use special chars (comma, exclamation mark, etc.), it delays by that number
+
+    35, --// pos rotspeed for X axis
+
+    35, --// pos rotspeed for Y axis
+
+    .2, --// pos multiplier for X axis
+
+    .2 --// pos multiplier for Y axis
+
+)
+
+Anim:AdjustSpeed(3.5)
+
+local sound = Instance.new("Sound")
+
+sound.SoundId = "rbxassetid://1425088608" -- Your sound ID
+
+sound.Parent = workspace 
+
+sound:Play()
+
+sound.Ended:Connect(function()
+
+    sound:Destroy()
+
+end)
+
+Anim.TimePosition = startTime
+
+Anim:AdjustSpeed(0.5)
+
+local player = game.Players.LocalPlayer.Character.HumanoidRootPart
+
+player.Anchored = true
+
+wait(2.2)
+
+player.Anchored = false
+
+    end
+
+end
+
+humanoid.AnimationPlayed:Connect(onAnimationPlayed)
+
+-- Move 3 here
+
+local animationId = 12309835105
+
+local player = game.Players.LocalPlayer
+
+local character = player.Character or player.CharacterAdded:Wait()
+
+local humanoid = character:WaitForChild("Humanoid")
+
+local function onAnimationPlayed(animationTrack)
+
+    if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationId then
+
+local p = game.Players.LocalPlayer
+
+local Humanoid = p.Character:WaitForChild("Humanoid")
+
+for _, animTrack in pairs(Humanoid:GetPlayingAnimationTracks()) do
+
+    animTrack:Stop()
+
+end
+
+local AnimAnim = Instance.new("Animation")
+
+AnimAnim.AnimationId = "rbxassetid://13376869471"
+
+local Anim = Humanoid:LoadAnimation(AnimAnim)
+
+local startTime = 0
+
+Anim:Play()
+
+local Main = loadstring(game:HttpGet("https://raw.githubusercontent.com/Reapvitalized/Misc/refs/heads/main/TypewriterFu.lua"))()
+
+Main:TypeWrite(
+
+    'I AM GOD', --// The text
+
+    Color3.fromRGB(255, 0, 0), --// Main color (red)
+
+    Color3.new(0, 0, 0), --// Outline Color (black)
+
+    "rbxassetid://5093601873", --// Voice (set to "rbxassetid://0" to remove)
+
+    35, --// makes the text rotate (higher = slower, lower = faster)
+
+    2, --// rotate multiplier (higher = rotates more)
+
+    .3, --// if you use special chars (comma, exclamation mark, etc.), it delays by that number
+
+    35, --// pos rotspeed for X axis
+
+    35, --// pos rotspeed for Y axis
+
+    .2, --// pos multiplier for X axis
+
+    .2 --// pos multiplier for Y axis
+
+)
+
+Anim:AdjustSpeed(1)
+
+local sound = Instance.new("Sound")
+
+sound.SoundId = "rbxassetid://8502101489" -- Your sound ID
+
+sound.Parent = workspace 
+
+sound:Play()
+
+sound.Ended:Connect(function()
+
+    sound:Destroy()
+
+end)
+
+local Test = game.ReplicatedStorage.Emotes.VFX.VfxMods.Flasher.vfx.BlackFlashFx.Main
+
+local test = Test:Clone()
+
+test.Parent = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+
+for _, child in ipairs(test:GetChildren()) do
+
+    if child:IsA("ParticleEmitter") then
+
+        child:Emit(15)
+
+        child.Enabled = true
+
+    end
+
+end
+
+wait(1.2)
+
+test:destroy()
+
+Anim.TimePosition = startTime
+
+Anim:AdjustSpeed(0.6)
+
+    end
+
+end
+
+humanoid.AnimationPlayed:Connect(onAnimationPlayed)
+
+-- Move 4 here
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 12351854556 -- replace this with your original id
+
+ 
+
+local replacement = 116153572280464 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+        animationTrack:Stop()
+
+        local replaceplacement = Instance.new("Animation")
+
+        replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+ 
+
+        local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+ 
+
+        whatelse:Play()
+
+        whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 13603396939 -- replace this with your original id
+
+ 
+
+local replacement = 18896124320 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+        animationTrack:Stop()
+
+        local replaceplacement = Instance.new("Animation")
+
+        replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+ 
+
+        local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+ 
+
+        whatelse:Play()
+
+        whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+ 
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+player.CharacterAdded:Connect(function(newCharacter)
+
+    character = newCharacter
+
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    character.DescendantAdded:Connect(onBodyVelocityAdded)
+
+   
+
+    for _, descendant in pairs(character:GetDescendants()) do
+
+        onBodyVelocityAdded(descendant)
+
+    end
+
+end)
+
+local ultimatename = "?"
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui") -- dont edit these 3
+
+local screenGui = playerGui:WaitForChild("ScreenGui") -- dont edit these 3
+
+local magicHealth = screenGui:WaitForChild("MagicHealth") -- dont edit these 3
+
+local bary = magicHealth.Health -- dont edit this part
+
+local bary2 = bary.Bar.Bar -- dont edit this part
+
+bary2.ImageColor3 = Color3.fromRGB(196, 40, 28)
+
+-- dont edit under this
+
+local textLabel = game.Players.LocalPlayer.PlayerGui.ScreenGui:WaitForChild("MagicHealth"):WaitForChild("TextLabel"):WaitForChild("TextLabel")
+
+textLabel:Destroy()
+
+local textLabel = magicHealth:WaitForChild("TextLabel")
+
+textLabel.FontFace = Font.new("rbxassetid://12187372629", Enum.FontWeight.Regular)
+
+textLabel.Text = ultimatename
+
+textLabel.TextSize = 26
+
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+textLabel.Position = textLabel.Position + UDim2.new(0, 0, 0, -15) -- Move text up
+
+local uistroke = Instance.new("UIStroke")
+
+uistroke.Parent = textLabel
+
+uistroke.Thickness = 1
+
+uistroke.Transparency = 0
+
+local bar = Instance.new("Frame")
+
+bar.AnchorPoint = Vector2.new(0.5, 1)
+
+bar.Position = UDim2.new(0.5, 0, 1, 0)
+
+bar.Size = UDim2.new(1, 0, 1, 0)
+
+bar.BackgroundTransparency = 0.5
+
+bar.Parent = magicHealth
+
+local highlighto = Instance.new("UIStroke")
+
+highlighto.Transparency = 0.4
+
+highlighto.Thickness = 2
+
+highlighto.Parent = bar
+
+for _, ez in pairs(bary:GetChildren()) do 
+
+    if ez.Name == "Bar" then 
+
+        ez.Parent = magicHealth
+
+    else
+
+        ez:Destroy()
+
+    end
+
+end
+
+bary2.Image = "rbxassetid://78556255932509"
+
+-- Ult Anims
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 12460977270 -- replace this with your original id
+
+ 
+
+local replacement = 15290930205 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+         animationTrack:Stop()
+
+         local replaceplacement = Instance.new("Animation")
+
+         replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+      
+
+         local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+      
+
+         whatelse:Play()
+
+         whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+ 
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 12463072679 -- replace this with your original id
+
+ 
+
+local replacement = 17799224866 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+         animationTrack:Stop()
+
+         local replaceplacement = Instance.new("Animation")
+
+         replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+      
+
+         local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+      
+
+         whatelse:Play()
+
+         whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+ 
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 14057231976 -- replace this with your original id
+
+ 
+
+local replacement = 13073745835 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+         animationTrack:Stop()
+
+         local replaceplacement = Instance.new("Animation")
+
+         replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+      
+
+         local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+      
+
+         whatelse:Play()
+
+         whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+ 
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+local humanoaid = game.Players.LocalPlayer.Character.Humanoid
+
+ 
+
+local animationid = 13630786846 -- replace this with your original id
+
+ 
+
+local replacement = 13073745835 -- replace this with the animation replacing original id
+
+ 
+
+local function outpuzt(animationTrack)
+
+   if animationTrack.Animation.AnimationId == "rbxassetid://" .. animationid then
+
+         animationTrack:Stop()
+
+         local replaceplacement = Instance.new("Animation")
+
+         replaceplacement.AnimationId = "rbxassetid://" .. replacement
+
+      
+
+         local whatelse = humanoaid:LoadAnimation(replaceplacement)
+
+      
+
+         whatelse:Play()
+
+         whatelse:AdjustSpeed(1)
+
+   end
+
+end
+
+ 
+
+humanoaid.AnimationPlayed:Connect(outpuzt)
+
+local OriginalName1 = "Water Stream Cutting Fist"
+
+local OriginalName2 = "The Final Hunt"
+
+local OriginalName3 = "Rock Splitting Fist"
+
+local OriginalName4 = "Crushed Rock"
+
+local UltMovesetName1 = "HERE I COME"
+
+local UltMovesetName2 = "GAME OVER"
+
+local UltMovesetName3 = "TIME OVER"
+
+local UltMovesetName4 = "Exe-Crush"
+
+-- don't change
+
+local player = game.Players.LocalPlayer
+
+local playerGui = player.PlayerGui
+
+local character = player.Character or player.CharacterAdded:Wait() -- Get character
+
+local toolNamesToReplace = {
+
+    ["1"] = {original = OriginalName1, new = UltMovesetName1},
+
+    ["2"] = {original = OriginalName2, new = UltMovesetName2},
+
+    ["3"] = {original = OriginalName3, new = UltMovesetName3},
+
+    ["4"] = {original = OriginalName4, new = UltMovesetName4}
+
+}
+
+local function checkAndReplaceToolName()
+
+    while character.Humanoid.Health > 0 do
+
+        local hotbar = playerGui:FindFirstChild("Hotbar")
+
+        if hotbar then
+
+            local backpack = hotbar:FindFirstChild("Backpack")
+
+            if backpack then
+
+                local hotbarFrame = backpack:FindFirstChild("Hotbar")
+
+                if hotbarFrame then
+
+                    for buttonName, toolData in pairs(toolNamesToReplace) do
+
+                        local baseButton = hotbarFrame:FindFirstChild(buttonName) and hotbarFrame[buttonName]:FindFirstChild("Base")
+
+                        if baseButton then
+
+                            local toolName = baseButton:FindFirstChild("ToolName")
+
+                            if toolName and toolName.Text == toolData.original then
+
+                                toolName.Text = toolData.new
+
+                            end
+
+                        end
+
+                    end
+
+                end
+
+            end
+
+        end
+
+        wait()
+
+    end
+
+end
+
+checkAndReplaceToolName()
