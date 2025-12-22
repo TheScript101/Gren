@@ -1,0 +1,116 @@
+--// Configuration
+local MovesetURL = "https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Gojo.txt"
+
+--// Default setting
+local MorphEnabled = true
+getgenv().morph = MorphEnabled
+
+--// Services
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+--// ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SettingsGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+--// Main Frame (TALLER)
+local Frame = Instance.new("Frame")
+Frame.Parent = ScreenGui
+Frame.Size = UDim2.fromScale(0.35, 0.38)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+Frame.Position = UDim2.fromScale(0.5, 0.5)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 16)
+Corner.Parent = Frame
+
+--// Title
+local Title = Instance.new("TextLabel")
+Title.Parent = Frame
+Title.Size = UDim2.new(1, -20, 0, 40)
+Title.Position = UDim2.new(0, 10, 0, 10)
+Title.BackgroundTransparency = 1
+Title.Text = "Settings"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 26
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+--// Morph Row Container
+local MorphRow = Instance.new("Frame")
+MorphRow.Parent = Frame
+MorphRow.Size = UDim2.new(1, -20, 0, 50)
+MorphRow.Position = UDim2.new(0, 10, 0, 70)
+MorphRow.BackgroundTransparency = 1
+
+-- Morph label
+local MorphText = Instance.new("TextLabel")
+MorphText.Parent = MorphRow
+MorphText.Size = UDim2.new(0.6, 0, 1, 0)
+MorphText.BackgroundTransparency = 1
+MorphText.Text = "Morph"
+MorphText.Font = Enum.Font.Gotham
+MorphText.TextSize = 20
+MorphText.TextColor3 = Color3.fromRGB(200, 200, 200)
+MorphText.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Toggle button
+local Toggle = Instance.new("TextButton")
+Toggle.Parent = MorphRow
+Toggle.Size = UDim2.new(0.35, 0, 0.8, 0)
+Toggle.Position = UDim2.new(0.65, 0, 0.1, 0)
+Toggle.Font = Enum.Font.GothamBold
+Toggle.TextSize = 18
+Toggle.BorderSizePixel = 0
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 10)
+ToggleCorner.Parent = Toggle
+
+-- Update visuals
+local function UpdateToggle()
+    if MorphEnabled then
+        Toggle.Text = "TRUE"
+        Toggle.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        Toggle.Text = "FALSE"
+        Toggle.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end
+
+UpdateToggle()
+
+Toggle.MouseButton1Click:Connect(function()
+    MorphEnabled = not MorphEnabled
+    UpdateToggle()
+end)
+
+--// Confirm Button (CLEARLY BELOW)
+local Confirm = Instance.new("TextButton")
+Confirm.Parent = Frame
+Confirm.Size = UDim2.new(1, -20, 0, 44)
+Confirm.Position = UDim2.new(0, 10, 0, 140)
+Confirm.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Confirm.Text = "Confirm"
+Confirm.Font = Enum.Font.GothamBold
+Confirm.TextSize = 20
+Confirm.TextColor3 = Color3.fromRGB(255, 255, 255)
+Confirm.BorderSizePixel = 0
+
+local ConfirmCorner = Instance.new("UICorner")
+ConfirmCorner.CornerRadius = UDim.new(0, 12)
+ConfirmCorner.Parent = Confirm
+
+--// Confirm logic
+Confirm.MouseButton1Click:Connect(function()
+    getgenv().morph = MorphEnabled
+    ScreenGui:Destroy()
+    loadstring(game:HttpGet(MovesetURL))()
+end)
