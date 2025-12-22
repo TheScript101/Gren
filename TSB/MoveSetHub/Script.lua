@@ -32,6 +32,34 @@ SaitamaTab:CreateButton({
     end
 })
 
+-- Mafioso Button
+SaitamaTab:CreateButton({
+    Name = "Mafioso Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Mafioso.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
+-- Okarun Button
+SaitamaTab:CreateButton({
+    Name = "Okarun Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Okarun.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
 -- Sukuna Button
 SaitamaTab:CreateButton({
     Name = "Sukuna Moveset",
