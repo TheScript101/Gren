@@ -60,20 +60,6 @@ SaitamaTab:CreateButton({
     end
 })
 
--- Okarun Button
-SaitamaTab:CreateButton({
-    Name = "Okarun Moveset",
-    Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Okarun.txt"))()
-      wait(1)
-        Rayfield:Notify({
-            Title = "Button Pressed",
-            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
-            Duration = 5
-        })
-    end
-})
-
 -- Sukuna Button
 SaitamaTab:CreateButton({
     Name = "Sukuna Moveset",
@@ -88,4 +74,19 @@ SaitamaTab:CreateButton({
     end
 })
 
+-- Create Garou Tab with Image Icon
+local GarouTab = Window:CreateTab("Garou", 17761223310)
 
+-- Okarun Button
+GarouTab:CreateButton({
+    Name = "Okarun Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Okarun.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
