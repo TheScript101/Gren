@@ -3,9 +3,11 @@ local ScriptURL = "https://raw.githubusercontent.com/Kenjihin69/Kenjihin69/refs/
 
 --// Default configs
 local Configs = {
-    Stand = false,
-    Ken = false,
-    Spawn = true
+    night = false,
+    infinitedash = true,
+    fog = false
+    Dance = false
+    secret = false
 }
 
 -- Apply defaults to getgenv
