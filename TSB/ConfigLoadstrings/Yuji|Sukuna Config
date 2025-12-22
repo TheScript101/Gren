@@ -1,5 +1,5 @@
 --// Script URL
-local ScriptURL = "https://raw.githubusercontent.com/Kenjihin69/Kenjihin69/refs/heads/main/Saitama%20to%20golden%20sigma"
+local ScriptURL = "https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Yuji%5CSukuna.txt"
 
 --// Default configs
 local Configs = {
@@ -114,9 +114,11 @@ local function CreateToggle(name)
 end
 
 --// Create toggles
-CreateToggle("Stand")
-CreateToggle("Ken")
-CreateToggle("Spawn")
+CreateToggle("infinitedash")
+CreateToggle("fog")
+CreateToggle("night")
+CreateToggle("Dance")
+CreateToggle("secret")
 
 --// Confirm Button
 local Confirm = Instance.new("TextButton")
