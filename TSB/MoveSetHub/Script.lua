@@ -18,20 +18,6 @@ local Window = Rayfield:CreateWindow({
 -- Create Saitama Tab with Image Icon
 local SaitamaTab = Window:CreateTab("Saitama", 17761220757)
 
--- Beerus Button
-SaitamaTab:CreateButton({
-    Name = "Beerus Moveset",
-    Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/ConfigLoadstrings/GojoConfig"))()
-      wait(1)
-        Rayfield:Notify({
-            Title = "Button Pressed",
-            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
-            Duration = 5
-        })
-    end
-})
-
 -- Gojo Button
 SaitamaTab:CreateButton({
     Name = "Gojo Moveset",
@@ -46,7 +32,7 @@ SaitamaTab:CreateButton({
     end
 })
 
--- Gojo Button
+-- Goldenhead Button
 SaitamaTab:CreateButton({
     Name = "Goldenhead Moveset",
     Callback = function()
@@ -107,6 +93,20 @@ SaitamaTab:CreateButton({
     Name = "Sukuna Moveset",
     Callback = function()
       loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/Sukuna.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
+-- Yuji/Sukuna Button
+SaitamaTab:CreateButton({
+    Name = "Yuji/Sukuna Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/ConfigLoadstrings/Yuji%7CSukuna%20Config"))()
       wait(1)
         Rayfield:Notify({
             Title = "Button Pressed",
