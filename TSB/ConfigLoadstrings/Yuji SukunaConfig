@@ -1,0 +1,143 @@
+--// Script URL
+local ScriptURL = "https://raw.githubusercontent.com/Kenjihin69/Kenjihin69/refs/heads/main/Saitama%20to%20golden%20sigma"
+
+--// Default configs
+local Configs = {
+    Stand = false,
+    Ken = false,
+    Spawn = true
+}
+
+-- Apply defaults to getgenv
+for k, v in pairs(Configs) do
+    getgenv()[k] = v
+end
+
+--// Services
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+--// ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GoldenHeadSettings"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+--// Main Frame
+local Frame = Instance.new("Frame")
+Frame.Parent = ScreenGui
+Frame.Size = UDim2.fromScale(0.4, 0.5)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+Frame.Position = UDim2.fromScale(0.5, 0.5)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+
+local FrameCorner = Instance.new("UICorner")
+FrameCorner.CornerRadius = UDim.new(0, 16)
+FrameCorner.Parent = Frame
+
+--// Title
+local Title = Instance.new("TextLabel")
+Title.Parent = Frame
+Title.Size = UDim2.new(1, -20, 0, 40)
+Title.Position = UDim2.new(0, 10, 0, 10)
+Title.BackgroundTransparency = 1
+Title.Text = "Yuji/Sukuna Settings (Scroll)"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+--// Scrolling Frame
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Parent = Frame
+Scroll.Size = UDim2.new(1, -20, 1, -120)
+Scroll.Position = UDim2.new(0, 10, 0, 60)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.ScrollBarImageTransparency = 0.2
+Scroll.BorderSizePixel = 0
+Scroll.BackgroundTransparency = 1
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local Layout = Instance.new("UIListLayout")
+Layout.Parent = Scroll
+Layout.Padding = UDim.new(0, 12)
+
+--// Toggle creator
+local function CreateToggle(name)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, 0, 0, 50)
+    Row.BackgroundTransparency = 1
+    Row.Parent = Scroll
+
+    local Label = Instance.new("TextLabel")
+    Label.Parent = Row
+    Label.Size = UDim2.new(0.6, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 20
+    Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local Toggle = Instance.new("TextButton")
+    Toggle.Parent = Row
+    Toggle.Size = UDim2.new(0.35, 0, 0.8, 0)
+    Toggle.Position = UDim2.new(0.65, 0, 0.1, 0)
+    Toggle.Font = Enum.Font.GothamBold
+    Toggle.TextSize = 18
+    Toggle.BorderSizePixel = 0
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 10)
+    Corner.Parent = Toggle
+
+    local function Update()
+        if Configs[name] then
+            Toggle.Text = "TRUE"
+            Toggle.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        else
+            Toggle.Text = "FALSE"
+            Toggle.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        end
+        Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+
+    Update()
+
+    Toggle.MouseButton1Click:Connect(function()
+        Configs[name] = not Configs[name]
+        Update()
+    end)
+end
+
+--// Create toggles
+CreateToggle("Stand")
+CreateToggle("Ken")
+CreateToggle("Spawn")
+
+--// Confirm Button
+local Confirm = Instance.new("TextButton")
+Confirm.Parent = Frame
+Confirm.Size = UDim2.new(1, -20, 0, 44)
+Confirm.Position = UDim2.new(0, 10, 1, -54)
+Confirm.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Confirm.Text = "Confirm"
+Confirm.Font = Enum.Font.GothamBold
+Confirm.TextSize = 20
+Confirm.TextColor3 = Color3.fromRGB(255, 255, 255)
+Confirm.BorderSizePixel = 0
+
+local ConfirmCorner = Instance.new("UICorner")
+ConfirmCorner.CornerRadius = UDim.new(0, 12)
+ConfirmCorner.Parent = Confirm
+
+--// Confirm logic
+Confirm.MouseButton1Click:Connect(function()
+    for k, v in pairs(Configs) do
+        getgenv()[k] = v
+    end
+
+    ScreenGui:Destroy()
+    loadstring(game:HttpGet(ScriptURL))()
+end)
