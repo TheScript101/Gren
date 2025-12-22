@@ -74,6 +74,20 @@ SaitamaTab:CreateButton({
     end
 })
 
+-- Manga Sukuna Button
+SaitamaTab:CreateButton({
+    Name = "Manga Sukuna Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/Movesets/MangaSukuna.txt"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
 -- Mafioso Button
 SaitamaTab:CreateButton({
     Name = "Mafioso Moveset",
