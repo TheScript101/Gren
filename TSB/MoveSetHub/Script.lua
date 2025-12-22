@@ -18,6 +18,20 @@ local Window = Rayfield:CreateWindow({
 -- Create Saitama Tab with Image Icon
 local SaitamaTab = Window:CreateTab("Saitama", 17761220757)
 
+-- Beerus Button
+SaitamaTab:CreateButton({
+    Name = "Beerus Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/ConfigLoadstrings/GojoConfig"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
 -- Gojo Button
 SaitamaTab:CreateButton({
     Name = "Gojo Moveset",
