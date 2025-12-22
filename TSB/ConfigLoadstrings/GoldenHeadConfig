@@ -42,9 +42,9 @@ Title.Parent = Frame
 Title.Size = UDim2.new(1, -20, 0, 40)
 Title.Position = UDim2.new(0, 10, 0, 10)
 Title.BackgroundTransparency = 1
-Title.Text = "GoldenHead Settings"
+Title.Text = "GoldenHead Settings (Scroll)"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 26
+Title.TextSize = 22
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
