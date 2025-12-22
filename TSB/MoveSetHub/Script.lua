@@ -46,6 +46,20 @@ SaitamaTab:CreateButton({
     end
 })
 
+-- Gojo Button
+SaitamaTab:CreateButton({
+    Name = "Goldenhead Moveset",
+    Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/TSB/ConfigLoadstrings/GoldenHeadConfig"))()
+      wait(1)
+        Rayfield:Notify({
+            Title = "Button Pressed",
+            Content = "Executed! (TEMPORARY — dying disables the moveset. Re-execute to enable again.)",
+            Duration = 5
+        })
+    end
+})
+
 -- Kars Button
 SaitamaTab:CreateButton({
     Name = "Kars Moveset",
