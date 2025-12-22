@@ -5,8 +5,8 @@ local ScriptURL = "https://raw.githubusercontent.com/TheScript101/Gren/refs/head
 local Configs = {
     night = false,
     infinitedash = true,
-    fog = false
-    Dance = false
+    fog = false,
+    Dance = false,
     secret = false
 }
 
