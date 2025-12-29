@@ -3,7 +3,7 @@ local function sendChatMessage(message)
     local chatService = game:GetService("TextChatService")
 
     if chatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
-        warn("TextChatService not enabled in this game")
+        warn("TextChatService not enabled")
         return
     end
 
@@ -15,41 +15,40 @@ local function sendChatMessage(message)
     end
 end
 
--- Create GUI
+-- Create ScreenGui (CoreGui = executor-safe)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ChatButtonGui"
 screenGui.IgnoreGuiInset = true
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
--- 🔥 Use CoreGui for executor reliability
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 screenGui.Parent = game:GetService("CoreGui")
 
 -- Create ImageButton
 local imageButton = Instance.new("ImageButton")
 imageButton.Name = "ChatButton"
-imageButton.Size = UDim2.new(0, 90, 0, 90) -- pixel size (VISIBLE)
-imageButton.Position = UDim2.new(1, -110, 1, -160) -- bottom-right-ish
+imageButton.Size = UDim2.new(0, 90, 0, 90) -- PIXELS (important)
+imageButton.Position = UDim2.new(1, -120, 1, -180) -- bottom-right
 imageButton.AnchorPoint = Vector2.new(0, 0)
+imageButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 imageButton.BackgroundTransparency = 0
-imageButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-imageButton.Image = "rbxassetid://126174819916927"
+imageButton.BorderSizePixel = 0
+imageButton.AutoButtonColor = true
 imageButton.Active = true
 imageButton.Draggable = true
-imageButton.AutoButtonColor = true
+imageButton.ZIndex = 100
+
+-- 🔥 rblxthumb image (THIS FIXES IT)
+imageButton.Image = "rblxthumb://type=Asset&id=126174819916927&w=420&h=420"
+
 imageButton.Parent = screenGui
 
--- Rounded corners (modern look)
+-- Rounded corners
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
+corner.CornerRadius = UDim.new(0, 14)
 corner.Parent = imageButton
 
--- Button press behavior
+-- Button behavior
 imageButton.Activated:Connect(function()
-    sendChatMessage("/sheriff Gokugamercoolki")
-    sendChatMessage("/map beachresort")
-    sendChatMessage("/murderer 360iytt")
-end)
     sendChatMessage("/sheriff Gokugamercoolki")
     sendChatMessage("/map beachresort")
     sendChatMessage("/murderer 360iytt")
