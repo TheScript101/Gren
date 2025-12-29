@@ -1,0 +1,40 @@
+-- Function to send chat messages using TextChatService
+local function sendChatMessage(message)
+    local chatService = game:GetService("TextChatService")
+    local textChannels = chatService:FindFirstChild("TextChannels")
+    local defaultChannel = textChannels and textChannels:FindFirstChild("RBXGeneral")
+
+    if defaultChannel then
+        defaultChannel:SendAsync(message)
+    else
+        warn("Default chat channel not found!")
+    end
+end
+
+-- Create GUI
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ChatButtonGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Create ImageButton
+local imageButton = Instance.new("ImageButton")
+imageButton.Name = "ChatButton"
+imageButton.Size = UDim2.fromScale(0.15, 0.15)
+imageButton.Position = UDim2.fromScale(0.85, 0.75)
+imageButton.AnchorPoint = Vector2.new(0.5, 0.5)
+imageButton.BackgroundTransparency = 1
+imageButton.Image = "rbxassetid://126174819916927"
+imageButton.Active = true
+imageButton.Draggable = true -- ✅ makes it draggable
+imageButton.Parent = screenGui
+
+-- Button press behavior
+imageButton.Activated:Connect(function()
+    sendChatMessage("/sheriff Gokugamercoolki")
+    sendChatMessage("/map beachresort")
+    sendChatMessage("/murderer 360iytt")
+end)
