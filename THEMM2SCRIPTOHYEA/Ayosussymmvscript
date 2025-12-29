@@ -1,55 +1,127 @@
--- Function to send chat messages
-local function sendChatMessage(message)
-    local chatService = game:GetService("TextChatService")
+local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
+local ContentProvider = game:GetService("ContentProvider")
+local TweenService = game:GetService("TweenService")
 
-    if chatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
+local player = Players.LocalPlayer
+
+----------------------------------------------------
+-- CHAT FUNCTION
+----------------------------------------------------
+local function sendChatMessage(msg)
+    if TextChatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
         warn("TextChatService not enabled")
         return
     end
 
-    local channel = chatService.TextChannels:FindFirstChild("RBXGeneral")
+    local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
     if channel then
-        channel:SendAsync(message)
-    else
-        warn("RBXGeneral channel not found")
+        channel:SendAsync(msg)
     end
 end
 
--- Create ScreenGui (CoreGui = executor-safe)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ChatButtonGui"
-screenGui.IgnoreGuiInset = true
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-screenGui.Parent = game:GetService("CoreGui")
+----------------------------------------------------
+-- GUI SETUP (CoreGui-safe)
+----------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "ChatButtonGui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+gui.Parent = game:GetService("CoreGui")
 
--- Create ImageButton
-local imageButton = Instance.new("ImageButton")
-imageButton.Name = "ChatButton"
-imageButton.Size = UDim2.new(0, 90, 0, 90) -- PIXELS (important)
-imageButton.Position = UDim2.new(1, -120, 1, -180) -- bottom-right
-imageButton.AnchorPoint = Vector2.new(0, 0)
-imageButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-imageButton.BackgroundTransparency = 0
-imageButton.BorderSizePixel = 0
-imageButton.AutoButtonColor = true
-imageButton.Active = true
-imageButton.Draggable = true
-imageButton.ZIndex = 100
+----------------------------------------------------
+-- CONFIRMATION BANNER (TOP)
+----------------------------------------------------
+local banner = Instance.new("TextLabel")
+banner.Size = UDim2.new(0, 260, 0, 45)
+banner.Position = UDim2.new(0.5, 0, 0, -60)
+banner.AnchorPoint = Vector2.new(0.5, 0)
+banner.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+banner.TextColor3 = Color3.fromRGB(0, 255, 0)
+banner.Font = Enum.Font.GothamBold
+banner.TextSize = 20
+banner.Text = "WORKED"
+banner.Visible = false
+banner.ZIndex = 200
+banner.Parent = gui
 
--- 🔥 rblxthumb image (THIS FIXES IT)
-imageButton.Image = "rblxthumb://type=Asset&id=126174819916927&w=420&h=420"
+local bannerCorner = Instance.new("UICorner")
+bannerCorner.CornerRadius = UDim.new(0, 12)
+bannerCorner.Parent = banner
 
-imageButton.Parent = screenGui
+----------------------------------------------------
+-- BUTTON
+----------------------------------------------------
+local button = Instance.new("ImageButton")
+button.Size = UDim2.new(0, 90, 0, 90)
+button.Position = UDim2.new(1, -120, 1, -180)
+button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+button.BorderSizePixel = 0
+button.Active = true
+button.Draggable = true
+button.AutoButtonColor = true
+button.ZIndex = 100
+button.Parent = gui
 
--- Rounded corners
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 14)
-corner.Parent = imageButton
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 14)
+buttonCorner.Parent = button
 
--- Button behavior
-imageButton.Activated:Connect(function()
+----------------------------------------------------
+-- IMAGE FIX (THUMBNAIL + FALLBACK)
+----------------------------------------------------
+local IMAGE_ID = 126174819916927
+
+local thumb = "rblxthumb://type=Asset&id=" .. IMAGE_ID .. "&w=420&h=420"
+button.Image = thumb
+button.ImageTransparency = 0
+
+-- Force-load thumbnail
+pcall(function()
+    ContentProvider:PreloadAsync({ button })
+end)
+
+-- Fallback if thumbnail fails
+task.delay(1, function()
+    if button.Image == "" or button.ImageTransparency == 1 then
+        button.Image = "rbxassetid://" .. IMAGE_ID
+    end
+end)
+
+----------------------------------------------------
+-- BANNER ANIMATION
+----------------------------------------------------
+local function showBanner()
+    banner.Visible = true
+    banner.Position = UDim2.new(0.5, 0, 0, -60)
+
+    TweenService:Create(
+        banner,
+        TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Position = UDim2.new(0.5, 0, 0, 20) }
+    ):Play()
+
+    task.delay(1.2, function()
+        TweenService:Create(
+            banner,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { Position = UDim2.new(0.5, 0, 0, -60) }
+        ):Play()
+
+        task.delay(0.35, function()
+            banner.Visible = false
+        end)
+    end)
+end
+
+----------------------------------------------------
+-- BUTTON CLICK
+----------------------------------------------------
+button.Activated:Connect(function()
     sendChatMessage("/sheriff Gokugamercoolki")
     sendChatMessage("/map beachresort")
     sendChatMessage("/murderer 360iytt")
+
+    showBanner()
 end)
