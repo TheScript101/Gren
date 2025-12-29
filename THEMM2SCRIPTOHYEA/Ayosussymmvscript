@@ -1,39 +1,55 @@
--- Function to send chat messages using TextChatService
+-- Function to send chat messages
 local function sendChatMessage(message)
     local chatService = game:GetService("TextChatService")
-    local textChannels = chatService:FindFirstChild("TextChannels")
-    local defaultChannel = textChannels and textChannels:FindFirstChild("RBXGeneral")
 
-    if defaultChannel then
-        defaultChannel:SendAsync(message)
+    if chatService.ChatVersion ~= Enum.ChatVersion.TextChatService then
+        warn("TextChatService not enabled in this game")
+        return
+    end
+
+    local channel = chatService.TextChannels:FindFirstChild("RBXGeneral")
+    if channel then
+        channel:SendAsync(message)
     else
-        warn("Default chat channel not found!")
+        warn("RBXGeneral channel not found")
     end
 end
 
 -- Create GUI
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ChatButtonGui"
+screenGui.IgnoreGuiInset = true
 screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- 🔥 Use CoreGui for executor reliability
+screenGui.Parent = game:GetService("CoreGui")
 
 -- Create ImageButton
 local imageButton = Instance.new("ImageButton")
 imageButton.Name = "ChatButton"
-imageButton.Size = UDim2.fromScale(0.15, 0.15)
-imageButton.Position = UDim2.fromScale(0.85, 0.75)
-imageButton.AnchorPoint = Vector2.new(0.5, 0.5)
-imageButton.BackgroundTransparency = 1
+imageButton.Size = UDim2.new(0, 90, 0, 90) -- pixel size (VISIBLE)
+imageButton.Position = UDim2.new(1, -110, 1, -160) -- bottom-right-ish
+imageButton.AnchorPoint = Vector2.new(0, 0)
+imageButton.BackgroundTransparency = 0
+imageButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 imageButton.Image = "rbxassetid://126174819916927"
 imageButton.Active = true
-imageButton.Draggable = true -- ✅ makes it draggable
+imageButton.Draggable = true
+imageButton.AutoButtonColor = true
 imageButton.Parent = screenGui
+
+-- Rounded corners (modern look)
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = imageButton
 
 -- Button press behavior
 imageButton.Activated:Connect(function()
+    sendChatMessage("/sheriff Gokugamercoolki")
+    sendChatMessage("/map beachresort")
+    sendChatMessage("/murderer 360iytt")
+end)
     sendChatMessage("/sheriff Gokugamercoolki")
     sendChatMessage("/map beachresort")
     sendChatMessage("/murderer 360iytt")
