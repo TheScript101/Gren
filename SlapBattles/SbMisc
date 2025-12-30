@@ -1,0 +1,227 @@
+-- Ping Pong Auto-Hit (Rayfield) — Updated per request
+-- Rayfield loader
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- Script Config
+local PING_REMOTE_NAME = "PingPongEvent" -- in ReplicatedStorage
+local ANIM_ID = "rbxassetid://13526154547"
+local ANIM_COOLDOWN = 1.5 -- seconds
+
+-- UI / defaults
+local autoHit = false
+local showRadius = false
+local hitRadius = 20 -- default recommended 20
+
+-- Create window & tab
+local Window = Rayfield:CreateWindow({
+    Name = "SLAP BATTLES MISC",
+    LoadingTitle = "SLAP BATTLES MISC",
+    LoadingSubtitle = "Ping Pong Tools",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+local PingPongTab = Window:CreateTab("Ping Pong", 0)
+
+-- Character-dependent refs (will rebind on respawn)
+local character, humanoid, root, animTrack
+local function bindCharacter(char)
+    character = char or player.Character
+    humanoid = character:FindFirstChildOfClass("Humanoid")
+    root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    -- Load animation track (if humanoid available)
+    if humanoid then
+        pcall(function()
+            local anim = Instance.new("Animation")
+            anim.AnimationId = ANIM_ID
+            if animTrack then
+                -- stop previous track safely
+                pcall(function() animTrack:Stop() end)
+            end
+            animTrack = humanoid:LoadAnimation(anim)
+        end)
+    end
+end
+
+-- Initial bind (may be nil until character exists)
+if player.Character then
+    bindCharacter(player.Character)
+else
+    player.CharacterAdded:Wait()
+    bindCharacter(player.Character)
+end
+
+-- Rebind on respawn
+player.CharacterAdded:Connect(function(char)
+    -- small wait to ensure parts exist
+    char:WaitForChild("HumanoidRootPart", 5)
+    bindCharacter(char)
+    -- if radius is shown, ensure it will follow the new character
+    if showRadius and radiusPart then
+        radiusPart.Parent = workspace
+    end
+end)
+
+----------------------------------------------------------
+-- Radius visual (flat disc) — created once
+----------------------------------------------------------
+local radiusPart = Instance.new("Part")
+radiusPart.Name = "PingPongRadiusDisc"
+radiusPart.Anchored = true
+radiusPart.CanCollide = false
+radiusPart.Material = Enum.Material.Neon
+radiusPart.Transparency = 0.6
+radiusPart.Color = Color3.fromRGB(0, 255, 0)
+radiusPart.Shape = Enum.PartType.Cylinder
+-- Make it thin flat: Set Y (height) small, X/Z based on diameter
+radiusPart.Size = Vector3.new(hitRadius * 2, 0.2, hitRadius * 2)
+radiusPart.CastShadow = false
+radiusPart.Parent = workspace
+
+-- Place very far away so it's invisible until enabled
+radiusPart.CFrame = CFrame.new(9e6, 9e6, 9e6)
+
+-- Helper to update radius visuals
+local function updateRadiusVisual()
+    if not radiusPart then return end
+    radiusPart.Size = Vector3.new(hitRadius * 2, 0.2, hitRadius * 2)
+    -- cylinder's axis is Y — keep upright; we'll place it at root.Position
+    if showRadius and root and root.Position then
+        local pos = root.Position
+        radiusPart.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, 0)
+        radiusPart.Parent = workspace
+    else
+        -- move far away when not showing
+        radiusPart.CFrame = CFrame.new(9e6, 9e6, 9e6)
+        radiusPart.Parent = workspace
+    end
+end
+
+-- Animation / firing cooldown tracking
+local lastFire = 0
+
+----------------------------------------------------------
+-- Rayfield UI elements
+----------------------------------------------------------
+PingPongTab:CreateToggle({
+    Name = "Auto Hit Ping Pong",
+    CurrentValue = false,
+    Callback = function(v)
+        autoHit = v
+    end
+})
+
+PingPongTab:CreateParagraph({
+    Title = "Info",
+    Content = "Auto Hit Ping Pong automatically hits ping pong balls nearby (others' or your own)."
+})
+
+PingPongTab:CreateToggle({
+    Name = "Show Radius",
+    CurrentValue = false,
+    Callback = function(v)
+        showRadius = v
+        -- only show near torso when enabled; update visuals
+        updateRadiusVisual()
+    end
+})
+
+PingPongTab:CreateSlider({
+    Name = "Auto Hit Radius",
+    Range = {1, 30}, -- max changed to 30
+    Increment = 1,
+    Suffix = "Studs",
+    CurrentValue = hitRadius,
+    Callback = function(v)
+        hitRadius = v
+        updateRadiusVisual()
+    end
+})
+
+PingPongTab:CreateParagraph({
+    Title = "Tip",
+    Content = "Recommended is 20 - Anything lower might not get detected by auto hit."
+})
+
+----------------------------------------------------------
+-- Helper: find remote safely
+----------------------------------------------------------
+local function getPingRemote()
+    local ok, rem = pcall(function()
+        return ReplicatedStorage:FindFirstChild(PING_REMOTE_NAME)
+    end)
+    if ok then return rem end
+    return nil
+end
+
+----------------------------------------------------------
+-- Main loop (heartbeat) — detection & action
+----------------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    -- update radius position each frame if visible
+    if showRadius and root then
+        -- place slightly under player so it visually sits at torso level
+        local rpos = root.Position - Vector3.new(0, (root.Size and root.Size.Y or 2) - 0.1, 0)
+        radiusPart.CFrame = CFrame.new(rpos)
+    end
+
+    if not autoHit then return end
+    if not root then return end
+
+    -- find ping pong parts in workspace (check BasePart name contains PingPongBall)
+    local found = false
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:find("PingPongBall") then
+            local ok, pos = pcall(function() return obj.Position end)
+            if not ok or not pos then
+                -- skip if we can't read position
+            else
+                local dist = (pos - root.Position).Magnitude
+                if dist <= hitRadius then
+                    found = true
+                    -- throttle fire+anim by cooldown
+                    local now = tick()
+                    if now - lastFire >= ANIM_COOLDOWN then
+                        lastFire = now
+                        -- fire remote (safe pcall)
+                        pcall(function()
+                            local remote = getPingRemote()
+                            if remote and remote.FireServer then
+                                remote:FireServer()
+                            end
+                        end)
+                        -- play animation if available
+                        pcall(function()
+                            if animTrack and animTrack.IsPlaying == false then
+                                animTrack:Play()
+                            elseif animTrack then
+                                -- if already playing, restart it
+                                animTrack:Stop()
+                                animTrack:Play()
+                            end
+                        end)
+                    end
+                    break -- fire once per loop when at least one ping found
+                end
+            end
+        end
+    end
+    -- (found unused) loop will continue each heartbeat
+end)
+
+-- ensure visual state is correct on script start
+updateRadiusVisual()
+
+-- cleanup on script unload (optional)
+game:BindToClose(function()
+    if radiusPart and radiusPart.Parent then
+        pcall(function() radiusPart:Destroy() end)
+    end
+end)
