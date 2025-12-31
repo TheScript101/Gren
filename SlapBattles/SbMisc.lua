@@ -403,6 +403,7 @@ RunService.Heartbeat:Connect(function(dt)
                                             if not char then return end
                                             for _, part in ipairs(char:GetChildren()) do
                                                 if part and part:IsA("BasePart") then
+                                                            wait(0.4)
                                                     part.Anchored = false
                                                 end
                                             end
