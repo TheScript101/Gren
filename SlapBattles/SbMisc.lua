@@ -336,6 +336,15 @@ local function isPlayerInRange(targetRoot, range)
     return (pos - root.Position).Magnitude <= range
 end
 
+-- returns true if the local player is currently ragdolled / unable to act
+local function isLocalRagdolled()
+    if not humanoid then return false end
+    local state = humanoid:GetState()
+    return humanoid.PlatformStand
+        or state == Enum.HumanoidStateType.Physics
+        or state == Enum.HumanoidStateType.Ragdoll
+end
+
 -------------------------------------------------
 -- COOLDOWN HUD (top of screen, z-index 200)
 -- Only visible while at least one cooldown is active
@@ -463,49 +472,63 @@ RunService.Heartbeat:Connect(function(dt)
     ----------------------
     -- COUNTER SCAN
     ----------------------
-    if autoCounter and root then
-        counterScanAccumulator = counterScanAccumulator + dt
-        if counterScanAccumulator >= counterScanInterval then
-            counterScanAccumulator = 0
-            local now = tick()
+----------------------
+-- COUNTER SCAN (updated: skip if local ragdolled)
+----------------------
+if autoCounter and root then
+    counterScanAccumulator = counterScanAccumulator + dt
+    if counterScanAccumulator >= counterScanInterval then
+        counterScanAccumulator = 0
+        local now = tick()
 
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= player and plr.Character and plr.Character.Parent then
-                    local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-                    local targetHumanoid = plr.Character:FindFirstChildOfClass("Humanoid")
-                    if targetRoot and targetHumanoid and isPlayerInRange(targetRoot, counterRadius) then
-                        local ok, tracks = pcall(function()
-                            return targetHumanoid:GetPlayingAnimationTracks()
-                        end)
-                        if ok and tracks then
-                            for _, track in ipairs(tracks) do
-                                local animInst = track.Animation
-                                if animInst and animInst.AnimationId and tostring(animInst.AnimationId) == SLAP_ANIM_ID then
-                                    -- Found the slap animation playing from this player
-                                    if now - lastCounterTime >= counterCooldown then
-                                        pcall(function()
-                                            local rem = ReplicatedStorage:FindFirstChild("Counter")
-                                            if rem and rem.FireServer then
-                                                rem:FireServer()
-                                            end
-                                        end)
-
-                                        -- SAFETY: unanchor all BasePart children of the local player's character
-                                        pcall(function()
-                                            local char = character or player.Character
-                                            if not char then return end
-                                            for _, part in ipairs(char:GetChildren()) do
-                                                if part and part:IsA("BasePart") then
-                                                            wait(0.4)
-                                                    part.Anchored = false
-                                                end
-                                            end
-                                        end)
-
-                                        lastCounterTime = now
-                                    end
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character and plr.Character.Parent then
+                local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+                local targetHumanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+                if targetRoot and targetHumanoid and isPlayerInRange(targetRoot, counterRadius) then
+                    local ok, tracks = pcall(function()
+                        return targetHumanoid:GetPlayingAnimationTracks()
+                    end)
+                    if ok and tracks then
+                        for _, track in ipairs(tracks) do
+                            local animInst = track.Animation
+                            if animInst and animInst.AnimationId and tostring(animInst.AnimationId) == SLAP_ANIM_ID then
+                                -- Found the slap animation playing from this player
+                                -- FIRST: if local player is ragdolled right now, skip this detection
+                                if isLocalRagdolled() then
+                                    -- do NOT update lastCounterTime so cooldown does not start
+                                    -- simply skip this detection and wait for the next time the anim plays
+                                    -- break out of this player's tracks loop (go check next player)
                                     break
                                 end
+
+                                -- If we're not ragdolled, and cooldown passed, fire remote
+                                if now - lastCounterTime >= counterCooldown then
+                                    pcall(function()
+                                        local rem = ReplicatedStorage:FindFirstChild("Counter")
+                                        if rem and rem.FireServer then
+                                            rem:FireServer()
+                                        end
+                                    end)
+
+                                    -- SAFETY: unanchor all BasePart children of the local player's character
+                                    pcall(function()
+                                        local char = character or player.Character
+                                        if not char then return end
+                                        for _, part in ipairs(char:GetChildren()) do
+                                            if part and part:IsA("BasePart") then
+                                                -- small wait not necessary, but preserved from old implementation
+                                                wait(0.05)
+                                                part.Anchored = false
+                                            end
+                                        end
+                                    end)
+
+                                    lastCounterTime = now
+                                end
+
+                                -- we've handled this player's slap this scan; go to next player
+                                break
                             end
                         end
                     end
@@ -513,4 +536,4 @@ RunService.Heartbeat:Connect(function(dt)
             end
         end
     end
-end)
+end
