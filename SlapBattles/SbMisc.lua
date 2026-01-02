@@ -257,7 +257,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ORION TOGGLE
-CounterTab:AddToggle({
+CounterTab:CreateToggle({
 	Name = "No Tp Back",
 	Default = false,
 	Callback = function(v)
