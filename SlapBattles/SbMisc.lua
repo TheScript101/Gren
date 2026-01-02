@@ -219,6 +219,99 @@ CounterTab:CreateParagraph({
     Content = "Recommended radius is 9 studs for counters."
 })
 
+-- =========================
+-- NO TP BACK (RAGDOLL FIX)
+-- =========================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+
+local NoTpBack = false
+local handling = false
+
+-- tuning values
+local STABLE_VELOCITY = 1
+local STABLE_TIME = 0.25
+local ANCHOR_TIME = 1
+
+-- helper to anchor / unanchor
+local function setAnchored(char, state)
+	for _, part in ipairs(char:GetChildren()) do
+		if part:IsA("BasePart") then
+			part.Anchored = state
+		end
+	end
+end
+
+-- rebind on respawn
+player.CharacterAdded:Connect(function(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	root = char:WaitForChild("HumanoidRootPart")
+	handling = false
+end)
+
+-- ORION TOGGLE
+CounterTab:AddToggle({
+	Name = "No Tp Back",
+	Default = false,
+	Callback = function(v)
+		NoTpBack = v
+	end
+})
+
+-- main logic (single heartbeat, safe)
+RunService.Heartbeat:Connect(function()
+	if not NoTpBack then return end
+	if handling then return end
+	if not character or not humanoid or not root then return end
+
+	local ragdolled =
+		humanoid.PlatformStand
+		or humanoid:GetState() == Enum.HumanoidStateType.Physics
+		or humanoid:GetState() == Enum.HumanoidStateType.Ragdoll
+
+	if not ragdolled then return end
+
+	handling = true
+
+	task.spawn(function()
+		local stableTimer = 0
+
+		while NoTpBack and humanoid and root do
+			local velocity = root.AssemblyLinearVelocity.Magnitude
+
+			if velocity <= STABLE_VELOCITY then
+				stableTimer += RunService.Heartbeat:Wait()
+				if stableTimer >= STABLE_TIME then
+					break
+				end
+			else
+				stableTimer = 0
+				RunService.Heartbeat:Wait()
+			end
+		end
+
+		if not NoTpBack or not character then
+			handling = false
+			return
+		end
+
+		-- anchor once fully stabilized
+		setAnchored(character, true)
+		task.wait(ANCHOR_TIME)
+		setAnchored(character, false)
+
+		handling = false
+	end)
+end)
+
+
 -------------------------------------------------
 -- HELPERS & RESPAWN REBIND
 -------------------------------------------------
