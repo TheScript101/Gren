@@ -350,6 +350,8 @@ unselectBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Select button: opens KeyframeSequence browser for the selected humanoid
+-- Replace the whole selectBtn.MouseButton1Click handler with this block
+
 selectBtn.MouseButton1Click:Connect(function()
     if not selectedModel then
         toast("No humanoid selected.")
@@ -360,10 +362,14 @@ selectBtn.MouseButton1Click:Connect(function()
         toast("Selected target no longer a humanoid model.")
         return
     end
-    -- Populate seqFrame list
+
+    -- Clear previous list (remove TextButtons and TextLabels we created previously)
     for _, child in ipairs(seqScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
+        if child:IsA("TextButton") or child:IsA("TextLabel") then
+            child:Destroy()
+        end
     end
+
     local seqs = findKeyframeSequences(selectedModel)
     if #seqs == 0 then
         local noneLabel = Instance.new("TextLabel", seqScroll)
@@ -373,41 +379,58 @@ selectBtn.MouseButton1Click:Connect(function()
         noneLabel.TextColor3 = Color3.new(1,1,1)
         noneLabel.Font = Enum.Font.Gotham
         noneLabel.TextSize = 16
+        -- ensure scroll area updates
+        seqScroll.CanvasSize = UDim2.new(0,0,0,40)
     else
+        local createdButtons = 0
         for i, seq in ipairs(seqs) do
+            local thisSeq = seq -- capture local copy to avoid closure bug
+
+            -- count keyframes inside this sequence
+            local keyframes = {}
+            for _, kf in ipairs(thisSeq:GetChildren()) do
+                if kf:IsA("Keyframe") then
+                    table.insert(keyframes, kf)
+                end
+            end
+
             local btn = Instance.new("TextButton", seqScroll)
             btn.Size = UDim2.new(1, 0, 0, 34)
-            btn.Text = tostring(seq.Name) .. "  (" .. tostring(#seq:GetChildren()) .. " children)"
+            btn.Position = UDim2.new(0, 0, 0, 0)
+            btn.Text = tostring(thisSeq.Name) .. "  (" .. tostring(#keyframes) .. " keyframes)"
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 16
             btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
             btn.TextColor3 = Color3.new(1,1,1)
             btn.Name = "KFSeqBtn_" .. i
+
+            -- capture local keyframes list for this button as well
+            local localKeyframes = keyframes
+            table.sort(localKeyframes, function(a,b) return a.Time < b.Time end)
+
             btn.MouseButton1Click:Connect(function()
                 -- open keyframe detail screen for this seq
-                -- count Keyframe children
-                local keyframes = {}
-                for _, kf in ipairs(seq:GetChildren()) do
-                    if kf:IsA("Keyframe") then
-                        table.insert(keyframes, kf)
-                    end
-                end
-                table.sort(keyframes, function(a,b) return a.Time < b.Time end)
-                kfHeader.Text = "Keyframes: " .. tostring(#keyframes)
-                -- store custom fields for confirm handler
-                kfFrame:SetAttribute("SelectedSeqName", seq.Name)
-                -- store references (we store the sequence object directly in attribute table mapping)
-                kfFrame:SetAttribute("SelectedSeqIndex", i)
-                -- because attributes can't store instances, keep a small mapping table up top
-                kfFrame.SelectedSequence = seq
-                kfFrame.KeyframesList = keyframes
+                kfHeader.Text = "Keyframes: " .. tostring(#localKeyframes)
+                -- store direct references for confirm handler
+                kfFrame.SelectedSequence = thisSeq
+                kfFrame.KeyframesList = localKeyframes
+                -- clear any previously entered number
+                numberBox.Text = ""
+                infoLabel.Text = ""
                 -- switch frames
                 mainFrame.Visible = false
                 seqFrame.Visible = false
                 kfFrame.Visible = true
             end)
+
+            createdButtons = createdButtons + 1
         end
+
+        -- update canvas size manually so scrolling works reliably
+        local totalHeight = createdButtons * 40 + 6
+        seqScroll.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
     end
+
     -- Show seqFrame
     mainFrame.Visible = false
     seqFrame.Visible = true
