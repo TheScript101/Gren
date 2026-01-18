@@ -478,34 +478,44 @@ end)
 
 -- Confirm handler (attempt to pause animation at exact keyframe)
 confirmBtn.MouseButton1Click:Connect(function()
-    local seq = kfFrame.SelectedSequence
-    local keyframes = kfFrame.KeyframesList or {}
+    local seq = SelectedSequence
+    local keyframes = SelectedKeyframes or {}
+
     if not seq then
         toast("No sequence selected.")
         return
     end
+
     local n = toPositiveInteger(numberBox.Text)
     if not n or n < 1 or n > #keyframes then
         toast("Enter a valid keyframe number between 1 and " .. tostring(#keyframes))
         return
     end
+
     local kf = keyframes[n]
     if not kf then
         toast("Keyframe not found.")
         return
     end
+
     local targetTime = kf.Time or 0
-    -- Try to find an Animation asset associated with this KeyframeSequence / model
+
+    -- Find associated animation
     local animInstance = findAssociatedAnimation(selectedModel, seq)
     if not animInstance then
-        toast("No Animation asset found to play this sequence. Can't freeze the Animator.")
+        toast("No Animation asset found to play this sequence.")
         return
     end
+
     local humanoid = selectedModel:FindFirstChildOfClass("Humanoid")
     if not humanoid then
-        toast("Selected model has no Humanoid (unexpected).")
+        toast("Selected model has no Humanoid.")
         return
     end
+
+    -- (continue with freeze logic here)
+end)
+
     -- Ensure Animator exists
     local animator = humanoid:FindFirstChild("Animator")
     if not animator then
