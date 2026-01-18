@@ -1,0 +1,574 @@
+-- LocalScript (put in StarterGui)
+-- "Select Humanoid With Anim" GUI + selection + KeyframeSequence browser + pause-at-keyframe
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- === Helper functions =======================================================
+local function isHumanoidModel(model)
+    if not model or not model:IsA("Model") then return false end
+    return model:FindFirstChildOfClass("Humanoid") ~= nil
+end
+
+local function findKeyframeSequences(model)
+    local seqs = {}
+    for _, v in ipairs(model:GetDescendants()) do
+        if v:IsA("KeyframeSequence") then
+            table.insert(seqs, v)
+        end
+    end
+    table.sort(seqs, function(a,b) return tostring(a.Name) < tostring(b.Name) end)
+    return seqs
+end
+
+-- Try to find an Animation instance associated with the KeyframeSequence
+local function findAssociatedAnimation(model, keyframeSequence)
+    -- 1) Look for Animation instances in model descendants whose Name matches KFS name
+    for _, a in ipairs(model:GetDescendants()) do
+        if a:IsA("Animation") then
+            if a.Name == keyframeSequence.Name then return a end
+        end
+    end
+    -- 2) Look for Animation instance that contains the KeyframeSequence as descendant (rare but possible)
+    for _, a in ipairs(model:GetDescendants()) do
+        if a:IsA("Animation") then
+            for _, d in ipairs(a:GetDescendants()) do
+                if d == keyframeSequence then return a end
+            end
+        end
+    end
+    -- 3) Search ReplicatedStorage for Animation with same name (useful if dev stored animations there)
+    for _, a in ipairs(ReplicatedStorage:GetDescendants()) do
+        if a:IsA("Animation") and a.Name == keyframeSequence.Name then
+            return a
+        end
+    end
+    -- 4) Try any Animation in the model (fallback to first found)
+    for _, a in ipairs(model:GetDescendants()) do
+        if a:IsA("Animation") then return a end
+    end
+    return nil
+end
+
+-- Create a Highlight around a model (returns the Highlight instance)
+local function createHighlightForModel(model)
+    -- remove any existing highlight we previously created
+    for _,child in ipairs(model:GetChildren()) do
+        if child:IsA("Highlight") and child.Name == "__SelectHighlight" then
+            child:Destroy()
+        end
+    end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "__SelectHighlight"
+    highlight.Parent = model
+    highlight.FillTransparency = 1 -- no fill, outline only
+    highlight.OutlineColor = Color3.fromRGB(0, 170, 255) -- blueish
+    highlight.OutlineTransparency = 0
+    return highlight
+end
+
+-- Utility: clear highlight if present
+local function clearHighlight(model)
+    if not model then return end
+    local h = model:FindFirstChild("__SelectHighlight")
+    if h and h:IsA("Highlight") then h:Destroy() end
+end
+
+-- Safely parse number
+local function toPositiveInteger(str)
+    local n = tonumber(str)
+    if not n then return nil end
+    n = math.floor(n)
+    if n < 1 then return nil end
+    return n
+end
+
+-- === Build GUI ==============================================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HumanoidKeyframeBrowser"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local function makeMainFrame()
+    local frame = Instance.new("Frame")
+    frame.Name = "MainFrame"
+    frame.Size = UDim2.new(0, 420, 0, 300)
+    frame.AnchorPoint = Vector2.new(0.5,0.5)
+    frame.Position = UDim2.new(0.5, 0.5, 0.5, 0) -- centered
+    frame.BackgroundColor3 = Color3.fromRGB(36,36,36) -- grayish black
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    frame.Visible = false
+    return frame
+end
+
+local mainFrame = makeMainFrame()
+
+-- Top bar (title + toggle)
+local title = Instance.new("TextLabel", mainFrame)
+title.Name = "Title"
+title.Size = UDim2.new(1, -12, 0, 40)
+title.Position = UDim2.new(0, 6, 0, 6)
+title.BackgroundTransparency = 1
+title.Text = "Select Humanoid With Anim"
+title.TextSize = 20
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamSemibold
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Toggle button (top-right)
+local toggleBtn = Instance.new("TextButton", mainFrame)
+toggleBtn.Name = "ToggleSelect"
+toggleBtn.Size = UDim2.new(0, 140, 0, 28)
+toggleBtn.Position = UDim2.new(1, -146, 0, 6)
+toggleBtn.Text = "Enable Selection"
+toggleBtn.Font = Enum.Font.Gotham
+toggleBtn.TextSize = 14
+toggleBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+
+-- Selected info area
+local selectedLabel = Instance.new("TextLabel", mainFrame)
+selectedLabel.Name = "SelectedLabel"
+selectedLabel.Size = UDim2.new(1, -12, 0, 26)
+selectedLabel.Position = UDim2.new(0,6,0,56)
+selectedLabel.BackgroundTransparency = 1
+selectedLabel.Text = "Selected: (none)"
+selectedLabel.Font = Enum.Font.Gotham
+selectedLabel.TextSize = 16
+selectedLabel.TextColor3 = Color3.new(1,1,1)
+selectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Select & Unselect buttons
+local selectBtn = Instance.new("TextButton", mainFrame)
+selectBtn.Name = "SelectBtn"
+selectBtn.Size = UDim2.new(0, 96, 0, 30)
+selectBtn.Position = UDim2.new(0, 6, 0, 86)
+selectBtn.Text = "Select"
+selectBtn.Font = Enum.Font.Gotham
+selectBtn.TextSize = 14
+selectBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+selectBtn.TextColor3 = Color3.new(1,1,1)
+
+local unselectBtn = Instance.new("TextButton", mainFrame)
+unselectBtn.Name = "UnselectBtn"
+unselectBtn.Size = UDim2.new(0, 96, 0, 30)
+unselectBtn.Position = UDim2.new(0, 110, 0, 86)
+unselectBtn.Text = "Unselect"
+unselectBtn.Font = Enum.Font.Gotham
+unselectBtn.TextSize = 14
+unselectBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+unselectBtn.TextColor3 = Color3.new(1,1,1)
+
+-- Browse KeyframeSequences screen (frame 2)
+local seqFrame = Instance.new("Frame", screenGui)
+seqFrame.Name = "SeqFrame"
+seqFrame.Size = mainFrame.Size
+seqFrame.AnchorPoint = mainFrame.AnchorPoint
+seqFrame.Position = mainFrame.Position
+seqFrame.BackgroundColor3 = mainFrame.BackgroundColor3
+seqFrame.BorderSizePixel = 0
+seqFrame.Visible = false
+
+local seqTitle = Instance.new("TextLabel", seqFrame)
+seqTitle.Size = UDim2.new(1, -12, 0, 36)
+seqTitle.Position = UDim2.new(0,6,0,6)
+seqTitle.BackgroundTransparency = 1
+seqTitle.Text = "Keyframe Sequences"
+seqTitle.Font = Enum.Font.GothamSemibold
+seqTitle.TextSize = 18
+seqTitle.TextColor3 = Color3.new(1,1,1)
+seqTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local seqBackBtn = Instance.new("TextButton", seqFrame)
+seqBackBtn.Size = UDim2.new(0, 80, 0, 26)
+seqBackBtn.Position = UDim2.new(0, 6, 0, 46)
+seqBackBtn.Text = "Back"
+seqBackBtn.Font = Enum.Font.Gotham
+seqBackBtn.TextSize = 14
+seqBackBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+seqBackBtn.TextColor3 = Color3.new(1,1,1)
+
+local seqScroll = Instance.new("ScrollingFrame", seqFrame)
+seqScroll.Name = "SeqScroll"
+seqScroll.Size = UDim2.new(1, -12, 1, -86)
+seqScroll.Position = UDim2.new(0,6,0,86)
+seqScroll.CanvasSize = UDim2.new(0,0,0,0)
+seqScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+seqScroll.ScrollBarThickness = 8
+seqScroll.BackgroundTransparency = 1
+seqScroll.BorderSizePixel = 0
+seqScroll.ScrollBarImageColor3 = Color3.fromRGB(180,180,180)
+
+local seqLayout = Instance.new("UIListLayout", seqScroll)
+seqLayout.Padding = UDim.new(0,6)
+
+-- Frame 3: Keyframe details / enter index
+local kfFrame = Instance.new("Frame", screenGui)
+kfFrame.Name = "KeyframeFrame"
+kfFrame.Size = mainFrame.Size
+kfFrame.AnchorPoint = mainFrame.AnchorPoint
+kfFrame.Position = mainFrame.Position
+kfFrame.BackgroundColor3 = mainFrame.BackgroundColor3
+kfFrame.BorderSizePixel = 0
+kfFrame.Visible = false
+
+local kfBackBtn = Instance.new("TextButton", kfFrame)
+kfBackBtn.Size = UDim2.new(0, 80, 0, 26)
+kfBackBtn.Position = UDim2.new(0, 6, 0, 6)
+kfBackBtn.Text = "Back"
+kfBackBtn.Font = Enum.Font.Gotham
+kfBackBtn.TextSize = 14
+kfBackBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+kfBackBtn.TextColor3 = Color3.new(1,1,1)
+
+local kfHeader = Instance.new("TextLabel", kfFrame)
+kfHeader.Size = UDim2.new(1, -12, 0, 36)
+kfHeader.Position = UDim2.new(0,6,0,52)
+kfHeader.BackgroundTransparency = 1
+kfHeader.Text = "Keyframes: 0"
+kfHeader.Font = Enum.Font.GothamSemibold
+kfHeader.TextSize = 18
+kfHeader.TextColor3 = Color3.new(1,1,1)
+kfHeader.TextXAlignment = Enum.TextXAlignment.Left
+
+local numberBox = Instance.new("TextBox", kfFrame)
+numberBox.PlaceholderText = "Enter Keyframe Number"
+numberBox.Size = UDim2.new(1, -12, 0, 32)
+numberBox.Position = UDim2.new(0,6,0,96)
+numberBox.ClearTextOnFocus = false
+numberBox.Text = ""
+numberBox.Font = Enum.Font.Gotham
+numberBox.TextSize = 16
+numberBox.TextColor3 = Color3.new(1,1,1)
+numberBox.BackgroundColor3 = Color3.fromRGB(50,50,50)
+numberBox.BorderSizePixel = 0
+
+local confirmBtn = Instance.new("TextButton", kfFrame)
+confirmBtn.Size = UDim2.new(0, 120, 0, 34)
+confirmBtn.Position = UDim2.new(0, 6, 0, 140)
+confirmBtn.Text = "Confirm"
+confirmBtn.Font = Enum.Font.Gotham
+confirmBtn.TextSize = 16
+confirmBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+confirmBtn.TextColor3 = Color3.new(1,1,1)
+
+local infoLabel = Instance.new("TextLabel", kfFrame)
+infoLabel.Size = UDim2.new(1, -12, 0, 26)
+infoLabel.Position = UDim2.new(0,6,0,184)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = ""
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextSize = 14
+infoLabel.TextColor3 = Color3.new(1,1,1)
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Toggle visibility via key (optional) and provide initial visible state false
+local uiEnabled = true
+mainFrame.Visible = true
+
+-- === State ================================================================
+local selectionEnabled = false
+local hoveredModel = nil
+local selectedModel = nil
+local highlightInstance = nil
+
+-- Helper: show toast info in infoLabel
+local function toast(msg)
+    infoLabel.Text = msg
+    delay(4, function()
+        if infoLabel and infoLabel.Parent then
+            if infoLabel.Text == msg then infoLabel.Text = "" end
+        end
+    end)
+end
+
+-- === Selection logic ======================================================
+local function onHover(target)
+    -- highlight for hover (but only for humanoids)
+    if target and target.Parent then
+        local m = target:FindFirstAncestorOfClass("Model")
+        if isHumanoidModel(m) then
+            -- temporary highlight via Outline using Selection? we will not show hover highlight separate from selected
+            hoveredModel = m
+            return
+        end
+    end
+    hoveredModel = nil
+end
+
+local function enableSelectionMode(enable)
+    selectionEnabled = enable
+    if selectionEnabled then
+        toggleBtn.Text = "Disable Selection"
+        toast("Selection enabled: click a humanoid model to pick it.")
+    else
+        toggleBtn.Text = "Enable Selection"
+        hoveredModel = nil
+    end
+end
+
+-- Mouse / Input handling for selection
+mouse.Move:Connect(function()
+    if not selectionEnabled then return end
+    local target = mouse.Target
+    onHover(target)
+end)
+
+-- Click to pick
+local clickConn
+clickConn = mouse.Button1Down:Connect(function()
+    if not selectionEnabled then return end
+    local target = mouse.Target
+    if not target then return end
+    local model = target:FindFirstAncestorOfClass("Model")
+    if isHumanoidModel(model) then
+        -- mark selected
+        if selectedModel and selectedModel ~= model then
+            clearHighlight(selectedModel)
+        end
+        selectedModel = model
+        selectedLabel.Text = "Selected: " .. (selectedModel.Name or "(unnamed)")
+        highlightInstance = createHighlightForModel(selectedModel)
+    else
+        toast("That is not a humanoid model. Click a model containing a Humanoid.")
+    end
+end)
+
+-- Unselect button
+unselectBtn.MouseButton1Click:Connect(function()
+    if selectedModel then
+        clearHighlight(selectedModel)
+    end
+    selectedModel = nil
+    selectedLabel.Text = "Selected: (none)"
+end)
+
+-- Select button: opens KeyframeSequence browser for the selected humanoid
+selectBtn.MouseButton1Click:Connect(function()
+    if not selectedModel then
+        toast("No humanoid selected.")
+        return
+    end
+    -- verify still has Humanoid
+    if not isHumanoidModel(selectedModel) then
+        toast("Selected target no longer a humanoid model.")
+        return
+    end
+    -- Populate seqFrame list
+    for _, child in ipairs(seqScroll:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local seqs = findKeyframeSequences(selectedModel)
+    if #seqs == 0 then
+        local noneLabel = Instance.new("TextLabel", seqScroll)
+        noneLabel.Size = UDim2.new(1, 0, 0, 30)
+        noneLabel.Text = "No key frame sequence found."
+        noneLabel.BackgroundTransparency = 1
+        noneLabel.TextColor3 = Color3.new(1,1,1)
+        noneLabel.Font = Enum.Font.Gotham
+        noneLabel.TextSize = 16
+    else
+        for i, seq in ipairs(seqs) do
+            local btn = Instance.new("TextButton", seqScroll)
+            btn.Size = UDim2.new(1, 0, 0, 34)
+            btn.Text = tostring(seq.Name) .. "  (" .. tostring(#seq:GetChildren()) .. " children)"
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 16
+            btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.Name = "KFSeqBtn_" .. i
+            btn.MouseButton1Click:Connect(function()
+                -- open keyframe detail screen for this seq
+                -- count Keyframe children
+                local keyframes = {}
+                for _, kf in ipairs(seq:GetChildren()) do
+                    if kf:IsA("Keyframe") then
+                        table.insert(keyframes, kf)
+                    end
+                end
+                table.sort(keyframes, function(a,b) return a.Time < b.Time end)
+                kfHeader.Text = "Keyframes: " .. tostring(#keyframes)
+                -- store custom fields for confirm handler
+                kfFrame:SetAttribute("SelectedSeqName", seq.Name)
+                -- store references (we store the sequence object directly in attribute table mapping)
+                kfFrame:SetAttribute("SelectedSeqIndex", i)
+                -- because attributes can't store instances, keep a small mapping table up top
+                kfFrame.SelectedSequence = seq
+                kfFrame.KeyframesList = keyframes
+                -- switch frames
+                mainFrame.Visible = false
+                seqFrame.Visible = false
+                kfFrame.Visible = true
+            end)
+        end
+    end
+    -- Show seqFrame
+    mainFrame.Visible = false
+    seqFrame.Visible = true
+end)
+
+-- Toggle button click
+toggleBtn.MouseButton1Click:Connect(function()
+    enableSelectionMode(not selectionEnabled)
+end)
+
+-- Allow toggling GUI on/off by pressing RightControl (optional)
+UserInputService.InputBegan:Connect(function(input,gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        uiEnabled = not uiEnabled
+        mainFrame.Visible = uiEnabled and not seqFrame.Visible and not kfFrame.Visible
+    end
+end)
+
+-- Back button on seqFrame
+seqBackBtn.MouseButton1Click:Connect(function()
+    seqFrame.Visible = false
+    mainFrame.Visible = true
+end)
+
+-- Back button on kfFrame
+kfBackBtn.MouseButton1Click:Connect(function()
+    kfFrame.Visible = false
+    seqFrame.Visible = true
+end)
+
+-- Confirm handler (attempt to pause animation at exact keyframe)
+confirmBtn.MouseButton1Click:Connect(function()
+    local seq = kfFrame.SelectedSequence
+    local keyframes = kfFrame.KeyframesList or {}
+    if not seq then
+        toast("No sequence selected.")
+        return
+    end
+    local n = toPositiveInteger(numberBox.Text)
+    if not n or n < 1 or n > #keyframes then
+        toast("Enter a valid keyframe number between 1 and " .. tostring(#keyframes))
+        return
+    end
+    local kf = keyframes[n]
+    if not kf then
+        toast("Keyframe not found.")
+        return
+    end
+    local targetTime = kf.Time or 0
+    -- Try to find an Animation asset associated with this KeyframeSequence / model
+    local animInstance = findAssociatedAnimation(selectedModel, seq)
+    if not animInstance then
+        toast("No Animation asset found to play this sequence. Can't freeze the Animator.")
+        return
+    end
+    local humanoid = selectedModel:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        toast("Selected model has no Humanoid (unexpected).")
+        return
+    end
+    -- Ensure Animator exists
+    local animator = humanoid:FindFirstChild("Animator")
+    if not animator then
+        -- In some cases, animations are played via AnimationController. Try to create Animator.
+        animator = Instance.new("Animator")
+        animator.Parent = humanoid
+    end
+
+    -- Prepare Animation object to load, ensure it has AnimationId set
+    local animationToLoad = animInstance
+    if not animationToLoad.AnimationId or animationToLoad.AnimationId == "" then
+        toast("Found Animation object but it has no AnimationId. Can't play.")
+        return
+    end
+
+    -- Load and play
+    local success, trackOrErr = pcall(function()
+        local track = animator:LoadAnimation(animationToLoad)
+        track:Play()
+        track:AdjustSpeed(1)
+        return track
+    end)
+    if not success or not trackOrErr then
+        toast("Failed to load/play animation: " .. tostring(trackOrErr))
+        return
+    end
+    local track = trackOrErr
+    -- Wait until the track has a TimePosition property updating
+    local timeout = 5
+    local elapsed = 0
+    while elapsed < timeout and (not track.IsPlaying) do
+        wait(0.05)
+        elapsed = elapsed + 0.05
+    end
+
+    -- Freeze at targetTime
+    -- clamp the time inside track length if possible
+    local ok, len = pcall(function() return track.Length end)
+    if ok and len and len > 0 then
+        if targetTime > len then
+            targetTime = len
+        end
+    end
+
+    -- Use RenderStepped to set TimePosition and pause (frame-exact)
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if track.TimePosition >= targetTime then
+            track.TimePosition = targetTime
+            track:AdjustSpeed(0) -- freeze
+            conn:Disconnect()
+            toast("Frozen at keyframe #"..tostring(n).." (time: "..tostring(targetTime).. "s).")
+        end
+    end)
+end)
+
+-- Clean up highlight when GUI destroyed / player leaves
+player.AncestryChanged:Connect(function()
+    if not player:IsDescendantOf(game) then
+        if selectedModel then clearHighlight(selectedModel) end
+    end
+end)
+
+-- Make sure UI visible by default
+mainFrame.Visible = true
+seqFrame.Visible = false
+kfFrame.Visible = false
+
+-- Done
+-- === GUI TOGGLE BUTTON (DROP-IN) ===
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Wait for GUI
+local gui = player:WaitForChild("PlayerGui"):WaitForChild("HumanoidKeyframeBrowser")
+
+-- Create toggle button GUI
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "HumanoidKeyframeToggle"
+toggleGui.ResetOnSpawn = false
+toggleGui.Parent = player.PlayerGui
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 160, 0, 36)
+toggleBtn.Position = UDim2.new(0, 12, 0.5, -18)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Text = "Toggle Animator GUI"
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.Gotham
+toggleBtn.TextSize = 15
+toggleBtn.Parent = toggleGui
+
+-- Toggle logic
+local enabled = true
+
+toggleBtn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	gui.Enabled = enabled
+	toggleBtn.Text = enabled and "Hide Animator GUI" or "Show Animator GUI"
+end)
+
