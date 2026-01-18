@@ -408,20 +408,34 @@ selectBtn.MouseButton1Click:Connect(function()
             local localKeyframes = keyframes
             table.sort(localKeyframes, function(a,b) return a.Time < b.Time end)
 
-            btn.MouseButton1Click:Connect(function()
-                -- open keyframe detail screen for this seq
-                kfHeader.Text = "Keyframes: " .. tostring(#localKeyframes)
-                -- store direct references for confirm handler
-                kfFrame.SelectedSequence = thisSeq
-                kfFrame.KeyframesList = localKeyframes
-                -- clear any previously entered number
-                numberBox.Text = ""
-                infoLabel.Text = ""
-                -- switch frames
-                mainFrame.Visible = false
-                seqFrame.Visible = false
-                kfFrame.Visible = true
-            end)
+            -- globals at top of script (or above this code)
+				_G.SelectedSequence = nil
+				_G.SelectedKeyframes = nil
+
+				btn.MouseButton1Click:Connect(function()
+						-- safety checks   
+						if not kfHeader or not kfFrame then
+							warn("Keyframe UI not initialized")
+							return
+						end
+
+    -- update header text
+    kfHeader.Text = "Keyframes: " .. tostring(#localKeyframes)
+
+    -- store references safely
+    _G.SelectedSequence = thisSeq
+    _G.SelectedKeyframes = localKeyframes
+
+    -- clear inputs (if they exist)
+    if numberBox then numberBox.Text = "" end
+    if infoLabel then infoLabel.Text = "" end
+
+    -- switch frames safely
+    if mainFrame then mainFrame.Visible = false end
+    if seqFrame then seqFrame.Visible = false end
+    kfFrame.Visible = true
+end)
+
 
             createdButtons = createdButtons + 1
         end
