@@ -147,7 +147,8 @@ ClearAllButton.Font = Enum.Font.Gotham
 ClearAllButton.TextSize = 14
 ClearAllButton.BackgroundColor3 = Color3.fromRGB(60,60,60)
 ClearAllButton.TextColor3 = Color3.fromRGB(255,255,255)
-CleadAllButton.Parent = SettingsFrame
+ClearAllButton.Parent = SettingsFrame
+ClearAllButton.Visible = false
 local ClearCorner = Instance.new("UICorner", ClearAllButton); ClearCorner.CornerRadius = UDim.new(0,8)
 
 local function makeToggle(parent, text, y, initial)
