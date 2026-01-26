@@ -41,7 +41,7 @@ ToggleButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
 -- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 360, 0, 420)
+MainFrame.Size = UDim2.new(0, 360, 0, 380)
 MainFrame.Position = UDim2.new(0.5, -180, 0.5, -220)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.Visible = false
@@ -140,7 +140,7 @@ SettingsTitle.TextColor3 = Color3.new(1,1,1)
 
 local ClearAllButton = Instance.new("TextButton")
 ClearAllButton.Size = UDim2.new(1, -20, 0, 34)
-ClearAllButton.Position = UDim2.new(0, 10, 0, 166)
+ClearAllButton.Position = UDim2.new(1, -10, 0, 166)
 ClearAllButton.AnchorPoint = Vector2.new(1,0)
 ClearAllButton.Text = "Clear All Logged Audios"
 ClearAllButton.Font = Enum.Font.Gotham
@@ -452,6 +452,7 @@ local isSettingsOpen = false
 TitleSettingsButton.MouseButton1Click:Connect(function()
     isSettingsOpen = not isSettingsOpen
     SettingsFrame.Visible = isSettingsOpen
+    ClearAllButton.Visible = isSettingsOpen
 end)
 
 -- Toggle UI Visibility (main icon)
