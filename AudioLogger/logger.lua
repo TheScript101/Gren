@@ -123,7 +123,7 @@ local CopyUICorner = Instance.new("UICorner", CopyButton); CopyUICorner.CornerRa
 -- Settings Frame (toggleable via TitleSettingsButton)
 local SettingsFrame = Instance.new("Frame")
 SettingsFrame.Parent = ScreenGui
-SettingsFrame.Size = UDim2.new(0, 260, 0, 120)
+SettingsFrame.Size = UDim2.new(0, 260, 0, 220)
 SettingsFrame.Position = UDim2.new(0.5, 180, 0.5, -220)
 SettingsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 SettingsFrame.Visible = false
