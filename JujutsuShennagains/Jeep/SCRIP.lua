@@ -555,7 +555,7 @@ toggleBtn.InputBegan:Connect(function(input)
                     toggleMiniContainer = I("Frame", {
                         Parent = screenGui,
                         Size = UDim2.new(0, 48, 0, 48),
-                        Position = UDim2.new(0.85, 30, 0.5, 150),
+                        Position = UDim2.new(0.85, 30, 0.5, -150),
                         BackgroundColor3 = vSpeedOn and ON_COLOR or BG_COLOR,
                         ZIndex = 1
                     })
