@@ -1,4 +1,4 @@
---[[ -----------------------------------------------------------------------------------------
+uh--[[ -----------------------------------------------------------------------------------------
     ---------  DA JEEP MODIFIER GUI (Single LocalScript)  -----------------------------------
     Paste into a LocalScript (PlayerScripts / StarterGui) or into your executor.
     I only add big comment headers when a new feature block begins so you can find things easily.
@@ -192,7 +192,7 @@ local tutImage = I("ImageLabel", {
     Size = UDim2.new(0, 120, 0, 120),
     Position = UDim2.new(0, 10, 0, 62),
     BackgroundTransparency = 1,
-    Image = "rbxassetid://129018416400347",
+    Image = "rbxthumb://type=Asset&id=129018416400347&w=420&h=420",
     ScaleType = Enum.ScaleType.Fit
 })
 -- text under image
@@ -317,7 +317,7 @@ local spawnBtn = I("TextButton", {
 cornerize(spawnBtn, 8)
 
 -- mini version spawn (long hold)
-local spawnMiniImageId = "rbxassetid://14850118545"
+local spawnMiniImageId = "rbxthumb://type=Asset&id=14850118545&w=420&h=420"
 local spawnMiniBtn -- store ref to avoid duplicates
 local spawnHoldStart = 0
 local SPAWN_HOLD_TIME = 0.6
@@ -464,7 +464,7 @@ local toggleBtn = I("TextButton", {
 cornerize(toggleBtn, 8)
 
 -- mini toggle image id
-local toggleMiniImageId = "rbxassetid://92681645288864"
+local toggleMiniImageId = "rbxthumb://type=Asset&id=92681645288864&w=420&h=420"
 local toggleMiniBtn -- store ref
 local toggleHoldStart = 0
 
