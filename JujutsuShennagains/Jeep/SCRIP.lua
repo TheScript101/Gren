@@ -465,7 +465,8 @@ cornerize(toggleBtn, 8)
 
 -- mini toggle image id
 local toggleMiniImageId = "rbxthumb://type=Asset&id=92681645288864&w=420&h=420"
-local toggleMiniBtn -- store ref
+local toggleMiniContainer -- container frame for mini toggle (so we can change its bg color)
+local toggleMiniBtnImage -- the image button inside the container
 local toggleHoldStart = 0
 
 -- vehicle loop control
@@ -528,6 +529,11 @@ local function setToggleState(on)
             end
         end
     end
+
+    -- *** NEW/UPDATED: update mini toggle container color to reflect state ***
+    if toggleMiniContainer and toggleMiniContainer.Parent then
+        toggleMiniContainer.BackgroundColor3 = vSpeedOn and ON_COLOR or BG_COLOR
+    end
 end
 
 -- basic click toggles
@@ -544,27 +550,33 @@ toggleBtn.InputBegan:Connect(function(input)
             if input.UserInputState == Enum.UserInputState.End then
                 conn:Disconnect()
                 local held = (tick() - toggleHoldStart) >= SPAWN_HOLD_TIME
-                if held and not toggleMiniBtn then
-                    toggleMiniBtn = I("ImageButton", {
+                if held and not toggleMiniContainer then
+                    -- Create a container frame so we can change background color when toggle is on/off
+                    toggleMiniContainer = I("Frame", {
                         Parent = screenGui,
                         Size = UDim2.new(0, 48, 0, 48),
                         Position = UDim2.new(0.85, 0, 0.5, 0),
-                        BackgroundColor3 = BG_COLOR,
-                        Image = toggleMiniImageId,
-                        AutoButtonColor = true
+                        BackgroundColor3 = vSpeedOn and ON_COLOR or BG_COLOR,
+                        ZIndex = 1
                     })
-                    cornerize(toggleMiniBtn, 10)
+                    cornerize(toggleMiniContainer, 10)
+                    -- image button inside (transparent background so container bg shows)
+                    toggleMiniBtnImage = I("ImageButton", {
+                        Parent = toggleMiniContainer,
+                        Size = UDim2.new(1, 0, 1, 0),
+                        Position = UDim2.new(0,30,0,150),
+                        BackgroundTransparency = 1,
+                        Image = toggleMiniImageId,
+                        AutoButtonColor = true,
+                        ZIndex = 2
+                    })
                     -- clicking mini toggles the speed (on/off)
-                    toggleMiniBtn.InputBegan:Connect(function(i)
+                    toggleMiniBtnImage.InputBegan:Connect(function(i)
                         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
                             setToggleState(not vSpeedOn)
                         end
                     end)
-                    -- update mini visual color to reflect state (frame behind image)
-                    -- create a small background frame behind the image to color-change on state
-                    local bg = I("Frame", {Parent = toggleMiniBtn, Size = UDim2.new(1,0,1,0), Position = UDim2.new(0,0,0,0), BackgroundTransparency = 1})
-                    bg.ZIndex = 1
-                    makeDraggable(toggleMiniBtn)
+                    makeDraggable(toggleMiniContainer)
                 end
             end
         end)
