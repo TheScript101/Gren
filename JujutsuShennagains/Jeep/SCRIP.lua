@@ -555,7 +555,7 @@ toggleBtn.InputBegan:Connect(function(input)
                     toggleMiniContainer = I("Frame", {
                         Parent = screenGui,
                         Size = UDim2.new(0, 48, 0, 48),
-                        Position = UDim2.new(0.85, 0, 0.5, 0),
+                        Position = UDim2.new(0.85, 30, 0.5, 150),
                         BackgroundColor3 = vSpeedOn and ON_COLOR or BG_COLOR,
                         ZIndex = 1
                     })
@@ -564,7 +564,7 @@ toggleBtn.InputBegan:Connect(function(input)
                     toggleMiniBtnImage = I("ImageButton", {
                         Parent = toggleMiniContainer,
                         Size = UDim2.new(1, 0, 1, 0),
-                        Position = UDim2.new(0,30,0,150),
+                        Position = UDim2.new(0,0,0,0),
                         BackgroundTransparency = 1,
                         Image = toggleMiniImageId,
                         AutoButtonColor = true,
