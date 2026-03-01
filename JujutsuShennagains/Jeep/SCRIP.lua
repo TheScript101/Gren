@@ -629,7 +629,7 @@ OpenCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 OpenCloseButton.Font = Enum.Font.GothamBold
 OpenCloseButton.TextScaled = true
 OpenCloseButton.AutoButtonColor = false
-OpenCloseButton.Visible = false
+OpenCloseButton.Visible = true
 
 local SideCorner = Instance.new("UICorner")
 SideCorner.CornerRadius = UDim.new(1, 0)
