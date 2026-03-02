@@ -419,6 +419,108 @@ spawnBtn.InputBegan:Connect(function(input)
     end
 end)
 
+--[[ --------- FEATURE 4: Nuh Uh Emote Button --------------------------------------------------]]
+
+local nuhFeature = makeFeature("Nuh Uh Emote")
+
+-- Main button
+local nuhBtn = I("TextButton", {
+    Parent = nuhFeature,
+    Size = UDim2.new(0.6, 0, 0, 36),
+    Position = UDim2.new(0, 10, 0, 36),
+    BackgroundColor3 = ELEMENT_COLOR,
+    Text = "Play Nuh Uh",
+    Font = Enum.Font.GothamBold,
+    TextColor3 = TEXT_COLOR
+})
+cornerize(nuhBtn, 8)
+
+-- Mini image id (rbxthumb 420x420)
+local nuhMiniImageId = "rbxthumb://type=Asset&id=16697537181&w=420&h=420"
+
+local nuhMiniBtn
+local nuhHoldStart = 0
+
+-- Nuh Uh emote remote action (emote slot 2)
+local function doNuhEmote()
+    local ok, err = pcall(function()
+        local args = {[1] = 2} -- play emote slot 2
+        -- same robust remote lookup as Spawn Jeep
+        local targetRemote = nil
+        local tryPaths = {
+            {"Knit","Knit","Services","EmoteService","RE","Emote"},
+            {"Knit","Knit","Services","EmoteService","RE"},
+            {"Knit","Services","EmoteService","RE","Emote"},
+            {"Knit","Services","EmoteService","RE"}
+        }
+        for _, pathParts in ipairs(tryPaths) do
+            local current = ReplicatedStorage
+            local ok2 = true
+            for _, name in ipairs(pathParts) do
+                if current:FindFirstChild(name) then
+                    current = current[name]
+                else
+                    ok2 = false; break
+                end
+            end
+            if ok2 and current then
+                targetRemote = current
+                break
+            end
+        end
+        if not targetRemote then
+            targetRemote = ReplicatedStorage:FindFirstChild("Emote", true) or ReplicatedStorage:FindFirstChildWhichIsA("RemoteEvent", true)
+        end
+        if targetRemote and targetRemote.FireServer then
+            targetRemote:FireServer(unpack(args))
+        else
+            local success = pcall(function()
+                ReplicatedStorage.Knit.Knit.Services.EmoteService.RE.Emote:FireServer(unpack(args))
+            end)
+            if not success then
+                warn("Couldn't find target remote for Nuh Uh Emote. Remote path may differ in this game.")
+            end
+        end
+    end)
+    if not ok then warn("Error firing Nuh Uh Emote:", err) end
+end
+
+-- click handler
+nuhBtn.MouseButton1Click:Connect(doNuhEmote)
+
+-- long press detection for nuhBtn to create mini button
+nuhBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        nuhHoldStart = tick()
+        local conn
+        conn = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                conn:Disconnect()
+                local held = (tick() - nuhHoldStart) >= SPAWN_HOLD_TIME
+                if held and not nuhMiniBtn then
+                    -- create mini draggable image button for Nuh Uh Emote
+                    nuhMiniBtn = I("ImageButton", {
+                        Parent = screenGui,
+                        Size = UDim2.new(0, 48, 0, 48),
+                        Position = UDim2.new(0.85, 0, 0.32, 0),
+                        BackgroundColor3 = BG_COLOR,
+                        Image = nuhMiniImageId,
+                        AutoButtonColor = true
+                    })
+                    cornerize(nuhMiniBtn, 10)
+                    -- click on mini triggers Nuh Uh
+                    nuhMiniBtn.InputBegan:Connect(function(i)
+                        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                            doNuhEmote()
+                        end
+                    end)
+                    makeDraggable(nuhMiniBtn)
+                end
+            end
+        end)
+    end
+end)
+
 --[[ --------- FEATURE 2: Speed Modifier (textbox) ------------------------------------------]]
 local speedFeature = makeFeature("Speed Modifier")
 -- textbox field
