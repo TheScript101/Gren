@@ -201,10 +201,10 @@ tool.Activated:Connect(function()
     end
 
     -- TOTAL FREEZE TIME = 2.8s
-    task.wait(1.9)
+    task.wait(2)
 
     -- STOP ANIMATION
-    track:Stop()
+    -- Changed Lol
 
     -- UNFREEZE
     root.Anchored = false
@@ -217,9 +217,11 @@ tool.Activated:Connect(function()
     if variant == "Air" then
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
         task.wait(0.3)
+        track:Stop()
         punch:Activate()
     else
         task.wait(0.2)
+        track:Stop()
         punch:Activate()
     end
 
