@@ -216,7 +216,7 @@ tool.Activated:Connect(function()
     -- 🔥 VARIANT EXECUTION
     if variant == "Air" then
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        task.wait(0.3)
+        task.wait(0.25)
         track:Stop()
         punch:Activate()
     else
