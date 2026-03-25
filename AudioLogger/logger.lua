@@ -348,11 +348,13 @@ local function watchModelForSounds(model)
     if not model then return end
     for _, s in ipairs(model:GetDescendants()) do
         if s:IsA("Sound") then
+            logSound(s) -- NEW: instant log
             attachToSound(s)
         end
     end
     model.DescendantAdded:Connect(function(desc)
         if desc:IsA("Sound") then
+            logSound(desc) -- NEW: instant log
             attachToSound(desc)
         end
     end)
@@ -369,10 +371,10 @@ Players.PlayerAdded:Connect(function(plr)
 end)
 game.DescendantAdded:Connect(function(desc)
     if desc:IsA("Sound") then
+        logSound(desc) -- NEW: instant log (fixes fast destroy sounds)
         attachToSound(desc)
     end
 end)
-
 -- Settings interactions -----------------------------------
 local function updateSettingButtons()
     btnLogPlayer.Text = "Log Player Audios: " .. (settings.logPlayer and "ON" or "OFF")
@@ -500,6 +502,6 @@ spawn(function()
                 end
             end
         end
-        wait(1)
+        wait(0.1)
     end
 end)
