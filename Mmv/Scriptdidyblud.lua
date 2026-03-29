@@ -140,10 +140,10 @@ button.MouseButton1Click:Connect(function()
 	local chosenMap = maps[math.random(1, #maps)]
 
 	SendChatMessage("/map " .. chosenMap)
-	task.wait(0.8)
+	task.wait(0.96)
 
 	SendChatMessage("/murderer 360iytt")
-	task.wait(0.8)
+	task.wait(0.98)
 
 	SendChatMessage("/sheriff wrinkledcomp0sure")
 	
