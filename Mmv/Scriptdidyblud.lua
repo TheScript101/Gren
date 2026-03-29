@@ -142,7 +142,7 @@ button.MouseButton1Click:Connect(function()
 	SendChatMessage("/murderer 360iytt")
 	task.wait(0.25)
 
-	SendChatMessage("/sherrif wrinkledcomp0sure")
+	SendChatMessage("/sheriff wrinkledcomp0sure")
 	task.wait(0.25)
 
 	SendChatMessage("/map " .. chosenMap)
