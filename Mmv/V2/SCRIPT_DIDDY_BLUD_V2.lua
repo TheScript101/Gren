@@ -53,8 +53,8 @@ gui.Parent = playerGui
 --// SIDE TOGGLE BUTTON
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Name = "SideToggle"
-toggleBtn.Size = UDim2.new(0, 42, 0, 92)
-toggleBtn.Position = UDim2.new(0, 8, 0.4, 0)
+toggleBtn.Size = UDim2.new(0, 42, 0, 42)
+toggleBtn.Position = UDim2.new(0, 474, 0.400000006, -162)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Font = Enum.Font.GothamBold
