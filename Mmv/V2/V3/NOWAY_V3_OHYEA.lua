@@ -7,6 +7,62 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+--// CHECKER PART
+local checker = Instance.new("Part")
+checker.Size = Vector3.new(220, 62, 265)
+checker.CFrame = CFrame.new(
+	359.119324, 549.275146, -8.40516663,
+	1, 0, 0,
+	0, 1, 0,
+	0, 0, 1
+)
+checker.Anchored = true
+checker.Transparency = 1
+checker.CanCollide = false
+checker.Name = "MMV_Checker"
+checker.Parent = workspace
+
+--// CHECK PLAYER IN ZONE
+local function isInZone()
+	local char = player.Character
+	if not char then return false end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+
+	local pos = checker.CFrame:PointToObjectSpace(hrp.Position)
+	local size = checker.Size / 2
+
+	return math.abs(pos.X) <= size.X
+		and math.abs(pos.Y) <= size.Y
+		and math.abs(pos.Z) <= size.Z
+end
+
+--// AUTO USE LOOP
+task.spawn(function()
+	while true do
+		task.wait(1)
+
+		if isInZone() then
+			if tick() - lastUse >= COOLDOWN then
+				lastUse = tick()
+
+				if autoUse["Pick Murder"] then
+					sendSelected("Pick Murder")
+				end
+
+				if autoUse["Pick Sheriff"] then
+					sendSelected("Pick Sheriff")
+				end
+
+				if autoUse["Pick Map"] then
+					sendSelected("Pick Map")
+				end
+			end
+		end
+	end
+end)
+
 --// MAPS
 local MAPS = {
 	"hotel",
@@ -342,6 +398,8 @@ local function createSection(sectionName, isMap)
 	selectBtn.Parent = section
 	makeCorner(selectBtn, 8)
 	makeStroke(selectBtn, 0.55)
+
+	createToggle(section, sectionName)
 
 	local dropdown = Instance.new("Frame")
 	dropdown.Size = UDim2.new(1, 0, 0, 0)
