@@ -115,28 +115,35 @@ local function createSection(name, isMap)
 	label.TextScaled = true
 	label.Parent = top
 
-	local toggle = Instance.new("TextButton")
-	toggle.Size = UDim2.new(0.4,0,1,0)
-	toggle.Position = UDim2.new(0.6,0,0,0)
-	toggle.Text = "OFF"
-	toggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0.4,0,1,0)
+toggle.Position = UDim2.new(0.6,0,0,0)
+toggle.Text = "SET"
+toggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
 	toggle.TextColor3 = Color3.new(1,1,1)
 	toggle.Parent = top
 	Instance.new("UICorner", toggle)
 
-	local enabled = false
-
 	toggle.MouseButton1Click:Connect(function()
-		enabled = not enabled
-		toggle.Text = enabled and "ON" or "OFF"
 
-		if name == "Pick Murder" then murderEnabled = enabled end
-		if name == "Pick Sheriff" then sheriffEnabled = enabled end
-		if name == "Pick Map" then mapEnabled = enabled end
+	if name == "Pick Murder" then
+		SendChatMessage("/murderer " .. selectedMurder)
 
-		executeCommands()
-	end)
+	elseif name == "Pick Sheriff" then
+		SendChatMessage("/sheriff " .. selectedSheriff)
 
+	elseif name == "Pick Map" then
+		local maps = {
+			"hotel","milbase","beachresort","yacht","farmhouse",
+			"mineshaft","vampirescastle","workshop",
+			"trainstation","icecastle","christmasinitaly"
+		}
+
+		local chosen = selectedMap == "Random" and maps[math.random(1,#maps)] or selectedMap
+		SendChatMessage("/map " .. chosen)
+	end
+
+end)
 	-- dropdown button
 	local dropBtn = Instance.new("TextButton")
 	dropBtn.Size = UDim2.new(1,0,0,25)
