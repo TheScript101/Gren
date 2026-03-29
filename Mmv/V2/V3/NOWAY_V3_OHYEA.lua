@@ -38,31 +38,6 @@ local function isInZone()
 		and math.abs(pos.Z) <= size.Z
 end
 
---// AUTO USE LOOP
-task.spawn(function()
-	while true do
-		task.wait(1)
-
-		if isInZone() then
-			if tick() - lastUse >= COOLDOWN then
-				lastUse = tick()
-
-				if autoUse["Pick Murder"] then
-					sendSelected("Pick Murder")
-				end
-
-				if autoUse["Pick Sheriff"] then
-					sendSelected("Pick Sheriff")
-				end
-
-				if autoUse["Pick Map"] then
-					sendSelected("Pick Map")
-				end
-			end
-		end
-	end
-end)
-
 --// MAPS
 local MAPS = {
 	"hotel",
@@ -555,3 +530,53 @@ task.spawn(function()
 		content.CanvasSize = UDim2.new(0, 0, 0, contentLayout.AbsoluteContentSize.Y + 6)
 	end
 end)
+
+--// AUTO USE LOOP
+task.spawn(function()
+	while true do
+		task.wait(1)
+
+		if isInZone() then
+			if tick() - lastUse >= COOLDOWN then
+				lastUse = tick()
+
+				if autoUse["Pick Murder"] then
+					sendSelected("Pick Murder")
+				end
+
+				if autoUse["Pick Sheriff"] then
+					sendSelected("Pick Sheriff")
+				end
+
+				if autoUse["Pick Map"] then
+					sendSelected("Pick Map")
+				end
+			end
+		end
+	end
+end)
+
+--// RESPAWN AUTO USE
+local function onCharacterAdded()
+	task.wait(2)
+
+	if isInZone() then
+		if autoUse["Pick Murder"] then
+			sendSelected("Pick Murder")
+		end
+		if autoUse["Pick Sheriff"] then
+			sendSelected("Pick Sheriff")
+		end
+		if autoUse["Pick Map"] then
+			sendSelected("Pick Map")
+		end
+	end
+end
+
+-- run for current character
+if player.Character then
+	task.spawn(onCharacterAdded)
+end
+
+-- run on every respawn
+player.CharacterAdded:Connect(onCharacterAdded)
