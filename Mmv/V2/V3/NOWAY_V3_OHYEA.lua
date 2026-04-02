@@ -46,11 +46,11 @@ local MAPS = {
 	"yacht",
 	"farmhouse",
 	"mineshaft",
-	"vampirescastle",
+	"vampirecastle",
 	"workshop",
-	"trainstation",
+	"station",
 	"icecastle",
-	"christmasinitaly",
+	"christmasitaly",
 }
 
 --// CHAT FUNCTION
