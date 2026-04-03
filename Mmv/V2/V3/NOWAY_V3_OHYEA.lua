@@ -51,6 +51,14 @@ local MAPS = {
 	"station",
 	"icecastle",
 	"christmasitaly",
+    "biolab", 
+    "factory",
+    "researchfacility",
+    "manor",
+    "spaceship", 
+    "logcabin", 
+    "skilodge", 
+    "SkiVillage_RegularMode", 
 }
 
 --// CHAT FUNCTION
