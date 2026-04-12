@@ -88,6 +88,11 @@ local jumpBtn   = createToolButton("HighJump", "1843065736")
 local shieldBtn = createToolButton("Shield", "1843056725")
 local axeBtn    = createToolButton("Axe", "399887168")
 
+task.wait(0.5)
+for tool in pairs(buttons) do
+	updateButtonVisibility(tool)
+end
+
 -- // MAP
 local buttons = {
 	Heal = healBtn,
@@ -210,6 +215,8 @@ local function createOtherToolButton(toolName)
 	sizeLimit.MaxTextSize = 18
 	sizeLimit.MinTextSize = 8
 	sizeLimit.Parent = btn
+
+end
 	
 local function refreshOtherToolButtons()
 	local present = {}
