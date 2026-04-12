@@ -23,8 +23,8 @@ screenGui.Parent = CoreGui
 
 -- MAIN FRAME (for layout)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 220)
-mainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+mainFrame.Size = UDim2.new(0, 170, 0, 100)
+mainFrame.Position = UDim2.new(0.0200000014, 0, 0.100000016, 0)
 mainFrame.BackgroundTransparency = 0.8
 mainFrame.Parent = screenGui
 
