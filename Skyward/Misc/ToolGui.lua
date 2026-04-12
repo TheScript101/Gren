@@ -30,12 +30,12 @@ mainFrame.Parent = screenGui
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = mainframe
+	corner.Parent = mainFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = Color3.new(0, 0, 0)
 	stroke.Thickness = 0.8
-	stroke.Parent = mainframe
+	stroke.Parent = mainFrame
 
 -- GRID LAYOUT (🔥 THIS FIXES EVERYTHING)
 local layout = Instance.new("UIGridLayout")
