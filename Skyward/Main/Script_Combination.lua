@@ -264,6 +264,8 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Text = "Now u can see all tools",
 	Duration = 1
 })
+								wait(0.1)
+								gui:Destroy()
 		                        end,
 	                         	nil,
 		                        nil -- or add GUI 6 here
