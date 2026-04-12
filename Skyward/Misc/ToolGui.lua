@@ -25,17 +25,8 @@ screenGui.Parent = CoreGui
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 190, 0, 180)
 mainFrame.Position = UDim2.new(0.7500000014, 0, 0.1700000016, 0)
-mainFrame.BackgroundTransparency = 0.8
+mainFrame.BackgroundTransparency = 1
 mainFrame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.new(0, 0, 0)
-stroke.Thickness = 0.8
-stroke.Parent = mainFrame
 
 -- GRID LAYOUT
 local layout = Instance.new("UIGridLayout")
@@ -86,9 +77,9 @@ local buttons = {
 
 -- // EXCLUDED TOOLS
 local excludedTools = {
-	Block = true,
-	Bow = true,
-	Sword = true,
+	block = true,
+	bow = true,
+	sword = true,
 }
 
 -- // OTHER TOOL BUTTONS
@@ -99,14 +90,36 @@ local function isKnownTool(name)
 end
 
 local function isExcludedTool(name)
-	return excludedTools[name] == true
+	return excludedTools[name:lower()] == true
 end
 
-local function updateButtonAppearance(tool)
+local function isEquipped(toolName)
+	return character:FindFirstChild(toolName) ~= nil
+end
+
+local function syncButtonAppearance(tool)
 	local btn = buttons[tool]
 	if btn then
-		btn.BackgroundColor3 = toggles[tool] and Color3.fromRGB(0, 255, 255)
+		btn.BackgroundColor3 = isEquipped(tool) and Color3.fromRGB(0, 255, 255)
 			or Color3.fromRGB(255, 255, 255)
+	end
+end
+
+local function syncOtherButtonAppearance(toolName)
+	local btn = otherButtons[toolName]
+	if btn then
+		btn.BackgroundColor3 = isEquipped(toolName) and Color3.fromRGB(0, 255, 255)
+			or Color3.fromRGB(255, 255, 255)
+	end
+end
+
+local function syncAllAppearances()
+	for tool in pairs(buttons) do
+		syncButtonAppearance(tool)
+	end
+
+	for toolName in pairs(otherButtons) do
+		syncOtherButtonAppearance(toolName)
 	end
 end
 
@@ -164,6 +177,15 @@ local function createOtherToolButton(toolName)
 	sizeLimit.MinTextSize = 8
 	sizeLimit.Parent = btn
 
+	btn.MouseButton1Click:Connect(function()
+		if isEquipped(toolName) then
+			unequipTool()
+		else
+			equipTool(toolName)
+		end
+		syncAllAppearances()
+	end)
+
 	otherButtons[toolName] = btn
 end
 
@@ -205,25 +227,40 @@ local function refreshOtherToolButtons()
 			otherButtons[name].LayoutOrder = 100 + i
 		end
 	end
+
+	syncAllAppearances()
 end
 
 -- // CLICK SYSTEM
 for toolName, btn in pairs(buttons) do
 	btn.MouseButton1Click:Connect(function()
-		toggles[toolName] = not toggles[toolName]
-
-		if toggles[toolName] then
-			equipTool(toolName)
-		else
+		if isEquipped(toolName) then
 			unequipTool()
+			toggles[toolName] = false
+		else
+			equipTool(toolName)
+			toggles[toolName] = true
 		end
 
-		updateButtonAppearance(toolName)
+		syncAllAppearances()
 	end)
 end
 
 -- // TOOL TRACKING
+local connections = {}
+
+local function disconnectConnections()
+	for _, conn in ipairs(connections) do
+		if conn and conn.Connected then
+			conn:Disconnect()
+		end
+	end
+	table.clear(connections)
+end
+
 local function monitor()
+	disconnectConnections()
+
 	local function updateAll()
 		for name in pairs(buttons) do
 			updateButtonVisibility(name)
@@ -231,22 +268,22 @@ local function monitor()
 		refreshOtherToolButtons()
 	end
 
-	character.ChildAdded:Connect(function(child)
+	table.insert(connections, character.ChildAdded:Connect(function(child)
 		if buttons[child.Name] then
 			updateButtonVisibility(child.Name)
 		end
 		refreshOtherToolButtons()
-	end)
+	end))
 
-	character.ChildRemoved:Connect(function(child)
+	table.insert(connections, character.ChildRemoved:Connect(function(child)
 		if buttons[child.Name] then
 			updateButtonVisibility(child.Name)
 		end
 		refreshOtherToolButtons()
-	end)
+	end))
 
-	player.Backpack.ChildAdded:Connect(updateAll)
-	player.Backpack.ChildRemoved:Connect(updateAll)
+	table.insert(connections, player.Backpack.ChildAdded:Connect(updateAll))
+	table.insert(connections, player.Backpack.ChildRemoved:Connect(updateAll))
 end
 
 -- // RESET SUPPORT
@@ -256,7 +293,6 @@ player.CharacterAdded:Connect(function(char)
 
 	for tool in pairs(toggles) do
 		toggles[tool] = false
-		updateButtonAppearance(tool)
 		updateButtonVisibility(tool)
 	end
 
@@ -271,7 +307,6 @@ end)
 
 -- // INIT
 for tool in pairs(toggles) do
-	updateButtonAppearance(tool)
 	updateButtonVisibility(tool)
 end
 
