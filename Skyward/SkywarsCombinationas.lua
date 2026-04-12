@@ -231,7 +231,7 @@ createPrompt(
 	                          	"Yes",
 	                          	"No",
 	                         	function()
-	                         		loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ToolGui.lua"))()
+	                         	 loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ToolGui.lua"))()
 		                        end,
 	                         	nil,
 		                        nil -- or add GUI 6 here
