@@ -157,7 +157,7 @@ do
 end
 
 yes.MouseButton1Click:Connect(function()
-	-- put your yes script here
+	loadstring(game:HttpGet(""))()
 end)
 
 no.MouseButton1Click:Connect(function()
