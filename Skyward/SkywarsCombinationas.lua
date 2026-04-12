@@ -158,6 +158,8 @@ end
 
 yes.MouseButton1Click:Connect(function()
 	loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Autoclicker.lua"))()
+	wait(0.1)
+	gui:Destroy()
 end)
 
 no.MouseButton1Click:Connect(function()
