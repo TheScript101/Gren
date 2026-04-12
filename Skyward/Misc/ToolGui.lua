@@ -56,6 +56,28 @@ local function createToolButton(toolName, imageId)
 	stroke.Thickness = 1
 	stroke.Parent = btn
 
+	-- ✅ CLICK HANDLER HERE
+	btn.MouseButton1Click:Connect(function()
+
+		-- HEAL CHECK
+		if toolName == "Heal" then
+			if humanoid.Health >= 75 then
+				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
+				return
+			end
+		end
+
+		if isEquipped(toolName) then
+			unequipTool()
+			toggles[toolName] = false
+		else
+			equipTool(toolName)
+			toggles[toolName] = true
+		end
+
+		syncAllAppearances()
+	end)
+
 	return btn
 end
 
@@ -242,28 +264,6 @@ local function refreshOtherToolButtons()
 
 	syncAllAppearances()
 end
-
--- // CLICK SYSTEM
-	btn.MouseButton1Click:Connect(function()
-
-		-- HEAL CHECK
-		if toolName == "Heal" then
-			if humanoid.Health >= 75 then
-				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
-				return
-			end
-		end
-
-		if isEquipped(toolName) then
-			unequipTool()
-			toggles[toolName] = false
-		else
-			equipTool(toolName)
-			toggles[toolName] = true
-		end
-
-		syncAllAppearances()
-	end)
 
 -- // TOOL TRACKING
 local connections = {}
