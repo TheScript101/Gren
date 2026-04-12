@@ -56,26 +56,6 @@ local function createToolButton(toolName, imageId)
 	stroke.Thickness = 1
 	stroke.Parent = btn
 
-	-- ✅ CLICK HANDLER HERE
-	btn.MouseButton1Click:Connect(function()
-
-		-- HEAL CHECK
-		if toolName == "Heal" then
-			if humanoid.Health >= 75 then
-				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
-				return
-			end
-		end
-
-if character:FindFirstChild(toolName) then
-	unequipTool(toolName)
-else
-	equipTool(toolName)
-end
-
-		syncAllAppearances()
-	end)
-
 	return btn
 end
 
@@ -115,7 +95,6 @@ end
 
 local function isEquipped(toolName)
 	return character:FindFirstChild(toolName) ~= nil
-		or player.Backpack:FindFirstChild(toolName) == nil
 end
 
 local function syncButtonAppearance(tool)
@@ -154,31 +133,14 @@ local function updateButtonVisibility(tool)
 end
 
 local function equipTool(tool)
-	local found = player.Backpack:FindFirstChild(tool)
-
+	local found = player.Backpack:FindFirstChild(tool) or character:FindFirstChild(tool)
 	if found and found:IsA("Tool") then
-		found.Parent = character
+		humanoid:EquipTool(found)
 	end
 end
 
-local function unequipTool(tool)
-	local found = character:FindFirstChild(tool)
-
-	if found and found:IsA("Tool") then
-		found.Parent = player.Backpack
-	end
-end
-
-local StarterGui = game:GetService("StarterGui")
-
-local function sendNotification(title, text)
-	pcall(function()
-		StarterGui:SetCore("SendNotification", {
-			Title = title,
-			Text = text,
-			Duration = 3
-		})
-	end)
+local function unequipTool()
+	humanoid:UnequipTools()
 end
 
 local function createOtherToolButton(toolName)
@@ -215,8 +177,18 @@ local function createOtherToolButton(toolName)
 	sizeLimit.MinTextSize = 8
 	sizeLimit.Parent = btn
 
+	btn.MouseButton1Click:Connect(function()
+		if isEquipped(toolName) then
+			unequipTool()
+		else
+			equipTool(toolName)
+		end
+		syncAllAppearances()
+	end)
+
+	otherButtons[toolName] = btn
 end
-	
+
 local function refreshOtherToolButtons()
 	local present = {}
 	local order = {}
@@ -257,6 +229,29 @@ local function refreshOtherToolButtons()
 	end
 
 	syncAllAppearances()
+end
+
+-- // CLICK SYSTEM
+for toolName, btn in pairs(buttons) do
+	btn.MouseButton1Click:Connect(function()
+					-- HEAL CHECK
+		if toolName == "Heal" then
+			if humanoid.Health >= 75 then
+				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
+				return
+			end
+		end
+
+		if isEquipped(toolName) then
+			unequipTool()
+			toggles[toolName] = false
+		else
+			equipTool(toolName)
+			toggles[toolName] = true
+		end
+
+		syncAllAppearances()
+	end)
 end
 
 -- // TOOL TRACKING
