@@ -211,17 +211,15 @@ local function createOtherToolButton(toolName)
 	sizeLimit.MinTextSize = 8
 	sizeLimit.Parent = btn
 
-	btn.MouseButton1Click:Connect(function()
-		if isEquipped(toolName) then
-			unequipTool()
-		else
-			equipTool(toolName)
-		end
-		syncAllAppearances()
-	end)
-
-	otherButtons[toolName] = btn
-end
+if isEquipped(toolName) then
+	-- only unequip THIS tool
+	local tool = character:FindFirstChild(toolName)
+	if tool then
+		tool.Parent = player.Backpack
+	end
+else
+	equipTool(toolName)
+	end
 
 local function refreshOtherToolButtons()
 	local present = {}
