@@ -174,7 +174,7 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 OpenButton.Parent = ScreenGui
 OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-OpenButton.Position = UDim2.new(0, 10, 0.5, 0)
+OpenButton.Position = UDim2.new(0, 18, 0.5, -160)
 OpenButton.Size = UDim2.new(0, 120, 0, 50)
 OpenButton.Font = Enum.Font.Arcade
 OpenButton.Text = "Autoclicker MODDED"
