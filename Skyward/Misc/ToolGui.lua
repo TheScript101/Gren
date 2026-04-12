@@ -210,17 +210,7 @@ local function createOtherToolButton(toolName)
 	sizeLimit.MaxTextSize = 18
 	sizeLimit.MinTextSize = 8
 	sizeLimit.Parent = btn
-
-if isEquipped(toolName) then
-	-- only unequip THIS tool
-	local tool = character:FindFirstChild(toolName)
-	if tool then
-		tool.Parent = player.Backpack
-	end
-else
-	equipTool(toolName)
-	end
-
+	
 local function refreshOtherToolButtons()
 	local present = {}
 	local order = {}
