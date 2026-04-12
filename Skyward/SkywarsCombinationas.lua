@@ -4,6 +4,13 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local guiParent = player:WaitForChild("PlayerGui")
 
+wait(0.5)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "Choose Your Options",
+	Duration = 2.5
+})
+
 local function createPrompt(guiName, promptTitle, promptInfo, yesText, noText, yesCallback, noCallback, nextStep)
 	local old = guiParent:FindFirstChild(guiName)
 	if old then
@@ -188,6 +195,11 @@ createPrompt(
 	"No",
 	function()
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Autoclicker.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "Auto Clicker",
+	Duration = 1
+})
 	end,
 	nil,
 	function()
@@ -199,6 +211,11 @@ createPrompt(
 			"No",
 			function()
 				loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/%2BSensitivity.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "The Sensitivity",
+	Duration = 1
+})
 			end,
 			nil,
 			function()
@@ -210,6 +227,11 @@ createPrompt(
 					"No",
 					function()
 						loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/MegaVip.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "Walk in the mega VIP thing for it to work",
+	Duration = 1
+})
 					end,
 					nil,
 					function()
@@ -221,6 +243,11 @@ createPrompt(
 							"No",
 							function()
 								loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ESP.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "Now you can see every1",
+	Duration = 1
+})
 							end,
 							nil,
 							function()
@@ -232,6 +259,11 @@ createPrompt(
 	                          	"No",
 	                         	function()
 	                         	 loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ToolGui.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "Now u can see all tools",
+	Duration = 1
+})
 		                        end,
 	                         	nil,
 		                        nil -- or add GUI 6 here
