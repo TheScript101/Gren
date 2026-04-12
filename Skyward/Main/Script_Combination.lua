@@ -245,7 +245,7 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 								loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ESP.lua"))()
 game:GetService("StarterGui"):SetCore("SendNotification", {
 	Title = "Loaded",
-	Text = "Now you can see every1",
+	Text = "Now you can see everyone",
 	Duration = 1
 })
 							end,
@@ -265,7 +265,7 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Duration = 1
 })
 								wait(0.1)
-								gui:Destroy()
+								5_GUI:Destroy()
 		                        end,
 	                         	nil,
 		                        nil -- or add GUI 6 here
