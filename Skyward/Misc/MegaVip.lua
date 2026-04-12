@@ -14,7 +14,7 @@ for _, part in pairs(enterTeleportsFolder:GetChildren()) do
 
 					-- Resize effect for Enter
 					local originalSize = part.Size
-					part.Size = Vector3.new(8, 0.01, 7)
+					part.Size = Vector3.new(8, 0.01, 5.5)
 					task.delay(1, function()
 						part.Size = originalSize
 					end)
@@ -25,7 +25,7 @@ for _, part in pairs(enterTeleportsFolder:GetChildren()) do
 end
 
 ------------------------ MEGA VIP EXIT TELEPORT ------------------------
-local exitDestination = Vector3.new(0, 177.1, 6)
+local exitDestination = Vector3.new(0, 179.1, 6)
 local exitTeleportsFolder = workspace:WaitForChild("Lobby"):WaitForChild("MegaVIPRoom"):WaitForChild("Teleport"):WaitForChild("Exit")
 
 for _, part in pairs(exitTeleportsFolder:GetChildren()) do
@@ -40,7 +40,7 @@ for _, part in pairs(exitTeleportsFolder:GetChildren()) do
 
 					-- Resize effect for Exit
 					local originalSize = part.Size
-					part.Size = Vector3.new(4, 0.01, 3)
+					part.Size = Vector3.new(4, 0.01, 1.5)
 					task.delay(1, function()
 						part.Size = originalSize
 					end)
