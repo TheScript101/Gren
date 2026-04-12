@@ -157,7 +157,7 @@ do
 end
 
 yes.MouseButton1Click:Connect(function()
-	loadstring(game:HttpGet(""))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Autoclicker.lua"))()
 end)
 
 no.MouseButton1Click:Connect(function()
