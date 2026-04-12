@@ -67,13 +67,11 @@ local function createToolButton(toolName, imageId)
 			end
 		end
 
-		if isEquipped(toolName) then
-			unequipTool()
-			toggles[toolName] = false
-		else
-			equipTool(toolName)
-			toggles[toolName] = true
-		end
+if character:FindFirstChild(toolName) then
+	unequipTool(toolName)
+else
+	equipTool(toolName)
+end
 
 		syncAllAppearances()
 	end)
@@ -117,6 +115,7 @@ end
 
 local function isEquipped(toolName)
 	return character:FindFirstChild(toolName) ~= nil
+		or player.Backpack:FindFirstChild(toolName) == nil
 end
 
 local function syncButtonAppearance(tool)
@@ -155,14 +154,19 @@ local function updateButtonVisibility(tool)
 end
 
 local function equipTool(tool)
-	local found = player.Backpack:FindFirstChild(tool) or character:FindFirstChild(tool)
+	local found = player.Backpack:FindFirstChild(tool)
+
 	if found and found:IsA("Tool") then
-		humanoid:EquipTool(found)
+		found.Parent = character
 	end
 end
 
-local function unequipTool()
-	humanoid:UnequipTools()
+local function unequipTool(tool)
+	local found = character:FindFirstChild(tool)
+
+	if found and found:IsA("Tool") then
+		found.Parent = player.Backpack
+	end
 end
 
 local StarterGui = game:GetService("StarterGui")
