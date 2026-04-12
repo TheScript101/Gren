@@ -14,7 +14,7 @@ for _, part in pairs(enterTeleportsFolder:GetChildren()) do
 
 					-- Resize effect for Enter
 					local originalSize = part.Size
-					part.Size = Vector3.new(8, 0.01, 8)
+					part.Size = Vector3.new(8, 0.01, 7)
 					task.delay(1, function()
 						part.Size = originalSize
 					end)
@@ -40,7 +40,7 @@ for _, part in pairs(exitTeleportsFolder:GetChildren()) do
 
 					-- Resize effect for Exit
 					local originalSize = part.Size
-					part.Size = Vector3.new(4, 0.01, 4)
+					part.Size = Vector3.new(4, 0.01, 3)
 					task.delay(1, function()
 						part.Size = originalSize
 					end)
