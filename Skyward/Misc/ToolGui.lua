@@ -143,6 +143,18 @@ local function unequipTool()
 	humanoid:UnequipTools()
 end
 
+local StarterGui = game:GetService("StarterGui")
+
+local function sendNotification(title, text)
+	pcall(function()
+		StarterGui:SetCore("SendNotification", {
+			Title = title,
+			Text = text,
+			Duration = 3
+		})
+	end)
+end
+
 local function createOtherToolButton(toolName)
 	if otherButtons[toolName] then
 		return
@@ -232,8 +244,16 @@ local function refreshOtherToolButtons()
 end
 
 -- // CLICK SYSTEM
-for toolName, btn in pairs(buttons) do
 	btn.MouseButton1Click:Connect(function()
+
+		-- HEAL CHECK
+		if toolName == "Heal" then
+			if humanoid.Health >= 75 then
+				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
+				return
+			end
+		end
+
 		if isEquipped(toolName) then
 			unequipTool()
 			toggles[toolName] = false
@@ -244,7 +264,6 @@ for toolName, btn in pairs(buttons) do
 
 		syncAllAppearances()
 	end)
-end
 
 -- // TOOL TRACKING
 local connections = {}
