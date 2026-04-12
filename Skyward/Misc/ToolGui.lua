@@ -237,7 +237,12 @@ for toolName, btn in pairs(buttons) do
 					-- HEAL CHECK
 		if toolName == "Heal" then
 			if humanoid.Health >= 75 then
-				sendNotification("Nope", "Your over 75 HP, why do you need to use it?")
+				task.wait(0.2)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Nope",
+	Text = "Your over 75 HP, why do you need to use heal?",
+	Duration = 1
+})
 				return
 			end
 		end
