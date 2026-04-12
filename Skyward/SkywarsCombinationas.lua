@@ -194,7 +194,7 @@ createPrompt(
 	"Yes",
 	"No",
 	function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Autoclicker.lua"))()
+		loadstring(game:HttpGet(" https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Autoclicker.lua"))()
 game:GetService("StarterGui"):SetCore("SendNotification", {
 	Title = "Loaded",
 	Text = "Auto Clicker",
