@@ -15,8 +15,8 @@ gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 170, 0, 70)
-frame.Position = UDim2.new(0.5, -110, 0.8, -50)
+frame.Size = UDim2.new(0, 170, 0, 55)
+frame.Position = UDim2.new(0.5, -215, 0, -50)
 frame.BackgroundColor3 = Color3.fromRGB(25,25,30)
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
@@ -38,7 +38,7 @@ title.Parent = frame
 -- VALUE TEXT
 local valueLabel = Instance.new("TextLabel")
 valueLabel.Size = UDim2.new(1,0,0,20)
-valueLabel.Position = UDim2.new(0,0,0,25)
+valueLabel.Position = UDim2.new(0,0,0,15)
 valueLabel.BackgroundTransparency = 1
 valueLabel.Text = "Size: 10"
 valueLabel.Font = Enum.Font.Gotham
@@ -49,7 +49,7 @@ valueLabel.Parent = frame
 -- SLIDER BAR
 local sliderBar = Instance.new("Frame")
 sliderBar.Size = UDim2.new(1,-20,0,8)
-sliderBar.Position = UDim2.new(0,10,0,60)
+sliderBar.Position = UDim2.new(0,10,0,39)
 sliderBar.BackgroundColor3 = Color3.fromRGB(50,50,60)
 sliderBar.Parent = frame
 Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(1,0)
