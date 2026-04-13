@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 
 -- // SETTINGS
 _G.Body = true
-local hitboxSize = 10
+local hitboxSize = 8
 
 -- // GUI
 local gui = Instance.new("ScreenGui")
@@ -40,7 +40,7 @@ local valueLabel = Instance.new("TextLabel")
 valueLabel.Size = UDim2.new(1,0,0,20)
 valueLabel.Position = UDim2.new(0,0,0,15)
 valueLabel.BackgroundTransparency = 1
-valueLabel.Text = "Size: 10"
+valueLabel.Text = "Size: 8"
 valueLabel.Font = Enum.Font.Gotham
 valueLabel.TextSize = 11
 valueLabel.TextColor3 = Color3.fromRGB(200,200,200)
