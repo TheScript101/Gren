@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 
 -- // SETTINGS
 _G.Body = true
-local hitboxSize = 7
+local hitboxSize = 8
 
 -- // GUI
 local gui = Instance.new("ScreenGui")
