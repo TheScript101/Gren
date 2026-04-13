@@ -265,7 +265,9 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Duration = 1
 })
 								wait(0.1)
-								5_GUI:Destroy()
+								if gui and gui.Parent then
+                        	gui:Destroy()
+                        end
 		                        end,
 	                         	nil,
 		                        function()
@@ -283,7 +285,9 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Duration = 1
 })
 								wait(0.15)
-								6_GUI:Destroy()
+								if gui and gui.Parent then
+                        	gui:Destroy()
+							end
 	                        	end,
 	                        	nil,
 	                        	nil -- or add GUI 7 here
