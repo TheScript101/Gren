@@ -268,7 +268,27 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 								5_GUI:Destroy()
 		                        end,
 	                         	nil,
-		                        nil -- or add GUI 6 here
+		                        function()
+                        	createPrompt(
+                        		"6_GUI",
+                        		"Load Lock On?",
+                        		"Pick a option.",
+                        		"Yes",
+                        		"No",
+                        		function()
+	                        		loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Lock.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "ultimate gaming chair bro",
+	Duration = 1
+})
+								wait(0.15)
+								6_GUI:Destroy()
+	                        	end,
+	                        	nil,
+	                        	nil -- or add GUI 7 here
+                                	)
+                               end
                              )
                          end
 						)
