@@ -264,14 +264,10 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Text = "Now u can see all tools",
 	Duration = 1
 })
-								wait(0.1)
-								if gui and gui.Parent then
-                        	gui:Destroy()
-                        end
 		                        end,
 	                         	nil,
 		                        function()
-                        	createPrompt(
+                                	createPrompt(
                         		"6_GUI",
                         		"Load Lock On?",
                         		"Pick a option.",
