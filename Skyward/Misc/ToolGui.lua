@@ -338,19 +338,17 @@ local function getGui()
 end
 
 -- // LOOP CLEANER
-while true do
-	task.wait(5)
+task.wait(1) -- small delay to make sure GUI loads
 
-	local gui = getGui()
-	if gui then
-		local potion = gui:FindFirstChild("PotionButton")
-		if potion then
-			potion:Destroy()
-		end
+local gui = getGui()
+if gui then
+	local potion = gui:FindFirstChild("PotionButton")
+	if potion then
+		potion:Destroy()
+	end
 
-		local pickaxe = gui:FindFirstChild("PickAxeButton")
-		if pickaxe then
-			pickaxe:Destroy()
-		end
+	local pickaxe = gui:FindFirstChild("PickAxeButton")
+	if pickaxe then
+		pickaxe:Destroy()
 	end
 end
