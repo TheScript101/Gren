@@ -130,8 +130,8 @@ local function applyHighlightToCharacter(char)
     HL.Adornee = char
     HL.FillColor = Color3.fromRGB(255, 40, 40)
     HL.OutlineColor = Color3.fromRGB(255, 255, 255)
-    HL.FillTransparency = 0.25
-    HL.OutlineTransparency = 0
+    HL.FillTransparency = 0.87
+    HL.OutlineTransparency = 0.5
     HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     HL.Parent = game:GetService("CoreGui")
     HighlightHandle = HL
