@@ -290,7 +290,25 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 							end
 	                        	end,
 	                        	nil,
-	                        	nil -- or add GUI 7 here
+	                        	function()
+                             	createPrompt(
+	                        	"7_GUI",
+		                        "Load Hitbox Expander?",
+	                        	"Pick a option.",
+                        		"Yes",
+                        		"No",
+                        		function()
+                        			loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/HitboxSlider.lua"))()
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Loaded",
+	Text = "it's just lag! xd",
+	Duration = 1
+})
+                        		end,
+                        		nil,
+                        		nil -- or add GUI 8 here
+                                        	)
+                                      end					
                                 	)
                                end
                              )
