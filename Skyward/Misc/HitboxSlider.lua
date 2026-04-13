@@ -16,7 +16,7 @@ gui.Parent = game:GetService("CoreGui")
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 170, 0, 55)
-frame.Position = UDim2.new(0.5, -215, 0, -50)
+frame.Position = UDim2.new(0.5, -170, 0, -50)
 frame.BackgroundColor3 = Color3.fromRGB(25,25,30)
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
