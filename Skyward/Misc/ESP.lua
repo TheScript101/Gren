@@ -2,51 +2,62 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-local function addHighlights(character)
-	for _, obj in ipairs(character:GetChildren()) do
-		if obj:IsA("BasePart") and obj.Name ~= "HumanoidRootPart" then
-			if not obj:FindFirstChild("Cham") then
-				local highlight = Instance.new("Highlight")
-				highlight.Name = "Cham"
-				highlight.FillColor = Color3.fromRGB(255, 0, 0)
-				highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-				highlight.FillTransparency = 0.5 -- ✅ your value
-				highlight.OutlineTransparency = 0
-				highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-				highlight.Adornee = obj
-				highlight.Parent = obj
-			end
-		end
+local function addHighlightToPart(part)
+	if part.Name == "HumanoidRootPart" then return end
+	if not part:IsA("BasePart") then return end
+	if part:FindFirstChild("Cham") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "Cham"
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0.5
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = part
+	highlight.Parent = part
+end
+
+local function scanCharacter(character)
+	for _, obj in ipairs(character:GetDescendants()) do -- 🔥 FIX: Descendants (gets accessories too)
+		addHighlightToPart(obj)
 	end
 end
 
 function applyChamsToPlayer(player)
-	if player ~= LocalPlayer then
-		player.CharacterAdded:Connect(function(character)
-			addHighlights(character)
+	if player == LocalPlayer then return end
 
-			-- also handle new parts added later (accessories, etc.)
-			character.ChildAdded:Connect(function(child)
-				if child:IsA("BasePart") and child.Name ~= "HumanoidRootPart" then
-					task.wait()
-					addHighlights(character)
-				end
-			end)
+	local function setupCharacter(character)
+		task.wait(0.3) -- 🔥 FIX: wait for full load
+		scanCharacter(character)
+
+		-- 🔥 FIX: detect new parts (accessories, etc.)
+		character.DescendantAdded:Connect(function(obj)
+			addHighlightToPart(obj)
 		end)
 
-		-- Apply immediately if already spawned
-		if player.Character then
-			addHighlights(player.Character)
-		end
+		-- 🔥 FIX: safety loop (ensures nothing is missed)
+		task.spawn(function()
+			while character.Parent do
+				scanCharacter(character)
+				task.wait(2)
+			end
+		end)
+	end
+
+	-- Character spawn
+	player.CharacterAdded:Connect(setupCharacter)
+
+	-- Already spawned
+	if player.Character then
+		setupCharacter(player.Character)
 	end
 end
 
--- Apply to all current players
-for _, player in pairs(Players:GetPlayers()) do
+-- Existing players
+for _, player in ipairs(Players:GetPlayers()) do
 	applyChamsToPlayer(player)
 end
 
--- Apply to new players
-Players.PlayerAdded:Connect(function(player)
-	applyChamsToPlayer(player)
-end)
+-- New players
+Players.PlayerAdded:Connect(applyChamsToPlayer)
