@@ -12,7 +12,7 @@ local function addHighlightToPart(part)
 	highlight.FillColor = Color3.fromRGB(255, 0, 0)
 	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 	highlight.FillTransparency = 0.5
-	highlight.OutlineTransparency = 0.5
+	highlight.OutlineTransparency = 0.15
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.Adornee = part
 	highlight.Parent = part
@@ -28,7 +28,7 @@ function applyChamsToPlayer(player)
 	if player == LocalPlayer then return end
 
 	local function setupCharacter(character)
-		task.wait(0.3) -- 🔥 FIX: wait for full load
+		task.wait(0.15) -- 🔥 FIX: wait for full load
 		scanCharacter(character)
 
 		-- 🔥 FIX: detect new parts (accessories, etc.)
