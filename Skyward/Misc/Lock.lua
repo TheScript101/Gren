@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
+local CoreGui = game:GetService("CoreGui")
 
 -- config
 local MODE_CLICK_DELAY = 1.5
