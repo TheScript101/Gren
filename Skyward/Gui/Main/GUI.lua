@@ -117,6 +117,21 @@ CombatSection:Slider({
 	end
 })
 
+CombatSection2:Toggle({
+	Name = "Hitbox GUI",
+	Default = false,
+	Callback = function(v)
+		if v then
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/HitboxSlider.lua"))()
+		else
+			local gui = game:GetService("CoreGui"):FindFirstChild("HitboxSliderGui")
+			if gui then
+				gui:Destroy()
+			end
+		end
+	end
+})
+
 -- // SETTINGS
 local hitboxEnabled = false
 local hitboxSize = 7
