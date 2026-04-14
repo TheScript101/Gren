@@ -120,7 +120,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local autoclickerLoaded = false
 
-MiscTab:Section({}):Toggle({
+MiscSection:Toggle({
 	Name = "Auto Clicker",
 	Default = false,
 	Callback = function(v)
@@ -168,7 +168,7 @@ task.spawn(function()
 end)
 
 -- toggle in your GUI (put this in your section)
-MiscTab:Section({}):Toggle({
+MiscSection:Toggle({
 	Name = "Auto Click (No GUI)",
 	Default = false,
 	Callback = function(v)
