@@ -106,7 +106,8 @@ PlayerSection:Slider({
 
 -- // Label for auto clicker
 --// LABEL
-local label = Misc:Label({
+-- label goes here
+local label = MiscSection:Label({
 	Text = "Autoclicker",
 	Bold = true,
 })
