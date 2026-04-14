@@ -133,5 +133,37 @@ MiscTab:Section({}):Toggle({
 	end
 })
 
+-- // AUTO CLICKER WITH OUT THE GUI I
+-- state
+local autoClickEnabled = false
+local autoClickSpeed = 1 / 50 -- 50 CPS
+
+-- loop (runs once, controlled by toggle)
+task.spawn(function()
+	while true do
+		if autoClickEnabled then
+			local character = player.Character
+			if character then
+				local tool = character:FindFirstChildOfClass("Tool")
+				
+				if tool and tool:FindFirstChild("Handle") then
+					tool:Activate()
+				end
+			end
+		end
+		
+		task.wait(autoClickSpeed)
+	end
+end)
+
+-- toggle in your GUI (put this in your section)
+MiscSection:Toggle({
+	Name = "Auto Click (No GUI)",
+	Default = false,
+	Callback = function(v)
+		autoClickEnabled = v
+	end
+})
+
 -- DEFAULT TAB
 CombatTab:Select()
