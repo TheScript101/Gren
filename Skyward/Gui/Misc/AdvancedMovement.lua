@@ -90,7 +90,7 @@ task.spawn(function()
 		end
 
 		-- load your R6 anim script
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/Gazer-Ha/NOT-MINE/refs/heads/main/R6%20animation%20custe"))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Gui/Misc/R6CustomAnim.lua"))()
 	end
 
 	player.CharacterAdded:Connect(setupCharacter)
