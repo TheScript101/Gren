@@ -191,3 +191,65 @@ MiscSection:Slider({
 		autoClickSpeed = 1 / cps
 	end
 })
+
+local CoreGui = game:GetService("CoreGui")
+
+local toolGuiEnabled = false
+local cleanupEnabled = false
+local cleanupToken = 0
+
+--// TOGGLE 1: TOOL GUI
+MiscSection2:Toggle({
+	Name = "Tool GUI",
+	Default = false,
+	Callback = function(v)
+		toolGuiEnabled = v
+
+		if v then
+			loadstring(game:HttpGet(
+				"https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/ToolGui.lua"
+			))()
+		else
+			local gui = CoreGui:FindFirstChild("ToolToggleGui")
+			if gui then
+				gui:Destroy()
+			end
+		end
+	end
+})
+
+--// SUBLABEL WARNING
+MiscSection2:SubLabel({
+	Text = "If you use tool gui enable delete old tool gui with it",
+})
+
+--// TOGGLE 2: CLEANER LOOP
+MiscSection2:Toggle({
+	Name = "Delete Old Tool GUI",
+	Default = false,
+	Callback = function(v)
+		cleanupEnabled = v
+		cleanupToken += 1
+		local myToken = cleanupToken
+
+		if v then
+			task.spawn(function()
+				while cleanupEnabled and cleanupToken == myToken do
+					task.wait(10)
+
+					local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+					if playerGui then
+						local screenGui = playerGui:FindFirstChild("ScreenGui")
+						if screenGui then
+							local potion = screenGui:FindFirstChild("PotionButton")
+							if potion then potion:Destroy() end
+
+							local pickaxe = screenGui:FindFirstChild("PickAxeButton")
+							if pickaxe then pickaxe:Destroy() end
+						end
+					end
+				end
+			end)
+		end
+	end
+})
