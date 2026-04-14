@@ -140,25 +140,35 @@ MiscSection:Toggle({
 local autoClickEnabled = false
 local autoClickSpeed = 1 / 50 -- 50 CPS
 
--- loop (runs once, controlled by toggle)
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- SHIFT PRESS (runs once on execute)
+task.spawn(function()
+	task.wait(0.5)
+	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, nil)
+	task.wait(0.1)
+	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, nil)
+end)
+
+-- autoclick loop (always running, controlled by toggle)
 task.spawn(function()
 	while true do
 		if autoClickEnabled then
 			local character = player.Character
 			if character then
 				local tool = character:FindFirstChildOfClass("Tool")
-				
+
 				if tool and tool:FindFirstChild("Handle") then
 					tool:Activate()
 				end
 			end
 		end
-		
+
 		task.wait(autoClickSpeed)
 	end
 end)
 
--- toggle in your GUI (put this in your section)
+-- toggle in your GUI
 MiscSection:Toggle({
 	Name = "Auto Click (No GUI)",
 	Default = false,
