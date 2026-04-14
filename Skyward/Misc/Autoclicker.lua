@@ -186,7 +186,7 @@ end)
 
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
+MainFrame.Position = UDim2.new(0.300000012, -14, 0.300000012, -93)
 MainFrame.Size = UDim2.new(0, 375, 0, 300)
 MainFrame.Visible = false
 MainFrame.Active = true
