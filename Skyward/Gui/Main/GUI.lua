@@ -21,8 +21,10 @@ local CombatTab = Tabs:Tab({ Name = "Combat", Image = "lucide/sword" })
 local PlayerTab = Tabs:Tab({ Name = "Player", Image = "lucide/user" })
 local MiscTab = Tabs:Tab({ Name = "Misc", Image = "lucide/settings" })
 
---// PLAYER SECTION
+--// SECTION
+local CombatSection = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
+local MiscSection = MiscTab:Section({})
 
 --// SENS SYSTEM
 local sensitivity = 0.7
@@ -108,7 +110,7 @@ PlayerSection:Slider({
 --// LABEL
 -- label goes here
 -- label (correct MacLib usage)
-local label = MiscSection:Label({
+MiscSection:Label({
     Text = "Autoclicker",
     Bold = true,
 }, "AutoClickLabel")
@@ -166,7 +168,7 @@ task.spawn(function()
 end)
 
 -- toggle in your GUI (put this in your section)
-MiscSection:Toggle({
+MiscTab:Section({}):Toggle({
 	Name = "Auto Click (No GUI)",
 	Default = false,
 	Callback = function(v)
