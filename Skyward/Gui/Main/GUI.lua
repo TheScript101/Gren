@@ -138,7 +138,8 @@ MiscSection:Toggle({
 -- // AUTO CLICKER WITH OUT THE GUI I
 -- state
 local autoClickEnabled = false
-local autoClickSpeed = 1 / 50 -- 50 CPS
+local cps = 50
+local autoClickSpeed = 1 / cps
 
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
@@ -150,14 +151,13 @@ task.spawn(function()
 	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, nil)
 end)
 
--- autoclick loop (always running, controlled by toggle)
+-- autoclick loop
 task.spawn(function()
 	while true do
 		if autoClickEnabled then
 			local character = player.Character
 			if character then
 				local tool = character:FindFirstChildOfClass("Tool")
-
 				if tool and tool:FindFirstChild("Handle") then
 					tool:Activate()
 				end
@@ -168,7 +168,7 @@ task.spawn(function()
 	end
 end)
 
--- toggle in your GUI
+-- toggle
 MiscSection:Toggle({
 	Name = "Auto Click (No GUI)",
 	Default = false,
@@ -177,5 +177,16 @@ MiscSection:Toggle({
 	end
 })
 
--- DEFAULT TAB
-CombatTab:Select()
+-- CPS SLIDER (NEW)
+MiscSection:Slider({
+	Name = "Auto Click CPS",
+	Default = 50,
+	Minimum = 1,
+	Maximum = 100,
+	DisplayMethod = "Value",
+	Precision = 0,
+	Callback = function(value)
+		cps = value
+		autoClickSpeed = 1 / cps
+	end
+})
