@@ -1,1 +1,1 @@
-loadstring(game:HttpGet("https://github.com/TheScript101/Gren/blob/main/Skyward/Main/MAINLOADER.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Main/MAINLOADER.lua"))()
