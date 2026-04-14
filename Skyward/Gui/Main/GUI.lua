@@ -104,6 +104,13 @@ PlayerSection:Slider({
 	end
 })
 
+-- // Label for auto clicker
+--// LABEL
+MiscSection:Label({
+	Text = "Autoclicker",
+	Bold = true,
+})
+
 -- // SOME AUTOCLICKER YES
 local CoreGui = game:GetService("CoreGui")
 
