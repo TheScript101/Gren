@@ -141,7 +141,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 CombatSection2:Toggle({
-	Name = "Hitbox Expander",
+	Name = "Hitbox Expander (No Gui)",
 	Default = false,
 	Callback = function(v)
 		hitboxEnabled = v
@@ -165,7 +165,7 @@ CombatSection2:Toggle({
 })
 
 CombatSection2:Slider({
-	Name = "Hitbox Size",
+	Name = "Hitbox Size (No Gui)",
 	Default = 7,
 	Minimum = 1,
 	Maximum = 20,
