@@ -20,12 +20,15 @@ local Tabs = Window:TabGroup()
 local CombatTab = Tabs:Tab({ Name = "Combat", Image = "lucide/sword" })
 local PlayerTab = Tabs:Tab({ Name = "Player", Image = "lucide/user" })
 local MiscTab = Tabs:Tab({ Name = "Misc", Image = "lucide/settings" })
+local VisualTab = Tabs:Tab({ Name = "Visual", Image = "lucide/eye" })
+local FunTab = Tabs:Tab({ Name = "Fun", Image = "lucide/sparkles" })
 
 --// SECTION
 local CombatSection = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
-local MiscSection2 = MiscTab:Section({})
+local VisualSection = VisualTab:Section({})
+local FunSection = FunTab:Section({})
 
 -- // SOME AUTOCLICKER YES
 local CoreGui = game:GetService("CoreGui")
