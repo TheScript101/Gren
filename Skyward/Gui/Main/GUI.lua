@@ -257,3 +257,111 @@ MiscSection:Toggle({
 		end
 	end
 })
+
+------------------------ PLAYER CHAMS ------------------------
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local ChamsEnabled = false
+local connections = {}
+local appliedHighlights = {}
+
+local function addHighlightToPart(part)
+	if not ChamsEnabled then return end
+	if part.Name == "HumanoidRootPart" then return end
+	if not part:IsA("BasePart") then return end
+	if part:FindFirstChild("Cham") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "Cham"
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0.15
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = part
+	highlight.Parent = part
+
+	table.insert(appliedHighlights, highlight)
+end
+
+local function scanCharacter(character)
+	for _, obj in ipairs(character:GetDescendants()) do
+		addHighlightToPart(obj)
+	end
+end
+
+local function applyChamsToPlayer(player)
+	if player == LocalPlayer then return end
+
+	local function setupCharacter(character)
+		task.wait(0.15)
+
+		if not ChamsEnabled then return end
+
+		scanCharacter(character)
+
+		table.insert(connections, character.DescendantAdded:Connect(function(obj)
+			if ChamsEnabled then
+				addHighlightToPart(obj)
+			end
+		end))
+
+		table.insert(connections, task.spawn(function()
+			while ChamsEnabled and character.Parent do
+				scanCharacter(character)
+				task.wait(2)
+			end
+		end))
+	end
+
+	player.CharacterAdded:Connect(setupCharacter)
+
+	if player.Character then
+		setupCharacter(player.Character)
+	end
+end
+
+local function enableChams()
+	ChamsEnabled = true
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		applyChamsToPlayer(player)
+	end
+
+	connections[#connections + 1] = Players.PlayerAdded:Connect(applyChamsToPlayer)
+end
+
+local function disableChams()
+	ChamsEnabled = false
+
+	-- remove highlights
+	for _, v in ipairs(workspace:GetDescendants()) do
+		if v:IsA("Highlight") and v.Name == "Cham" then
+			v:Destroy()
+		end
+	end
+
+	-- disconnect events
+	for _, c in ipairs(connections) do
+		if typeof(c) == "RBXScriptConnection" then
+			c:Disconnect()
+		end
+	end
+
+	table.clear(connections)
+	table.clear(appliedHighlights)
+end
+
+-- // CHAN'MS TOGGLE YAY
+VisualSection:Toggle({
+	Name = "Player Chams",
+	Default = false,
+	Callback = function(v)
+		if v then
+			enableChams()
+		else
+			disableChams()
+		end
+	end
+})
