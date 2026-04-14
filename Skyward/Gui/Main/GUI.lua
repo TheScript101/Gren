@@ -7,7 +7,7 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 local Window = WMacLib:Window({
-	Title = "Skywars Hub",
+	Title = "Skywars",
 	Subtitle = "MacLib Edition",
 	Size = UDim2.fromOffset(520, 320),
 	DragStyle = 1,
@@ -29,11 +29,9 @@ local sensitivity = 0.7
 
 local cameraTouch = nil
 local lastPos = nil
-
-local sensEnabled = false
 local connections = {}
 
--- FUNCTION TO ENABLE
+-- ENABLE
 local function enableSensitivity()
 	connections.TouchStarted = UserInputService.TouchStarted:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
@@ -67,7 +65,7 @@ local function enableSensitivity()
 	end)
 end
 
--- FUNCTION TO DISABLE
+-- DISABLE
 local function disableSensitivity()
 	for _, conn in pairs(connections) do
 		if conn then
@@ -81,17 +79,28 @@ local function disableSensitivity()
 end
 
 --// TOGGLE
-PlayerSection:Toggle({
-	Name = "More Sensitivity",
+local sensToggle = PlayerSection:Toggle({
+	Name = "Custom Sensitivity",
 	Default = false,
 	Callback = function(v)
-		sensEnabled = v
-		
 		if v then
 			enableSensitivity()
 		else
 			disableSensitivity()
 		end
+	end
+})
+
+--// SLIDER
+PlayerSection:Slider({
+	Name = "Sensitivity",
+	Default = 70, -- represents 0.7
+	Minimum = 1,
+	Maximum = 200,
+	DisplayMethod = "Percent",
+	Precision = 0,
+	Callback = function(value)
+		sensitivity = value / 100
 	end
 })
 
