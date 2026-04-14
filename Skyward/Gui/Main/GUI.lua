@@ -199,7 +199,7 @@ CombatSection2:Slider({
 })
 
 -- // LOCK ON
-CombatSection2:Toggle({
+CombatSection3:Toggle({
 	Name = "Lock On GUI",
 	Default = false,
 	Callback = function(v)
