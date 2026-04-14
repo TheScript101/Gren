@@ -27,6 +27,7 @@ local FunTab = Tabs:Tab({ Name = "Fun", Image = "lucide/sparkles" })
 --// SECTION
 local CombatSection = CombatTab:Section({})
 local CombatSection2 = CombatTab:Section({})
+local CombatSection3 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
@@ -66,6 +67,12 @@ CombatSection:Toggle({
 local autoClickEnabled = false
 local cps = 50
 local autoClickSpeed = 1 / cps
+
+local lockMode = "Toggle" -- default
+local Locking = false
+local LockedTarget = nil
+local camLockEnabled = false
+local HighlightHandle = nil
 
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
@@ -188,6 +195,154 @@ CombatSection2:Slider({
 	DisplayMethod = "Number",
 	Callback = function(v)
 		hitboxSize = v
+	end
+})
+
+-- // LOCK ON
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local function getNearestPlayer()
+	local closest, dist = nil, math.huge
+	local myChar = LocalPlayer.Character
+	if not myChar then return nil end
+
+	local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return nil end
+
+	for _, pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LocalPlayer and pl.Character then
+			local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
+			local hum = pl.Character:FindFirstChild("Humanoid")
+			if hrp and hum and hum.Health > 0 then
+				local mag = (myHRP.Position - hrp.Position).Magnitude
+				if mag < dist then
+					dist = mag
+					closest = pl
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+local function clearHighlight()
+	if HighlightHandle then
+		HighlightHandle:Destroy()
+		HighlightHandle = nil
+	end
+end
+
+local function applyHighlight(char)
+	clearHighlight()
+	if not char then return end
+
+	local HL = Instance.new("Highlight")
+	HL.Adornee = char
+	HL.FillColor = Color3.fromRGB(255, 40, 40)
+	HL.OutlineColor = Color3.fromRGB(255, 255, 255)
+	HL.FillTransparency = 0.87
+	HL.OutlineTransparency = 0.5
+	HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	HL.Parent = game:GetService("CoreGui")
+
+	HighlightHandle = HL
+end
+
+local function rotateTowards(pos)
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local dir = (Vector3.new(pos.X, hrp.Position.Y, pos.Z) - hrp.Position)
+	if dir.Magnitude > 0 then
+		hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + dir.Unit)
+	end
+end
+
+-- // Main Loop for lock on
+RunService.RenderStepped:Connect(function()
+	if not Locking then return end
+
+	local validTarget = LockedTarget
+		and LockedTarget.Character
+		and LockedTarget.Character:FindFirstChild("Humanoid")
+		and LockedTarget.Character.Humanoid.Health > 0
+
+	if lockMode == "Always Rotation Lock" or lockMode == "Always Camlock" then
+		local nearest = getNearestPlayer()
+		if nearest ~= LockedTarget then
+			LockedTarget = nearest
+			if LockedTarget then
+				applyHighlight(LockedTarget.Character)
+			else
+				clearHighlight()
+			end
+		end
+	else
+		if not validTarget then
+			LockedTarget = getNearestPlayer()
+			if LockedTarget then
+				applyHighlight(LockedTarget.Character)
+			else
+				clearHighlight()
+			end
+		end
+	end
+
+	if LockedTarget and LockedTarget.Character then
+		local hrp = LockedTarget.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local pos = hrp.Position
+			rotateTowards(pos)
+
+			if camLockEnabled then
+				Camera.CFrame = CFrame.new(Camera.CFrame.Position, pos)
+			end
+		end
+	end
+end)
+
+-- // Drop down
+CombatSection3:Dropdown({
+	Name = "Lock Mode",
+	Options = {
+		"Rotation Lock",
+		"Always Rotation Lock",
+		"Camlock",
+		"Always Camlock"
+	},
+	Default = "Rotation Lock",
+	Callback = function(v)
+		lockMode = v
+		
+		camLockEnabled = (v == "Camlock" or v == "Always Camlock")
+	end
+})
+
+-- ACTUAL TOGGLE
+CombatSection3:Toggle({
+	Name = "Enable Lock",
+	Default = false,
+	Callback = function(v)
+		Locking = v
+
+		if not v then
+			LockedTarget = nil
+			clearHighlight()
+
+			local cam = workspace.CurrentCamera
+			local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				cam.CameraSubject = hum
+				cam.CameraType = Enum.CameraType.Custom
+			end
+		end
 	end
 })
 
