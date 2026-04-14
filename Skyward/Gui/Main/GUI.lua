@@ -179,7 +179,7 @@ MiscSection:Toggle({
 
 -- CPS SLIDER (NEW)
 MiscSection:Slider({
-	Name = "Auto Click CPS",
+	Name = "Auto Click CPS (No GUI)",
 	Default = 50,
 	Minimum = 1,
 	Maximum = 100,
