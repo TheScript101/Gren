@@ -116,6 +116,65 @@ CombatSection:Slider({
 	end
 })
 
+-- // SETTINGS
+local hitboxEnabled = false
+local hitboxSize = 7
+
+RunService.RenderStepped:Connect(function()
+	if not hitboxEnabled then return end
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player then
+			local char = plr.Character
+			if char then
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+					hrp.Transparency = 0.8
+					hrp.Color = Color3.fromRGB(0, 50, 150)
+					hrp.CanCollide = false
+				end
+			end
+		end
+	end
+end)
+
+CombatSection2:Toggle({
+	Name = "Hitbox Expander",
+	Default = false,
+	Callback = function(v)
+		hitboxEnabled = v
+
+		-- reset when OFF
+		if not v then
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr ~= player then
+					local char = plr.Character
+					if char then
+						local hrp = char:FindFirstChild("HumanoidRootPart")
+						if hrp then
+							hrp.Size = Vector3.new(2,2,1)
+							hrp.Transparency = 1
+						end
+					end
+				end
+			end
+		end
+	end
+})
+
+CombatSection2:Slider({
+	Name = "Hitbox Size",
+	Default = 7,
+	Minimum = 1,
+	Maximum = 20,
+	Precision = 0,
+	DisplayMethod = "Number",
+	Callback = function(v)
+		hitboxSize = v
+	end
+})
+
 --// SENS SYSTEM
 local sensitivity = 0.7
 
