@@ -107,10 +107,11 @@ PlayerSection:Slider({
 -- // Label for auto clicker
 --// LABEL
 -- label goes here
+-- label (correct MacLib usage)
 local label = MiscSection:Label({
-	Text = "Autoclicker",
-	Bold = true,
-})
+    Text = "Autoclicker",
+    Bold = true,
+}, "AutoClickLabel")
 
 -- // SOME AUTOCLICKER YES
 local CoreGui = game:GetService("CoreGui")
