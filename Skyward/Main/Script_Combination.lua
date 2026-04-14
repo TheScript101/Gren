@@ -300,6 +300,8 @@ game:GetService("StarterGui"):SetCore("SendNotification", {
 	Text = "it's just lag! xd",
 	Duration = 1
 })
+					wait(0.06)
+						loadstring(game:HttpGet(" https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Delete.lua"))()
                         		end,
                         		nil,
                         		nil -- or add GUI 8 here
