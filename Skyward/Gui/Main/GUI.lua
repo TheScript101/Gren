@@ -25,6 +25,7 @@ local MiscTab = Tabs:Tab({ Name = "Misc", Image = "lucide/settings" })
 local CombatSection = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
+local MiscSection2 = MiscTab:Section({})
 
 --// SENS SYSTEM
 local sensitivity = 0.7
