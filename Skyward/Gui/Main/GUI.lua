@@ -2,6 +2,7 @@ local WMacLib = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
