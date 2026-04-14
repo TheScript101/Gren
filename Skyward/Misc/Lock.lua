@@ -20,7 +20,7 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LockModeSelectorGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-screenGui.Parent = PlayerGui
+screenGui.Parent = CoreGui
 
 local panel = Instance.new("Frame", screenGui)
 panel.Size = UDim2.new(0, 500, 0, 180)
