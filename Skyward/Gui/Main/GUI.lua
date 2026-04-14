@@ -27,6 +27,91 @@ local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local MiscSection2 = MiscTab:Section({})
 
+-- // SOME AUTOCLICKER YES
+local CoreGui = game:GetService("CoreGui")
+
+local autoclickerLoaded = false
+
+CombatSection:Toggle({
+	Name = "Auto Clicker",
+	Default = false,
+	Callback = function(v)
+		if v then
+			-- prevent double loading
+			if not autoclickerLoaded then
+				autoclickerLoaded = true
+				
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Autoclicker.lua"))()
+			end
+		else
+			-- reset flag
+			autoclickerLoaded = false
+			
+			-- remove the GUI
+			local gui = CoreGui:FindFirstChild("Autoclicker")
+			if gui then
+				gui:Destroy()
+			end
+		end
+	end
+})
+
+-- // AUTO CLICKER WITH OUT THE GUI I
+-- state
+local autoClickEnabled = false
+local cps = 50
+local autoClickSpeed = 1 / cps
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- SHIFT PRESS (runs once on execute)
+task.spawn(function()
+	task.wait(0.5)
+	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, nil)
+	task.wait(0.1)
+	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, nil)
+end)
+
+-- autoclick loop
+task.spawn(function()
+	while true do
+		if autoClickEnabled then
+			local character = player.Character
+			if character then
+				local tool = character:FindFirstChildOfClass("Tool")
+				if tool and tool:FindFirstChild("Handle") then
+					tool:Activate()
+				end
+			end
+		end
+
+		task.wait(autoClickSpeed)
+	end
+end)
+
+-- toggle
+CombatSection:Toggle({
+	Name = "Auto Click (No GUI)",
+	Default = false,
+	Callback = function(v)
+		autoClickEnabled = v
+	end
+})
+
+-- CPS SLIDER (NEW)
+CombatSection:Slider({
+	Name = "Auto Click CPS (No GUI)",
+	Default = 50,
+	Minimum = 1,
+	Maximum = 100,
+	DisplayMethod = "Value",
+	Precision = 0,
+	Callback = function(value)
+		cps = value
+		autoClickSpeed = 1 / cps
+	end
+})
+
 --// SENS SYSTEM
 local sensitivity = 0.7
 
@@ -107,91 +192,7 @@ PlayerSection:Slider({
 	end
 })
 
--- // SOME AUTOCLICKER YES
-local CoreGui = game:GetService("CoreGui")
-
-local autoclickerLoaded = false
-
-MiscSection:Toggle({
-	Name = "Auto Clicker",
-	Default = false,
-	Callback = function(v)
-		if v then
-			-- prevent double loading
-			if not autoclickerLoaded then
-				autoclickerLoaded = true
-				
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Autoclicker.lua"))()
-			end
-		else
-			-- reset flag
-			autoclickerLoaded = false
-			
-			-- remove the GUI
-			local gui = CoreGui:FindFirstChild("Autoclicker")
-			if gui then
-				gui:Destroy()
-			end
-		end
-	end
-})
-
--- // AUTO CLICKER WITH OUT THE GUI I
--- state
-local autoClickEnabled = false
-local cps = 50
-local autoClickSpeed = 1 / cps
-
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
--- SHIFT PRESS (runs once on execute)
-task.spawn(function()
-	task.wait(0.5)
-	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, nil)
-	task.wait(0.1)
-	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, nil)
-end)
-
--- autoclick loop
-task.spawn(function()
-	while true do
-		if autoClickEnabled then
-			local character = player.Character
-			if character then
-				local tool = character:FindFirstChildOfClass("Tool")
-				if tool and tool:FindFirstChild("Handle") then
-					tool:Activate()
-				end
-			end
-		end
-
-		task.wait(autoClickSpeed)
-	end
-end)
-
--- toggle
-MiscSection:Toggle({
-	Name = "Auto Click (No GUI)",
-	Default = false,
-	Callback = function(v)
-		autoClickEnabled = v
-	end
-})
-
--- CPS SLIDER (NEW)
-MiscSection:Slider({
-	Name = "Auto Click CPS (No GUI)",
-	Default = 50,
-	Minimum = 1,
-	Maximum = 100,
-	DisplayMethod = "Value",
-	Precision = 0,
-	Callback = function(value)
-		cps = value
-		autoClickSpeed = 1 / cps
-	end
-})
-
+-- // GOD AHHHH TOOL GUI
 local CoreGui = game:GetService("CoreGui")
 
 local toolGuiEnabled = false
@@ -199,7 +200,7 @@ local cleanupEnabled = false
 local cleanupToken = 0
 
 --// TOGGLE 1: TOOL GUI
-MiscSection2:Toggle({
+MiscSection:Toggle({
 	Name = "Tool GUI",
 	Default = false,
 	Callback = function(v)
@@ -219,12 +220,12 @@ MiscSection2:Toggle({
 })
 
 --// SUBLABEL WARNING
-MiscSection2:SubLabel({
+MiscSection:SubLabel({
 	Text = "If you use tool gui enable delete old tool gui with it",
 })
 
 --// TOGGLE 2: CLEANER LOOP
-MiscSection2:Toggle({
+MiscSection:Toggle({
 	Name = "Delete Old Tool GUI",
 	Default = false,
 	Callback = function(v)
