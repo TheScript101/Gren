@@ -199,6 +199,21 @@ CombatSection2:Slider({
 })
 
 -- // LOCK ON
+CombatSection2:Toggle({
+	Name = "Lock On GUI",
+	Default = false,
+	Callback = function(v)
+		if v then
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Lock.lua"))()
+		else
+			local gui = game:GetService("CoreGui"):FindFirstChild("LockModeSelectorGui")
+			if gui then
+				gui:Destroy()
+			end
+		end
+	end
+})
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
