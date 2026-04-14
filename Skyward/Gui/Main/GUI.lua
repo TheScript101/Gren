@@ -611,3 +611,106 @@ VisualSection:Toggle({
 		end
 	end
 })
+
+--// SUB LABEL
+FunSection:SubLabel({
+	Text = "To use the Mega VIP, just walk in the mega VIP thing."
+})
+
+--// STATE
+local megaVipEnabled = false
+local megaVipConnections = {}
+
+--// FUNCTION TO CLEAR
+local function clearMegaVip()
+	for _, conn in pairs(megaVipConnections) do
+		if conn then
+			conn:Disconnect()
+		end
+	end
+	table.clear(megaVipConnections)
+end
+
+--// TOGGLE
+FunSection:Toggle({
+	Name = "Free Mega VIP",
+	Default = false,
+	Callback = function(v)
+		megaVipEnabled = v
+		
+		clearMegaVip() -- always clear old connections
+		
+		if not v then return end
+
+		------------------------ ENTER ------------------------
+		local enterDestination = Vector3.new(0, 175, 70)
+		local enterFolder = workspace:WaitForChild("Lobby"):WaitForChild("MegaVIPRoom"):WaitForChild("Teleport"):WaitForChild("Enter")
+
+		for _, part in pairs(enterFolder:GetChildren()) do
+			if part.Name == "Teleporter A" and part:FindFirstChild("TeleportMegaVIPEnter") then
+				
+				local conn = part.Touched:Connect(function(hit)
+					if not megaVipEnabled then return end
+					
+					local character = hit.Parent
+					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+					
+					if humanoid then
+						local rootPart = character:FindFirstChild("HumanoidRootPart")
+						if rootPart then
+							rootPart.CFrame = CFrame.new(enterDestination)
+
+							local originalSize = part.Size
+							part.Size = Vector3.new(8, 0.01, 5.5)
+							task.delay(1, function()
+								if part then
+									part.Size = originalSize
+								end
+							end)
+						end
+					end
+				end)
+
+				table.insert(megaVipConnections, conn)
+			end
+		end
+
+		------------------------ EXIT ------------------------
+		local exitDestination = Vector3.new(0, 179.1, 6)
+		local exitFolder = workspace:WaitForChild("Lobby"):WaitForChild("MegaVIPRoom"):WaitForChild("Teleport"):WaitForChild("Exit")
+
+		for _, part in pairs(exitFolder:GetChildren()) do
+			if part.Name == "Teleporter A" and part:FindFirstChild("TeleportMegaVIPExit") then
+				
+				local conn = part.Touched:Connect(function(hit)
+					if not megaVipEnabled then return end
+					
+					local character = hit.Parent
+					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+					
+					if humanoid then
+						local rootPart = character:FindFirstChild("HumanoidRootPart")
+						if rootPart then
+							rootPart.CFrame = CFrame.new(exitDestination)
+
+							local originalSize = part.Size
+							part.Size = Vector3.new(4, 0.01, 1.5)
+							task.delay(1, function()
+								if part then
+									part.Size = originalSize
+								end
+							end)
+						end
+					end
+				end)
+
+				table.insert(megaVipConnections, conn)
+			end
+		end
+	end
+})
+
+-------------------------------
+------------ END ------------
+-------------------------------
+-------------------------------
