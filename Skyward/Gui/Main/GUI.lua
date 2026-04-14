@@ -25,6 +25,7 @@ local FunTab = Tabs:Tab({ Name = "Fun", Image = "lucide/sparkles" })
 
 --// SECTION
 local CombatSection = CombatTab:Section({})
+local CombatSection2 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
