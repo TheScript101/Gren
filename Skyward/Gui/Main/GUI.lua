@@ -104,5 +104,34 @@ PlayerSection:Slider({
 	end
 })
 
+-- // SOME AUTOCLICKER YES
+local CoreGui = game:GetService("CoreGui")
+
+local autoclickerLoaded = false
+
+MiscTab:Section({}):Toggle({
+	Name = "Auto Clicker",
+	Default = false,
+	Callback = function(v)
+		if v then
+			-- prevent double loading
+			if not autoclickerLoaded then
+				autoclickerLoaded = true
+				
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/Skyward/Misc/Autoclicker.lua"))()
+			end
+		else
+			-- reset flag
+			autoclickerLoaded = false
+			
+			-- remove the GUI
+			local gui = CoreGui:FindFirstChild("Autoclicker")
+			if gui then
+				gui:Destroy()
+			end
+		end
+	end
+})
+
 -- DEFAULT TAB
 CombatTab:Select()
