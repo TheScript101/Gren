@@ -711,6 +711,8 @@ FunSection:Toggle({
 	end
 })
 
+local AutoJumpEnabled = false
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -750,12 +752,27 @@ local function startEdgeSaver(char)
 		local moveDir = humanoid.MoveDirection
 		if moveDir.Magnitude <= 0 then return end
 
-		local checkPos = root.Position + moveDir * CHECK_DISTANCE
-		local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+local AUTO_JUMP_OFFSET = 0.5 -- how early it jumps before edge
 
-		if not result then
-			humanoid:Move(Vector3.zero, true)
-		end
+-- normal edge check
+local checkPos = root.Position + moveDir * CHECK_DISTANCE
+local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+
+-- 🔥 auto jump check
+if AutoJumpEnabled then
+	local earlyPos = root.Position + moveDir * (CHECK_DISTANCE + AUTO_JUMP_OFFSET)
+	local earlyResult = workspace:Raycast(earlyPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+
+	if not earlyResult then
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		return
+	end
+end
+
+-- normal stop
+if not result then
+	humanoid:Move(Vector3.zero, true)
+end
 	end)
 end
 
@@ -792,6 +809,16 @@ FunSection2:Toggle({
 		end
 	end,
 	Description = "Saves you from falling off, jump to get over edges"
+})
+
+local AutoJumpEnabled = false
+
+FunSection2:Toggle({
+	Name = "Auto Jump Before Edge",
+	Default = false,
+	Callback = function(val)
+		AutoJumpEnabled = val
+	end
 })
 
 -------------------------------
