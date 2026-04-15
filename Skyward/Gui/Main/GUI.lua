@@ -363,6 +363,7 @@ CombatSection3:Toggle({
 	end
 })
 
+-- // AUTO HEAL 
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
@@ -383,24 +384,20 @@ local function useHeal()
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then healing = false return end
 
-	-- find tool in backpack or character
 	local tool = player.Backpack:FindFirstChild("Heal") or char:FindFirstChild("Heal")
 
 	if tool then
-		-- equip if not equipped
 		if tool.Parent ~= char then
 			tool.Parent = char
 		end
 
 		task.wait(0.1)
 
-		-- activate tool
 		pcall(function()
 			tool:Activate()
 		end)
 	end
 
-	-- small cooldown to prevent spam
 	task.wait(1)
 	healing = false
 end
@@ -411,18 +408,44 @@ local function setupCharacter(char)
 
 	humanoid.HealthChanged:Connect(function()
 		if not AutoHealEnabled then return end
-		if humanoid.Health <= HealthThreshold then
+		if not HealthThreshold then return end -- 🔥 FIX
+
+		if humanoid.Health <= tonumber(HealthThreshold) then
 			useHeal()
 		end
 	end)
 end
 
--- respawn handling
+-- respawn
 if player.Character then
 	setupCharacter(player.Character)
 end
 
 player.CharacterAdded:Connect(setupCharacter)
+
+-- =========================
+-- GUI (FUN SECTION 2)
+-- =========================
+
+FunSection2:Toggle({
+	Name = "Auto Heal",
+	Default = false,
+	Callback = function(val)
+		AutoHealEnabled = val
+	end
+})
+
+FunSection2:Slider({
+	Name = "Health Threshold",
+	Minimum = 1,
+	Maximum = 100,
+	Default = 30,
+	Precision = 0,
+	DisplayMethod = "Number",
+	Callback = function(val)
+		HealthThreshold = tonumber(val) or 30 -- 🔥 FIX
+	end
+})
 
 -- =========================
 -- GUI (FUN SECTION 2)
