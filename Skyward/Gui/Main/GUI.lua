@@ -611,9 +611,11 @@ CombatSection5:Toggle({
 
 CombatSection5:Slider({
 	Name = "Unequip Time",
-	Min = 1,
-	Max = 10,
+	Minimum = 1,
+	Maximum = 10,
 	Default = 10,
+	Precision = 0,
+	DisplayMethod = "Number",
 	Callback = function(val)
 		UnequipDelay = tonumber(val) or 10
 	end
