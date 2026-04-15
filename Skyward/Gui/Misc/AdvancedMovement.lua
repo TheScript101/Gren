@@ -89,7 +89,7 @@ end)
 
 	player.CharacterAdded:Connect(initializeTilt)
 	if player.Character then initializeTilt(player.Character) end
-end)
+end
 
 ----------------------------------------------------------------------
 -- [[ SCRIPT 2: R6 ANIMATIONS ONLY ]]
