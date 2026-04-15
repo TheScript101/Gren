@@ -483,7 +483,7 @@ local SwitchBackEnabled = true
 local UnequipDelay = 10
 local HPThreshold = 75
 local Cooldown = 30
-local lastShieldTime = 0
+local lastShieldTime = -math.huge
 
 local ToolLock = false
 local shielding = false
@@ -496,13 +496,19 @@ local ATTACK_ANIMS = {
 	["rbxassetid://11573598340"] = true
 }
 
-player.CharacterAdded:Connect(function(char)
+local function setupToolLock(char)
 	char.ChildAdded:Connect(function(child)
 		if ToolLock and child:IsA("Tool") then
 			child.Parent = player.Backpack
 		end
 	end)
-end)
+end
+
+player.CharacterAdded:Connect(setupToolLock)
+
+if player.Character then
+	setupToolLock(player.Character)
+end
 
 -- check if target is facing you (LESS STRICT)
 local function isFacing(attackerRoot, myRoot)
@@ -605,6 +611,7 @@ if SwitchBackEnabled then
 else
 	shielding = false
 	end
+end
 
 -- main loop
 RunService.RenderStepped:Connect(function()
