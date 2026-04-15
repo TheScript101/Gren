@@ -574,44 +574,48 @@ local function doShield()
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then shielding = false return end
 
-	-- store last tool
 	lastTool = char:FindFirstChildOfClass("Tool")
 
-	-- 🔥 UNEQUIP FIRST
+	-- 🔥 HARD CLEAN UNEQUIP (fix dual tool bug)
 	humanoid:UnequipTools()
-	task.wait(0.18)
+	task.wait(0.2)
+
+	-- ensure everything is cleared before equipping shield
+	for _, t in ipairs(player.Backpack:GetChildren()) do
+		if t:IsA("Tool") and t.Name ~= "Shield" then
+			t.Parent = player.Backpack
+		end
+	end
 
 	-- find shield
 	local tool = player.Backpack:FindFirstChild("Shield") or char:FindFirstChild("Shield")
 	if not tool then shielding = false return end
 
-	-- equip shield
 	tool.Parent = char
-	task.wait(0.20)
+	task.wait(0.2)
 
-	-- use shield
 	pcall(function()
 		tool:Activate()
 	end)
 
--- 🔥 SWITCH BACK LOGIC
-if SwitchBackEnabled then
-	ToolLock = true
+	-- switch back logic unchanged
+	if SwitchBackEnabled then
+		ToolLock = true
 
-	task.delay(UnequipDelay, function()
-		if not char or not humanoid then return end
+		task.delay(UnequipDelay, function()
+			if not char or not humanoid then return end
 
-		humanoid:UnequipTools()
+			humanoid:UnequipTools()
 
-		if lastTool and lastTool.Parent then
-			lastTool.Parent = char
-		end
+			if lastTool and lastTool.Parent then
+				lastTool.Parent = char
+			end
 
-		ToolLock = false
+			ToolLock = false
+			shielding = false
+		end)
+	else
 		shielding = false
-	end)
-else
-	shielding = false
 	end
 end
 
@@ -1099,8 +1103,10 @@ FunSection:Toggle({
 })
 
 -- // NO FALL OFF
+-- // NO FALL OFF
 
 local AutoJumpEnabled = false
+local AutoJumpNoBoost = false
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -1123,19 +1129,34 @@ local function startEdgeSaver(char)
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	rayParams.FilterDescendantsInstances = {char}
 
-	-- SETTINGS
+	-- SETTINGS (UNCHANGED)
 	local CHECK_DISTANCE = 1.2
 	local DOWN_DISTANCE = 10
 	local TP_BOOST_SPEED = 1.25
-local TP_BOOST_TIME = 0.25
+	local TP_BOOST_TIME = 0.25
+	local AUTO_JUMP_OFFSET = 0.5
 
-local boosting = false
+	local boosting = false
+
+	local function doTPBoost(humanoid)
+		if boosting then return end
+		boosting = true
+
+		local originalSpeed = humanoid.WalkSpeed
+		humanoid.WalkSpeed = originalSpeed * TP_BOOST_SPEED
+
+		task.delay(TP_BOOST_TIME, function()
+			if humanoid then
+				humanoid.WalkSpeed = originalSpeed
+			end
+			boosting = false
+		end)
+	end
 
 	edgeConnection = RunService.RenderStepped:Connect(function()
 		if not EdgeSaverEnabled then return end
 		if not root or not humanoid then return end
 
-		-- 🟢 allow full movement in air
 		local state = humanoid:GetState()
 		if state == Enum.HumanoidStateType.Freefall
 		or state == Enum.HumanoidStateType.Jumping then
@@ -1145,46 +1166,47 @@ local boosting = false
 		local moveDir = humanoid.MoveDirection
 		if moveDir.Magnitude <= 0 then return end
 
-local AUTO_JUMP_OFFSET = 0.5 -- how early it jumps before edge
+		-- normal edge check
+		local checkPos = root.Position + moveDir * CHECK_DISTANCE
+		local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
 
--- normal edge check
-local checkPos = root.Position + moveDir * CHECK_DISTANCE
-local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+		---------------------------------------------------
+		-- 🔥 AUTO JUMP BEFORE EDGE (BOOST VERSION)
+		---------------------------------------------------
+		if AutoJumpEnabled then
+			local earlyPos = root.Position + moveDir * (CHECK_DISTANCE + AUTO_JUMP_OFFSET)
+			local earlyResult = workspace:Raycast(earlyPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
 
-local function doTPBoost(humanoid)
-	if boosting then return end
-	boosting = true
-
-	local originalSpeed = humanoid.WalkSpeed
-	humanoid.WalkSpeed = originalSpeed * TP_BOOST_SPEED
-
-	task.delay(TP_BOOST_TIME, function()
-		if humanoid then
-			humanoid.WalkSpeed = originalSpeed
+			if not earlyResult then
+				if humanoid.FloorMaterial ~= Enum.Material.Air then
+					humanoid.Jump = true
+					doTPBoost(humanoid)
+				end
+				return
+			end
 		end
-		boosting = false
-	end)
-end
-			
--- 🔥 auto jump check
-if AutoJumpEnabled then
-	local earlyPos = root.Position + moveDir * (CHECK_DISTANCE + AUTO_JUMP_OFFSET)
-	local earlyResult = workspace:Raycast(earlyPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
 
-	if not earlyResult then
-		-- 🔥 force jump properly
-		if humanoid.FloorMaterial ~= Enum.Material.Air then
-			humanoid.Jump = true
-doTPBoost(humanoid)
+		---------------------------------------------------
+		-- 🟡 AUTO JUMP BEFORE EDGE (NO BOOST VERSION)
+		---------------------------------------------------
+		if AutoJumpNoBoost then
+			local earlyPos = root.Position + moveDir * (CHECK_DISTANCE + AUTO_JUMP_OFFSET)
+			local earlyResult = workspace:Raycast(earlyPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+
+			if not earlyResult then
+				if humanoid.FloorMaterial ~= Enum.Material.Air then
+					humanoid.Jump = true
+				end
+				return
+			end
 		end
-		return
-	end
-end
 
--- normal stop
-if not result then
-	humanoid:Move(Vector3.zero, true)
-end
+		---------------------------------------------------
+		-- 🟢 NORMAL EDGE SAVE (UNCHANGED)
+		---------------------------------------------------
+		if not result then
+			humanoid:Move(Vector3.zero, true)
+		end
 	end)
 end
 
@@ -1200,7 +1222,7 @@ if player.Character then
 end
 
 -- =========================
--- GUI TOGGLE (FUN SECTION 2)
+-- GUI TOGGLES (UNCHANGED + NEW ONE ADDED)
 -- =========================
 
 FunSection2:Toggle({
@@ -1224,10 +1246,19 @@ FunSection2:Toggle({
 })
 
 FunSection2:Toggle({
-	Name = "Auto Jump Before Edge",
+	Name = "Auto Jump Before Edge (Boost)",
 	Default = false,
 	Callback = function(val)
 		AutoJumpEnabled = val
+	end
+})
+
+-- 🆕 NEW FEATURE (NO BOOST VERSION)
+FunSection2:Toggle({
+	Name = "Auto Jump Before Edge (No Boost)",
+	Default = false,
+	Callback = function(val)
+		AutoJumpNoBoost = val
 	end
 })
 
