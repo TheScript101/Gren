@@ -30,11 +30,13 @@ local CombatSection2 = CombatTab:Section({})
 local CombatSection3 = CombatTab:Section({})
 local CombatSection4 = CombatTab:Section({})
 local CombatSection5 = CombatTab:Section({})
+local CombatSection6 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
 local FunSection = FunTab:Section({})
 local FunSection2 = FunTab:Section({})
+local FunSection3 = FunTab:Section({})
 
 -- // SOME AUTOCLICKER YES
 local CoreGui = game:GetService("CoreGui")
@@ -676,6 +678,47 @@ CombatSection5:Slider({
 	end
 })
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local autoBunnyHopEnabled = false
+local radius = 15
+
+-- loop
+RunService.RenderStepped:Connect(function()
+	if not autoBunnyHopEnabled then return end
+	
+	local char = player.Character
+	if not char then return end
+	
+	local root = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not root or not hum then return end
+	
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character then
+			local otherRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+			if otherRoot then
+				local dist = (root.Position - otherRoot.Position).Magnitude
+				if dist <= radius then
+					hum:ChangeState(Enum.HumanoidStateType.Jumping)
+					break
+				end
+			end
+		end
+	end
+end)
+
+-- UI (put in your Combat section 6)
+CombatSection6:Toggle({
+	Name = "Auto Bunny Hop Near Player",
+	Default = false,
+	Callback = function(v)
+		autoBunnyHopEnabled = v
+	end
+})
+
 --// SENS SYSTEM
 local sensitivity = 0.7
 
@@ -1155,6 +1198,36 @@ FunSection2:Toggle({
 	Default = false,
 	Callback = function(val)
 		AutoJumpEnabled = val
+	end
+})
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local bunnyHopEnabled = false
+
+-- loop
+task.spawn(function()
+	while true do
+		if bunnyHopEnabled then
+			local char = player.Character
+			if char then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				if hum then
+					hum:ChangeState(Enum.HumanoidStateType.Jumping)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+-- UI (put in your Fun tab section 3)
+FunSection3:Toggle({
+	Name = "Bunny Hop",
+	Default = false,
+	Callback = function(v)
+		bunnyHopEnabled = v
 	end
 })
 
