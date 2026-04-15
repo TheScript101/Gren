@@ -739,8 +739,8 @@ local function startEdgeSaver(char)
 	-- SETTINGS
 	local CHECK_DISTANCE = 1.2
 	local DOWN_DISTANCE = 10
-	local TP_BOOST_SPEED = 0.5
-local TP_BOOST_TIME = 0.2
+	local TP_BOOST_SPEED = 1.25
+local TP_BOOST_TIME = 0.25
 
 local boosting = false
 
