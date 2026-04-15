@@ -482,7 +482,10 @@ local SwitchBackEnabled = true
 
 local UnequipDelay = 10
 local HPThreshold = 75
+local Cooldown = 30
+local lastShieldTime = 0
 
+local ToolLock = false
 local shielding = false
 local lastTool = nil
 
@@ -493,11 +496,19 @@ local ATTACK_ANIMS = {
 	["rbxassetid://11573598340"] = true
 }
 
+player.CharacterAdded:Connect(function(char)
+	char.ChildAdded:Connect(function(child)
+		if ToolLock and child:IsA("Tool") then
+			child.Parent = player.Backpack
+		end
+	end)
+end)
+
 -- check if target is facing you (LESS STRICT)
 local function isFacing(attackerRoot, myRoot)
 	local direction = (myRoot.Position - attackerRoot.Position).Unit
 	local look = attackerRoot.CFrame.LookVector
-	return look:Dot(direction) > 0.2 -- was 0.5, now more lenient
+	return look:Dot(direction) > 0.07 -- was 0.5, now more lenient
 end
 
 -- get nearby attacker
@@ -575,32 +586,35 @@ local function doShield()
 		tool:Activate()
 	end)
 
-	-- 🔥 SWITCH BACK LOGIC
-	if SwitchBackEnabled then
-		task.delay(UnequipDelay, function()
-			if not char or not humanoid then return end
+-- 🔥 SWITCH BACK LOGIC
+if SwitchBackEnabled then
+	ToolLock = true
 
-			humanoid:UnequipTools()
+	task.delay(UnequipDelay, function()
+		if not char or not humanoid then return end
 
-			if lastTool and lastTool.Parent then
-				lastTool.Parent = char
-			end
+		humanoid:UnequipTools()
 
-			shielding = false
-		end)
-	else
-		-- stay on shield
+		if lastTool and lastTool.Parent then
+			lastTool.Parent = char
+		end
+
+		ToolLock = false
 		shielding = false
+	end)
+else
+	shielding = false
 	end
-end
 
 -- main loop
 RunService.RenderStepped:Connect(function()
 	if not AutoShieldEnabled then return end
 
 	local attacker = getAttacker()
-	if attacker then
-		doShield()
+	if attacker and (tick() - lastShieldTime >= Cooldown) then
+	lastShieldTime = tick()
+	doShield()
+		end
 	end
 end)
 
