@@ -28,6 +28,7 @@ local FunTab = Tabs:Tab({ Name = "Fun", Image = "lucide/sparkles" })
 local CombatSection = CombatTab:Section({})
 local CombatSection2 = CombatTab:Section({})
 local CombatSection3 = CombatTab:Section({})
+local CombatSection4 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
@@ -359,6 +360,89 @@ CombatSection3:Toggle({
 				cam.CameraType = Enum.CameraType.Custom
 			end
 		end
+	end
+})
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+-- states
+local AutoHealEnabled = false
+local HealthThreshold = 30
+local healing = false
+
+-- function to use heal tool
+local function useHeal()
+	if healing then return end
+	healing = true
+
+	local char = player.Character
+	if not char then healing = false return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then healing = false return end
+
+	-- find tool in backpack or character
+	local tool = player.Backpack:FindFirstChild("Heal") or char:FindFirstChild("Heal")
+
+	if tool then
+		-- equip if not equipped
+		if tool.Parent ~= char then
+			tool.Parent = char
+		end
+
+		task.wait(0.1)
+
+		-- activate tool
+		pcall(function()
+			tool:Activate()
+		end)
+	end
+
+	-- small cooldown to prevent spam
+	task.wait(1)
+	healing = false
+end
+
+-- monitor health
+local function setupCharacter(char)
+	local humanoid = char:WaitForChild("Humanoid")
+
+	humanoid.HealthChanged:Connect(function()
+		if not AutoHealEnabled then return end
+		if humanoid.Health <= HealthThreshold then
+			useHeal()
+		end
+	end)
+end
+
+-- respawn handling
+if player.Character then
+	setupCharacter(player.Character)
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+
+-- =========================
+-- GUI (FUN SECTION 2)
+-- =========================
+
+CombatSection4:Toggle({
+	Name = "Auto Heal",
+	Default = false,
+	Callback = function(val)
+		AutoHealEnabled = val
+	end
+})
+
+CombatSection4:Slider({
+	Name = "Health Threshold",
+	Min = 1,
+	Max = 100,
+	Default = 30,
+	Callback = function(val)
+		HealthThreshold = val
 	end
 })
 
