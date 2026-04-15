@@ -612,9 +612,8 @@ RunService.RenderStepped:Connect(function()
 
 	local attacker = getAttacker()
 	if attacker and (tick() - lastShieldTime >= Cooldown) then
-	lastShieldTime = tick()
-	doShield()
-		end
+		lastShieldTime = tick()
+		doShield()
 	end
 end)
 
