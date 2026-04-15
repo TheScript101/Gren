@@ -40,37 +40,52 @@ task.spawn(function()
 		local currentTiltX = 0
 		local currentTiltZ = 0
 
-		RunService.RenderStepped:Connect(function(dt)
-			if not character.Parent or humanoid.Health <= 0 then return end
+RunService.RenderStepped:Connect(function(dt)
+	if not character.Parent or humanoid.Health <= 0 then return end
 
-			local moveDir = humanoid.MoveDirection
-			local velocity = rootPart.Velocity.Magnitude
+	local moveDir = humanoid.MoveDirection
+	local velocity = rootPart.AssemblyLinearVelocity.Magnitude
 
-			-- 🔥 always face movement direction
-			local lookTarget = rootPart.CFrame
-
-			if moveDir.Magnitude > 0 then
-				lookTarget = CFrame.lookAt(rootPart.Position, rootPart.Position + moveDir)
-			end
-
-			-- tilt
-			local targetTiltX = 0
-			local targetTiltZ = 0
-
-			if velocity > 0.1 then
-				targetTiltX = math.clamp(-moveDir:Dot(rootPart.CFrame.LookVector) * tiltMultiplier * velocity, -maxTilt, maxTilt)
-				targetTiltZ = math.clamp(-moveDir:Dot(rootPart.CFrame.RightVector) * tiltMultiplier * velocity, -maxTilt, maxTilt)
-			end
-
-			currentTiltX += (targetTiltX - currentTiltX) * dt * fadeSpeed
-			currentTiltZ += (targetTiltZ - currentTiltZ) * dt * fadeSpeed
-
-			align.CFrame =
-				CFrame.new(rootPart.Position)
-				* (lookTarget - lookTarget.Position)
-				* CFrame.Angles(math.rad(currentTiltX), 0, math.rad(currentTiltZ))
-		end)
+	-- face movement direction (or keep current if idle)
+	local lookTarget = rootPart.CFrame
+	if moveDir.Magnitude > 0.05 then
+		lookTarget = CFrame.lookAt(rootPart.Position, rootPart.Position + moveDir)
 	end
+
+	-- DEFAULT = no tilt
+	local targetTiltX = 0
+	local targetTiltZ = 0
+
+	-- ONLY APPLY WHEN MOVING
+	if moveDir.Magnitude > 0.05 and velocity > 0.1 then
+		targetTiltX = math.clamp(
+			-moveDir:Dot(rootPart.CFrame.LookVector) * tiltMultiplier * velocity,
+			-maxTilt,
+			maxTilt
+		)
+
+		targetTiltZ = math.clamp(
+			-moveDir:Dot(rootPart.CFrame.RightVector) * tiltMultiplier * velocity,
+			-maxTilt,
+			maxTilt
+		)
+	end
+
+	-- 🔥 IMPORTANT: force smooth return to 0 when idle
+	if moveDir.Magnitude <= 0.05 then
+		targetTiltX = 0
+		targetTiltZ = 0
+	end
+
+	-- smooth interpolation back to neutral
+	currentTiltX += (targetTiltX - currentTiltX) * dt * fadeSpeed
+	currentTiltZ += (targetTiltZ - currentTiltZ) * dt * fadeSpeed
+
+	align.CFrame =
+		CFrame.new(rootPart.Position)
+		* (lookTarget - lookTarget.Position)
+		* CFrame.Angles(math.rad(currentTiltX), 0, math.rad(currentTiltZ))
+end)
 
 	player.CharacterAdded:Connect(initializeTilt)
 	if player.Character then initializeTilt(player.Character) end
