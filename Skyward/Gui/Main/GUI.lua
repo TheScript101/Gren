@@ -384,20 +384,41 @@ local function useHeal()
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then healing = false return end
 
+	-- 🔥 store currently equipped tool
+	local lastTool = char:FindFirstChildOfClass("Tool")
+
+	-- 🔥 unequip all tools
+	humanoid:UnequipTools()
+
+	task.wait(0.05)
+
+	-- 🔥 find heal tool
 	local tool = player.Backpack:FindFirstChild("Heal") or char:FindFirstChild("Heal")
 
 	if tool then
-		if tool.Parent ~= char then
-			tool.Parent = char
-		end
+		-- equip heal
+		tool.Parent = char
 
-		task.wait(0.1)
+		task.wait(0.05)
 
+		-- use heal
 		pcall(function()
 			tool:Activate()
 		end)
+
+		-- 🔥 hold heal for 0.20s
+		task.wait(0.20)
+
+		-- unequip heal
+		humanoid:UnequipTools()
 	end
 
+	-- 🔥 re-equip last tool if it still exists
+	if lastTool and lastTool.Parent then
+		lastTool.Parent = char
+	end
+
+	-- cooldown
 	task.wait(1)
 	healing = false
 end
