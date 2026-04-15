@@ -766,7 +766,10 @@ if AutoJumpEnabled then
 	local earlyResult = workspace:Raycast(earlyPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
 
 	if not earlyResult then
-		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		-- 🔥 force jump properly
+		if humanoid.FloorMaterial ~= Enum.Material.Air then
+			humanoid.Jump = true
+		end
 		return
 	end
 end
@@ -812,8 +815,6 @@ FunSection2:Toggle({
 	end,
 	Description = "Saves you from falling off, jump to get over edges"
 })
-
-local AutoJumpEnabled = false
 
 FunSection2:Toggle({
 	Name = "Auto Jump Before Edge",
