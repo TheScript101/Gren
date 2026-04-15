@@ -32,6 +32,7 @@ local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
 local FunSection = FunTab:Section({})
+local FunSection2 = FunTab:Section({})
 
 -- // SOME AUTOCLICKER YES
 local CoreGui = game:GetService("CoreGui")
@@ -708,6 +709,89 @@ FunSection:Toggle({
 			end
 		end
 	end
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- state
+local EdgeSaverEnabled = false
+local edgeConnection
+
+local function startEdgeSaver(char)
+	if edgeConnection then
+		edgeConnection:Disconnect()
+	end
+
+	local root = char:WaitForChild("HumanoidRootPart")
+	local humanoid = char:WaitForChild("Humanoid")
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = {char}
+
+	-- SETTINGS
+	local CHECK_DISTANCE = 1.2
+	local DOWN_DISTANCE = 10
+
+	edgeConnection = RunService.RenderStepped:Connect(function()
+		if not EdgeSaverEnabled then return end
+		if not root or not humanoid then return end
+
+		-- 🟢 allow full movement in air
+		local state = humanoid:GetState()
+		if state == Enum.HumanoidStateType.Freefall
+		or state == Enum.HumanoidStateType.Jumping then
+			return
+		end
+
+		local moveDir = humanoid.MoveDirection
+		if moveDir.Magnitude <= 0 then return end
+
+		local checkPos = root.Position + moveDir * CHECK_DISTANCE
+		local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
+
+		if not result then
+			humanoid:Move(Vector3.zero, true)
+		end
+	end)
+end
+
+-- handle respawn
+player.CharacterAdded:Connect(function(char)
+	if EdgeSaverEnabled then
+		startEdgeSaver(char)
+	end
+end)
+
+if player.Character then
+	startEdgeSaver(player.Character)
+end
+
+-- =========================
+-- GUI TOGGLE (FUN SECTION 2)
+-- =========================
+
+FunSection2:AddToggle({
+	Name = "Edge Saver",
+	Default = false,
+	Callback = function(val)
+		EdgeSaverEnabled = val
+
+		if val then
+			if player.Character then
+				startEdgeSaver(player.Character)
+			end
+		else
+			if edgeConnection then
+				edgeConnection:Disconnect()
+				edgeConnection = nil
+			end
+		end
+	end,
+	Description = "Saves you from falling off, jump to get over edges"
 })
 
 -------------------------------
