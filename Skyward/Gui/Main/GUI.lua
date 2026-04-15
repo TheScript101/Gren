@@ -469,7 +469,7 @@ CombatSection4:Slider({
 	end
 })
 
--- // NEW TAB OF AUTO SHIELD
+-- // NEW TAB AUTO SHIELD
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -478,7 +478,10 @@ local player = Players.LocalPlayer
 -- STATES
 local AutoShieldEnabled = false
 local FacingCheckEnabled = false
+local SwitchBackEnabled = true
+
 local UnequipDelay = 10
+local HPThreshold = 75
 
 local shielding = false
 local lastTool = nil
@@ -490,11 +493,11 @@ local ATTACK_ANIMS = {
 	["rbxassetid://11573598340"] = true
 }
 
--- check if target is facing you
+-- check if target is facing you (LESS STRICT)
 local function isFacing(attackerRoot, myRoot)
 	local direction = (myRoot.Position - attackerRoot.Position).Unit
 	local look = attackerRoot.CFrame.LookVector
-	return look:Dot(direction) > 0.5 -- adjust if needed
+	return look:Dot(direction) > 0.2 -- was 0.5, now more lenient
 end
 
 -- get nearby attacker
@@ -503,7 +506,13 @@ local function getAttacker()
 	if not char then return end
 
 	local myRoot = char:FindFirstChild("HumanoidRootPart")
-	if not myRoot then return end
+	local myHum = char:FindFirstChildOfClass("Humanoid")
+	if not myRoot or not myHum then return end
+
+	-- 🔥 HP CHECK
+	if myHum.Health > HPThreshold then
+		return
+	end
 
 	for _, plr in pairs(Players:GetPlayers()) do
 		if plr ~= player and plr.Character then
@@ -515,12 +524,10 @@ local function getAttacker()
 				local dist = (enemyRoot.Position - myRoot.Position).Magnitude
 				if dist <= 10 then
 					
-					-- 🔥 check animations
 					for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
 						local animId = track.Animation and track.Animation.AnimationId
 						if animId and ATTACK_ANIMS[animId] then
 							
-							-- 🔥 facing check
 							if FacingCheckEnabled then
 								if not isFacing(enemyRoot, myRoot) then
 									continue
@@ -551,32 +558,40 @@ local function doShield()
 	-- store last tool
 	lastTool = char:FindFirstChildOfClass("Tool")
 
+	-- 🔥 UNEQUIP FIRST
+	humanoid:UnequipTools()
+	task.wait(0.18)
+
 	-- find shield
 	local tool = player.Backpack:FindFirstChild("Shield") or char:FindFirstChild("Shield")
 	if not tool then shielding = false return end
 
 	-- equip shield
 	tool.Parent = char
-	task.wait(0.05)
+	task.wait(0.20)
 
 	-- use shield
 	pcall(function()
 		tool:Activate()
 	end)
 
-	-- wait before unequip
-	task.delay(UnequipDelay, function()
-		if not char or not humanoid then return end
+	-- 🔥 SWITCH BACK LOGIC
+	if SwitchBackEnabled then
+		task.delay(UnequipDelay, function()
+			if not char or not humanoid then return end
 
-		humanoid:UnequipTools()
+			humanoid:UnequipTools()
 
-		-- re-equip last tool
-		if lastTool and lastTool.Parent then
-			lastTool.Parent = char
-		end
+			if lastTool and lastTool.Parent then
+				lastTool.Parent = char
+			end
 
+			shielding = false
+		end)
+	else
+		-- stay on shield
 		shielding = false
-	end)
+	end
 end
 
 -- main loop
@@ -594,7 +609,7 @@ end)
 -- =========================
 
 CombatSection5:Toggle({
-	Name = "Auto Shield Attack",
+	Name = "Auto Shield",
 	Default = false,
 	Callback = function(val)
 		AutoShieldEnabled = val
@@ -609,8 +624,16 @@ CombatSection5:Toggle({
 	end
 })
 
+CombatSection5:Toggle({
+	Name = "Switch Back To Tool",
+	Default = true,
+	Callback = function(val)
+		SwitchBackEnabled = val
+	end
+})
+
 CombatSection5:Slider({
-	Name = "Unequip Time",
+	Name = "Time Until Switch Back",
 	Minimum = 1,
 	Maximum = 10,
 	Default = 10,
@@ -618,6 +641,18 @@ CombatSection5:Slider({
 	DisplayMethod = "Number",
 	Callback = function(val)
 		UnequipDelay = tonumber(val) or 10
+	end
+})
+
+CombatSection5:Slider({
+	Name = "HP Threshold",
+	Minimum = 1,
+	Maximum = 100,
+	Default = 75,
+	Precision = 0,
+	DisplayMethod = "Number",
+	Callback = function(val)
+		HPThreshold = tonumber(val) or 75
 	end
 })
 
