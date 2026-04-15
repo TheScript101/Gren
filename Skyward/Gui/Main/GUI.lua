@@ -29,6 +29,7 @@ local CombatSection = CombatTab:Section({})
 local CombatSection2 = CombatTab:Section({})
 local CombatSection3 = CombatTab:Section({})
 local CombatSection4 = CombatTab:Section({})
+local CombatSection5 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
@@ -465,6 +466,156 @@ CombatSection4:Slider({
 	DisplayMethod = "Number",
 	Callback = function(val)
 		HealthThreshold = tonumber(val) or 30 -- 🔥 FIX
+	end
+})
+
+-- // NEW TAB OF AUTO SHIELD
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- STATES
+local AutoShieldEnabled = false
+local FacingCheckEnabled = false
+local UnequipDelay = 10
+
+local shielding = false
+local lastTool = nil
+
+-- animation ids to detect
+local ATTACK_ANIMS = {
+	["rbxassetid://11573593648"] = true,
+	["rbxassetid://11573601703"] = true,
+	["rbxassetid://11573598340"] = true
+}
+
+-- check if target is facing you
+local function isFacing(attackerRoot, myRoot)
+	local direction = (myRoot.Position - attackerRoot.Position).Unit
+	local look = attackerRoot.CFrame.LookVector
+	return look:Dot(direction) > 0.5 -- adjust if needed
+end
+
+-- get nearby attacker
+local function getAttacker()
+	local char = player.Character
+	if not char then return end
+
+	local myRoot = char:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character then
+			local enemyChar = plr.Character
+			local enemyRoot = enemyChar:FindFirstChild("HumanoidRootPart")
+			local humanoid = enemyChar:FindFirstChildOfClass("Humanoid")
+
+			if enemyRoot and humanoid then
+				local dist = (enemyRoot.Position - myRoot.Position).Magnitude
+				if dist <= 10 then
+					
+					-- 🔥 check animations
+					for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+						local animId = track.Animation and track.Animation.AnimationId
+						if animId and ATTACK_ANIMS[animId] then
+							
+							-- 🔥 facing check
+							if FacingCheckEnabled then
+								if not isFacing(enemyRoot, myRoot) then
+									continue
+								end
+							end
+
+							return enemyChar
+						end
+					end
+
+				end
+			end
+		end
+	end
+end
+
+-- shield function
+local function doShield()
+	if shielding then return end
+	shielding = true
+
+	local char = player.Character
+	if not char then shielding = false return end
+
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then shielding = false return end
+
+	-- store last tool
+	lastTool = char:FindFirstChildOfClass("Tool")
+
+	-- find shield
+	local tool = player.Backpack:FindFirstChild("Shield") or char:FindFirstChild("Shield")
+	if not tool then shielding = false return end
+
+	-- equip shield
+	tool.Parent = char
+	task.wait(0.05)
+
+	-- use shield
+	pcall(function()
+		tool:Activate()
+	end)
+
+	-- wait before unequip
+	task.delay(UnequipDelay, function()
+		if not char or not humanoid then return end
+
+		humanoid:UnequipTools()
+
+		-- re-equip last tool
+		if lastTool and lastTool.Parent then
+			lastTool.Parent = char
+		end
+
+		shielding = false
+	end)
+end
+
+-- main loop
+RunService.RenderStepped:Connect(function()
+	if not AutoShieldEnabled then return end
+
+	local attacker = getAttacker()
+	if attacker then
+		doShield()
+	end
+end)
+
+-- =========================
+-- GUI (CombatSection5)
+-- =========================
+
+CombatSection5:Toggle({
+	Name = "Auto Shield Attack",
+	Default = false,
+	Callback = function(val)
+		AutoShieldEnabled = val
+	end
+})
+
+CombatSection5:Toggle({
+	Name = "Facing Check",
+	Default = false,
+	Callback = function(val)
+		FacingCheckEnabled = val
+	end
+})
+
+CombatSection5:Slider({
+	Name = "Unequip Time",
+	Min = 1,
+	Max = 10,
+	Default = 10,
+	Callback = function(val)
+		UnequipDelay = tonumber(val) or 10
 	end
 })
 
