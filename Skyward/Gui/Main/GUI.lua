@@ -774,7 +774,7 @@ end
 -- GUI TOGGLE (FUN SECTION 2)
 -- =========================
 
-FunSection2:AddToggle({
+FunSection2:Toggle({
 	Name = "Edge Saver",
 	Default = false,
 	Callback = function(val)
