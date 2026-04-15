@@ -427,30 +427,6 @@ player.CharacterAdded:Connect(setupCharacter)
 -- GUI (FUN SECTION 2)
 -- =========================
 
-FunSection2:Toggle({
-	Name = "Auto Heal",
-	Default = false,
-	Callback = function(val)
-		AutoHealEnabled = val
-	end
-})
-
-FunSection2:Slider({
-	Name = "Health Threshold",
-	Minimum = 1,
-	Maximum = 100,
-	Default = 30,
-	Precision = 0,
-	DisplayMethod = "Number",
-	Callback = function(val)
-		HealthThreshold = tonumber(val) or 30 -- 🔥 FIX
-	end
-})
-
--- =========================
--- GUI (FUN SECTION 2)
--- =========================
-
 CombatSection4:Toggle({
 	Name = "Auto Heal",
 	Default = false,
@@ -461,11 +437,13 @@ CombatSection4:Toggle({
 
 CombatSection4:Slider({
 	Name = "Health Threshold",
-	Min = 1,
-	Max = 100,
+	Minimum = 1,
+	Maximum = 100,
 	Default = 30,
+	Precision = 0,
+	DisplayMethod = "Number",
 	Callback = function(val)
-		HealthThreshold = val
+		HealthThreshold = tonumber(val) or 30 -- 🔥 FIX
 	end
 })
 
