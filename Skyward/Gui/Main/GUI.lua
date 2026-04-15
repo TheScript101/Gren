@@ -678,14 +678,29 @@ CombatSection5:Slider({
 	end
 })
 
+-- // bunny hop near player
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local autoBunnyHopEnabled = false
+
+-- SETTINGS
 local radius = 15
 
--- loop
+-- REGION (your box)
+local regionCenter = Vector3.new(3.1, 89, 4.92)
+local regionSize = Vector3.new(297, 69, 328)
+
+local function isInsideRegion(pos)
+	local min = regionCenter - (regionSize / 2)
+	local max = regionCenter + (regionSize / 2)
+
+	return pos.X >= min.X and pos.X <= max.X
+		and pos.Y >= min.Y and pos.Y <= max.Y
+		and pos.Z >= min.Z and pos.Z <= max.Z
+end
+
 RunService.RenderStepped:Connect(function()
 	if not autoBunnyHopEnabled then return end
 	
@@ -696,13 +711,23 @@ RunService.RenderStepped:Connect(function()
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	if not root or not hum then return end
 	
+	-- must be inside region
+	if not isInsideRegion(root.Position) then return end
+	
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= player and plr.Character then
-			local otherRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-			if otherRoot then
+			local otherChar = plr.Character
+			local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
+			local tool = otherChar:FindFirstChildOfClass("Tool")
+			
+			if otherRoot and tool then -- must be holding item
 				local dist = (root.Position - otherRoot.Position).Magnitude
+				
 				if dist <= radius then
-					hum:ChangeState(Enum.HumanoidStateType.Jumping)
+					-- real bhop (ground check)
+					if hum.FloorMaterial ~= Enum.Material.Air then
+						hum:ChangeState(Enum.HumanoidStateType.Jumping)
+					end
 					break
 				end
 			end
@@ -710,13 +735,18 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- UI (put in your Combat section 6)
+-- UI
 CombatSection6:Toggle({
 	Name = "Auto Bunny Hop Near Player",
 	Default = false,
 	Callback = function(v)
 		autoBunnyHopEnabled = v
 	end
+})
+
+-- LABEL (under toggle)
+CombatSection6:Label({
+	Text = "Only works when you are holding a item"
 })
 
 --// SENS SYSTEM
@@ -1201,12 +1231,12 @@ FunSection2:Toggle({
 	end
 })
 
+-- // BUNNY HOPP
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local bunnyHopEnabled = false
 
--- loop
 task.spawn(function()
 	while true do
 		if bunnyHopEnabled then
@@ -1214,15 +1244,18 @@ task.spawn(function()
 			if char then
 				local hum = char:FindFirstChildOfClass("Humanoid")
 				if hum then
-					hum:ChangeState(Enum.HumanoidStateType.Jumping)
+					-- only jump when on ground
+					if hum.FloorMaterial ~= Enum.Material.Air then
+						hum:ChangeState(Enum.HumanoidStateType.Jumping)
+					end
 				end
 			end
 		end
-		task.wait(0.1)
+		task.wait(0.05)
 	end
 end)
 
--- UI (put in your Fun tab section 3)
+-- UI
 FunSection3:Toggle({
 	Name = "Bunny Hop",
 	Default = false,
