@@ -399,7 +399,7 @@ local function useHeal()
 		-- equip heal
 		tool.Parent = char
 
-		task.wait(0.05)
+		task.wait(0.20)
 
 		-- use heal
 		pcall(function()
