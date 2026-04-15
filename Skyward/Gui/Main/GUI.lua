@@ -739,6 +739,10 @@ local function startEdgeSaver(char)
 	-- SETTINGS
 	local CHECK_DISTANCE = 1.2
 	local DOWN_DISTANCE = 10
+	local TP_BOOST_SPEED = 0.25
+local TP_BOOST_TIME = 0.2
+
+local boosting = false
 
 	edgeConnection = RunService.RenderStepped:Connect(function()
 		if not EdgeSaverEnabled then return end
@@ -760,6 +764,21 @@ local AUTO_JUMP_OFFSET = 0.5 -- how early it jumps before edge
 local checkPos = root.Position + moveDir * CHECK_DISTANCE
 local result = workspace:Raycast(checkPos, Vector3.new(0, -DOWN_DISTANCE, 0), rayParams)
 
+local function doTPBoost(humanoid)
+	if boosting then return end
+	boosting = true
+
+	local originalSpeed = humanoid.WalkSpeed
+	humanoid.WalkSpeed = originalSpeed * TP_BOOST_SPEED
+
+	task.delay(TP_BOOST_TIME, function()
+		if humanoid then
+			humanoid.WalkSpeed = originalSpeed
+		end
+		boosting = false
+	end)
+end
+			
 -- 🔥 auto jump check
 if AutoJumpEnabled then
 	local earlyPos = root.Position + moveDir * (CHECK_DISTANCE + AUTO_JUMP_OFFSET)
@@ -769,6 +788,7 @@ if AutoJumpEnabled then
 		-- 🔥 force jump properly
 		if humanoid.FloorMaterial ~= Enum.Material.Air then
 			humanoid.Jump = true
+doTPBoost(humanoid)
 		end
 		return
 	end
