@@ -711,6 +711,8 @@ FunSection:Toggle({
 	end
 })
 
+-- // NO FALL OFF
+
 local AutoJumpEnabled = false
 
 local Players = game:GetService("Players")
