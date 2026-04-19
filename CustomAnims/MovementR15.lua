@@ -152,7 +152,7 @@ end)
 				if not walkTrack.IsPlaying then
 					runTrack:Stop()
 					walkTrack:Play()
-					walkTrack:AdjustSpeed(3)
+					walkTrack:AdjustSpeed(3.5)
 				end
 			end
 		else
