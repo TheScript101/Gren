@@ -75,7 +75,6 @@ local function setupChar(char)
 			if running then
 				if not runTrack.IsPlaying then
 					walkTrack:Stop()
-  				walkTrack:AdjustSpeed(2) -- 2x speed
 					runTrack:Play()
 					runTrack:AdjustSpeed(3) -- 3x speed
 				end
@@ -83,6 +82,7 @@ local function setupChar(char)
 				if not walkTrack.IsPlaying then
 					runTrack:Stop()
 					walkTrack:Play()
+					walkTrack:AdjustSpeed(2) -- 2x speed
 				end
 			end
 		else
