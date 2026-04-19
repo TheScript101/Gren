@@ -1,4 +1,5 @@
 --// CONFIG
+local IdleAnim = "rbxassetid://127972564618207"
 local WalkAnim = "rbxassetid://103118629044297"
 local RunAnim = "rbxassetid://102622695004986"
 local BlockAnim = "rbxassetid://105310177683245"
@@ -41,7 +42,7 @@ Instance.new("UICorner", runBtn)
 --// STATE
 local running = false
 local blocking = false
-local walkTrack, runTrack, blockTrack
+local idleTrack, walkTrack, runTrack, blockTrack
 
 local function setupChar(char)
 	local hum = char:WaitForChild("Humanoid")
@@ -49,45 +50,118 @@ local function setupChar(char)
 
 	hum.WalkSpeed = WalkSpeed
 
-	-- disable default animate script (fixes stacking)
+	-- disable default animate script
 	local animate = char:FindFirstChild("Animate")
 	if animate then animate.Disabled = true end
 
-	-- load animations
+	--// REMOVE SPECIFIC ANIMATIONS
+local bannedAnims = {
+	["rbxassetid://913376220"] = true,
+	["rbxassetid://913402848"] = true,
+	["rbxassetid://14366558676"] = true
+}
+
+-- stop + delete if detected
+local function purgeAnimations(humanoid)
+	-- stop already playing
+	for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+		local id = track.Animation and track.Animation.AnimationId
+		if id and bannedAnims[id] then
+			track:Stop()
+			track:Destroy()
+		end
+	end
+
+	-- detect future ones
+	humanoid.AnimationPlayed:Connect(function(track)
+		local id = track.Animation and track.Animation.AnimationId
+		if id and bannedAnims[id] then
+			track:Stop()
+			track:Destroy()
+		end
+	end)
+end
+
+purgeAnimations(hum)
+
+--// DISABLE JUMP COMPLETELY
+hum.JumpPower = 0
+hum.UseJumpPower = true
+hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+
+-- prevent jump input
+hum:GetPropertyChangedSignal("Jump"):Connect(function()
+	hum.Jump = false
+end)
+
+--// REMOVE MOBILE JUMP BUTTON
+task.spawn(function()
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	local function removeJump()
+		local touchGui = playerGui:FindFirstChild("TouchGui")
+		if touchGui then
+			local frame = touchGui:FindFirstChild("TouchControlFrame")
+			if frame then
+				local jump = frame:FindFirstChild("JumpButton")
+				if jump then
+					jump:Destroy()
+				end
+			end
+		end
+	end
+
+	-- run multiple times to make sure it's gone
+	for i = 1,5 do
+		removeJump()
+		task.wait(0.5)
+	end
+end)
+
+	-- load anims
 	local function load(id)
 		local anim = Instance.new("Animation")
 		anim.AnimationId = id
 		return animator:LoadAnimation(anim)
 	end
 
+	idleTrack = load(IdleAnim)
 	walkTrack = load(WalkAnim)
 	runTrack = load(RunAnim)
 	blockTrack = load(BlockAnim)
 
+	idleTrack.Looped = true
 	walkTrack.Looped = true
 	runTrack.Looped = true
 
-	-- movement handling (FIX idle issues)
+	-- MOVEMENT HANDLER
 	hum.Running:Connect(function(speed)
 		if blocking then return end
 
 		if speed > 0 then
+			idleTrack:Stop()
+
 			if running then
 				if not runTrack.IsPlaying then
 					walkTrack:Stop()
 					runTrack:Play()
-					runTrack:AdjustSpeed(3) -- 3x speed
+					runTrack:AdjustSpeed(3)
 				end
 			else
 				if not walkTrack.IsPlaying then
 					runTrack:Stop()
 					walkTrack:Play()
-					walkTrack:AdjustSpeed(3) -- 3x speed
+					walkTrack:AdjustSpeed(3)
 				end
 			end
 		else
 			walkTrack:Stop()
 			runTrack:Stop()
+
+			if not idleTrack.IsPlaying then
+				idleTrack:Play()
+			end
 		end
 	end)
 
@@ -113,6 +187,7 @@ local function setupChar(char)
 			running = false
 			hum.WalkSpeed = 0
 
+			idleTrack:Stop()
 			walkTrack:Stop()
 			runTrack:Stop()
 
@@ -120,7 +195,7 @@ local function setupChar(char)
 
 			task.delay(0.9, function()
 				if blocking then
-					blockTrack:AdjustSpeed(0) -- freeze at 0.9
+					blockTrack:AdjustSpeed(0)
 				end
 			end)
 
@@ -131,6 +206,9 @@ local function setupChar(char)
 			blockBtn.Text = "Block"
 		end
 	end)
+
+	-- START WITH IDLE
+	idleTrack:Play()
 end
 
 -- INIT
