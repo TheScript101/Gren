@@ -3,7 +3,7 @@ local WalkAnim = "rbxassetid://103118629044297"
 local RunAnim = "rbxassetid://102622695004986"
 local BlockAnim = "rbxassetid://105310177683245"
 
-local WalkSpeed = 8
+local WalkSpeed = 6
 local RunSpeed = 28
 
 --// SERVICES
@@ -82,7 +82,7 @@ local function setupChar(char)
 				if not walkTrack.IsPlaying then
 					runTrack:Stop()
 					walkTrack:Play()
-					walkTrack:AdjustSpeed(2) -- 2x speed
+					walkTrack:AdjustSpeed(3) -- 3x speed
 				end
 			end
 		else
