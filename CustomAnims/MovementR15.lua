@@ -11,11 +11,14 @@ local RunSpeed = 28
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
---// GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+--// GUI (ONLY CREATE ONCE)
+local gui = player.PlayerGui:FindFirstChild("MoveGui") or Instance.new("ScreenGui")
+gui.Name = "MoveGui"
 gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame", gui)
+local frame = gui:FindFirstChild("MainFrame") or Instance.new("Frame", gui)
+frame.Name = "MainFrame"
 frame.Size = UDim2.new(0,180,0,110)
 frame.Position = UDim2.new(0.5,-90,0.5,-55)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
@@ -23,7 +26,8 @@ frame.Active = true
 frame.Draggable = true
 Instance.new("UICorner", frame)
 
-local blockBtn = Instance.new("TextButton", frame)
+local blockBtn = frame:FindFirstChild("Block") or Instance.new("TextButton", frame)
+blockBtn.Name = "Block"
 blockBtn.Size = UDim2.new(0.9,0,0,40)
 blockBtn.Position = UDim2.new(0.05,0,0.05,0)
 blockBtn.Text = "Block"
@@ -31,7 +35,8 @@ blockBtn.BackgroundColor3 = Color3.fromRGB(80,80,120)
 blockBtn.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", blockBtn)
 
-local runBtn = Instance.new("TextButton", frame)
+local runBtn = frame:FindFirstChild("Run") or Instance.new("TextButton", frame)
+runBtn.Name = "Run"
 runBtn.Size = UDim2.new(0.9,0,0,40)
 runBtn.Position = UDim2.new(0.05,0,0.55,0)
 runBtn.Text = "Run"
@@ -42,177 +47,174 @@ Instance.new("UICorner", runBtn)
 --// STATE
 local running = false
 local blocking = false
-local idleTrack, walkTrack, runTrack, blockTrack
 
+-- connection holders
+local currentConnections = {}
+
+local function disconnectAll()
+	for _,c in pairs(currentConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	currentConnections = {}
+end
+
+--// MAIN SETUP
 local function setupChar(char)
+	disconnectAll()
+
+	-- reset state
+	running = false
+	blocking = false
+	runBtn.Text = "Run"
+	blockBtn.Text = "Block"
+
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
 	hum.WalkSpeed = WalkSpeed
 
-	-- disable default animate script
+	-- disable default animate
 	local animate = char:FindFirstChild("Animate")
 	if animate then animate.Disabled = true end
 
-	--// REMOVE SPECIFIC ANIMATIONS
-local bannedAnims = {
-	["rbxassetid://913376220"] = true,
-	["rbxassetid://913402848"] = true,
-	["rbxassetid://14366558676"] = true
-}
+	-- remove banned anims
+	local banned = {
+		["rbxassetid://913376220"] = true,
+		["rbxassetid://913402848"] = true,
+		["rbxassetid://14366558676"] = true
+	}
 
--- stop + delete if detected
-local function purgeAnimations(humanoid)
-	-- stop already playing
-	for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-		local id = track.Animation and track.Animation.AnimationId
-		if id and bannedAnims[id] then
-			track:Stop()
-			track:Destroy()
-		end
-	end
+	table.insert(currentConnections,
+		hum.AnimationPlayed:Connect(function(track)
+			local id = track.Animation and track.Animation.AnimationId
+			if id and banned[id] then
+				track:Stop()
+				track:Destroy()
+			end
+		end)
+	)
 
-	-- detect future ones
-	humanoid.AnimationPlayed:Connect(function(track)
-		local id = track.Animation and track.Animation.AnimationId
-		if id and bannedAnims[id] then
-			track:Stop()
-			track:Destroy()
-		end
-	end)
-end
+	-- disable jump safely
+	hum.JumpPower = 0
+	hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 
-purgeAnimations(hum)
+	table.insert(currentConnections,
+		hum:GetPropertyChangedSignal("Jump"):Connect(function()
+			hum.Jump = false
+		end)
+	)
 
---// DISABLE JUMP COMPLETELY
-hum.JumpPower = 0
-hum.UseJumpPower = true
-hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-
--- prevent jump input
-hum:GetPropertyChangedSignal("Jump"):Connect(function()
-	hum.Jump = false
-end)
-
---// REMOVE MOBILE JUMP BUTTON
-task.spawn(function()
-	local playerGui = player:WaitForChild("PlayerGui")
-
-	local function removeJump()
-		local touchGui = playerGui:FindFirstChild("TouchGui")
-		if touchGui then
-			local frame = touchGui:FindFirstChild("TouchControlFrame")
+	-- remove mobile jump (wait properly)
+	task.spawn(function()
+		local pg = player:WaitForChild("PlayerGui")
+		local touch = pg:WaitForChild("TouchGui", 5)
+		if touch then
+			local frame = touch:WaitForChild("TouchControlFrame", 5)
 			if frame then
 				local jump = frame:FindFirstChild("JumpButton")
-				if jump then
-					jump:Destroy()
-				end
+				if jump then jump:Destroy() end
 			end
 		end
-	end
+	end)
 
-	-- run multiple times to make sure it's gone
-	for i = 1,5 do
-		removeJump()
-		task.wait(0.5)
-	end
-end)
-
-	-- load anims
+	-- load animations
 	local function load(id)
-		local anim = Instance.new("Animation")
-		anim.AnimationId = id
-		return animator:LoadAnimation(anim)
+		local a = Instance.new("Animation")
+		a.AnimationId = id
+		return animator:LoadAnimation(a)
 	end
 
-	idleTrack = load(IdleAnim)
-	walkTrack = load(WalkAnim)
-	runTrack = load(RunAnim)
-	blockTrack = load(BlockAnim)
+	local idle = load(IdleAnim)
+	local walk = load(WalkAnim)
+	local run = load(RunAnim)
+	local block = load(BlockAnim)
 
-	idleTrack.Looped = true
-	walkTrack.Looped = true
-	runTrack.Looped = true
+	idle.Looped = true
+	walk.Looped = true
+	run.Looped = true
 
-	-- MOVEMENT HANDLER
-	hum.Running:Connect(function(speed)
+
+	-- WALK STUFF
+local RunService = game:GetService("RunService")
+
+table.insert(currentConnections,
+	RunService.RenderStepped:Connect(function()
+		if not hum or not hum.Parent then return end
 		if blocking then return end
 
-		if speed > 0 then
-			idleTrack:Stop()
+		local moving = hum.MoveDirection.Magnitude > 0
+
+		if moving then
+			if idle.IsPlaying then idle:Stop() end
 
 			if running then
-				if not runTrack.IsPlaying then
-					walkTrack:Stop()
-					runTrack:Play()
-					runTrack:AdjustSpeed(3)
+				if not run.IsPlaying then
+					walk:Stop()
+					run:Play()
+					run:AdjustSpeed(3)
 				end
 			else
-				if not walkTrack.IsPlaying then
-					runTrack:Stop()
-					walkTrack:Play()
-					walkTrack:AdjustSpeed(3.5)
+				if not walk.IsPlaying then
+					run:Stop()
+					walk:Play()
+					walk:AdjustSpeed(3.5)
 				end
 			end
 		else
-			walkTrack:Stop()
-			runTrack:Stop()
+			if walk.IsPlaying then walk:Stop() end
+			if run.IsPlaying then run:Stop() end
 
-			if not idleTrack.IsPlaying then
-				idleTrack:Play()
+			if not idle.IsPlaying then
+				idle:Play()
 			end
 		end
 	end)
+)
+	
+	-- BUTTONS (CONNECTED ONCE PER CHARACTER)
+	disconnectAll() -- prevent stacking
 
-	-- RUN TOGGLE
-	runBtn.MouseButton1Click:Connect(function()
+	currentConnections[#currentConnections+1] = runBtn.MouseButton1Click:Connect(function()
 		if blocking then return end
 		running = not running
 
-		if running then
-			hum.WalkSpeed = RunSpeed
-			runBtn.Text = "Walk"
-		else
-			hum.WalkSpeed = WalkSpeed
-			runBtn.Text = "Run"
-		end
+		hum.WalkSpeed = running and RunSpeed or WalkSpeed
+		runBtn.Text = running and "Walk" or "Run"
 	end)
 
-	-- BLOCK TOGGLE
-	blockBtn.MouseButton1Click:Connect(function()
+	currentConnections[#currentConnections+1] = blockBtn.MouseButton1Click:Connect(function()
 		blocking = not blocking
 
 		if blocking then
 			running = false
 			hum.WalkSpeed = 0
 
-			idleTrack:Stop()
-			walkTrack:Stop()
-			runTrack:Stop()
+			idle:Stop()
+			walk:Stop()
+			run:Stop()
 
-			blockTrack:Play()
+			block:Play()
 
 			task.delay(0.9, function()
 				if blocking then
-					blockTrack:AdjustSpeed(0)
+					block:AdjustSpeed(0)
 				end
 			end)
 
 			blockBtn.Text = "Unblock"
 		else
-			blockTrack:Stop()
+			block:Stop()
 			hum.WalkSpeed = WalkSpeed
 			blockBtn.Text = "Block"
 		end
 	end)
 
-	-- START WITH IDLE
-	idleTrack:Play()
+	idle:Play()
 end
 
 -- INIT
 if player.Character then
 	setupChar(player.Character)
 end
+
 player.CharacterAdded:Connect(setupChar)
