@@ -8,7 +8,7 @@ local PunchAnim = "rbxassetid://87725149616750"
 local DeathAnim = "rbxassetid://76861507413325"
 
 local WalkSpeed = 10
-local RunSpeed = 28
+local RunSpeed = 25
 
 --// SERVICES
 local Players = game:GetService("Players")
@@ -176,7 +176,7 @@ if moving then
 					if not run.IsPlaying then
 						walk:Stop()
 						run:Play()
-						run:AdjustSpeed(3) -- FIX
+						run:AdjustSpeed(3.2) -- FIX
 					end
 				else
 					if not walk.IsPlaying then
