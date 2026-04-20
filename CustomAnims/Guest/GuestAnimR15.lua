@@ -303,7 +303,7 @@ table.insert(currentConnections,
         end
 
         punch:Play()
-        punch:AdjustSpeed(2) -- 2x speed
+        punch:AdjustSpeed(2.75) -- 2x speed
 
         task.delay((punch.Length > 0 and punch.Length or 0.6) / 2, function()
             punching = false
