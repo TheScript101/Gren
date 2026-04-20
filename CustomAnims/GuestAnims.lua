@@ -138,10 +138,13 @@ local function setupChar(char)
 		return track
 	end
 
-	local idle = load(IdleAnim, Enum.AnimationPriority.Idle)
-	local injuredIdle = load(InjuredIdleAnim, Enum.AnimationPriority.Idle)
-	local injuredWalk = load(InjuredWalkAnim, Enum.AnimationPriority.Movement) -- FIX
-	local walk = load(WalkAnim, Enum.AnimationPriority.Movement)
+local idle = load(IdleAnim, Enum.AnimationPriority.Idle)
+local walk = load(WalkAnim, Enum.AnimationPriority.Movement)
+
+-- injured overlays MUST be Action priority
+local injuredIdle = load(InjuredIdleAnim, Enum.AnimationPriority.Action)
+local injuredWalk = load(InjuredWalkAnim, Enum.AnimationPriority.Action)
+
 	local run = load(RunAnim, Enum.AnimationPriority.Movement)
 	local block = load(BlockAnim, Enum.AnimationPriority.Action)
 	local punch = load(PunchAnim, Enum.AnimationPriority.Action4)
