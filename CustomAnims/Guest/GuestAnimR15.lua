@@ -23,7 +23,7 @@ gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = player.PlayerGui.MoveGui:FindFirstChild("MainFrame") or Instance.new("Frame", gui)
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 220, 0, 260)
+frame.Size = UDim2.new(0, 220, 0, 305)
 frame.Position = UDim2.new(0.5, -110, 0.5, -130)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.Active = true
@@ -99,6 +99,8 @@ local blockBtn = makeBtn("Block", "Block", Color3.fromRGB(80,80,120))
 local punchBtn = makeBtn("Punch", "Punch", Color3.fromRGB(140,70,70))
 local injuredBtn = makeBtn("Injured", "Injured", Color3.fromRGB(120,90,40))
 local deathBtn = makeBtn("Death", "Death", Color3.fromRGB(90,40,40))
+-- NEW:
+local parryBtn  = makeBtn("Parry",  "Parry",  Color3.fromRGB(100,150,180))
 
 --// STATE
 local running = false
@@ -278,6 +280,39 @@ end
 )
 
 
+table.insert(currentConnections,
+    parryBtn.MouseButton1Click:Connect(function()
+        if deadLoop then return end
+
+        -- cancel block if active
+        if blocking then
+            blocking = false
+            block:Stop()
+            hum.WalkSpeed = WalkSpeed
+            blockBtn.Text = "Block"
+        end
+
+        -- do a fast punch (parry)
+        punching = true
+        running = false
+        hum.WalkSpeed = 0
+
+        -- stop movement anims + any other tracks
+        for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+
+        punch:Play()
+        punch:AdjustSpeed(2) -- 2x speed
+
+        task.delay((punch.Length > 0 and punch.Length or 0.6) / 2, function()
+            punching = false
+            hum.WalkSpeed = running and RunSpeed or WalkSpeed
+        end)
+    end)
+)
+
+
 
 -- RUN
 table.insert(currentConnections,
@@ -406,19 +441,39 @@ table.insert(currentConnections,
         deadLoop = not deadLoop
 
         if deadLoop then
+            -- hard override all states
+            running = false
+            blocking = false
+            injured = false
+            punching = false
+
             hum.WalkSpeed = 0
-            stopMovementAnims()
+
+            -- stop everything
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
+
+            -- make sure injured visuals are gone
+            injuredIdle:Stop()
+            injuredWalk:Stop()
+            injuredBtn.Text = "Injured"
+
+            -- play only death
             death:Play()
         else
-            death:Stop() -- FIX
+            -- leaving death
+            death:Stop()
             hum.WalkSpeed = WalkSpeed
 
-            injuredIdle:Stop()
-            idle:Stop()
-            idle:Play()
+            -- restart base idle
+            if not idle.IsPlaying then
+                idle:Play()
+            end
         end
     end)
 )
+
 
 idle:Play()
 end -- closes setupChar()
