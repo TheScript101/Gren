@@ -207,7 +207,7 @@ table.insert(currentConnections,
             if not run.IsPlaying then
                 run:Play()
                 run:AdjustWeight(1.5)
-				run:AdjustSpeed(3.6)
+				run:AdjustSpeed(4)
             end
 
             return -- IMPORTANT: prevents walk/idle logic from overriding run
