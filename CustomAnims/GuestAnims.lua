@@ -246,14 +246,37 @@ end
 
 
 
-	-- RUN
-	table.insert(currentConnections,
-		runBtn.MouseButton1Click:Connect(function()
-			if blocking or deadLoop or punching then return end
-			running = not running
-			hum.WalkSpeed = running and RunSpeed or WalkSpeed
-			runBtn.Text = running and "Walk" or "Run"
-		end)
+-- RUN
+table.insert(currentConnections,
+	runBtn.MouseButton1Click:Connect(function()
+		if blocking or deadLoop or punching then return end
+
+		-- PREVENT RUN WHILE INJURED
+		if injured then
+			runBtn.Text = "Become Uninjured To Run"
+			task.delay(0.5, function()
+				if not running then
+					runBtn.Text = "Run"
+				end
+			end)
+			return
+		end
+
+		running = not running
+
+		if running then
+			hum.WalkSpeed = RunSpeed
+			runBtn.Text = "Walk"
+		else
+			hum.WalkSpeed = WalkSpeed
+			runBtn.Text = "Run"
+
+			-- 🔥 FIX: force stop run animation immediately
+			if run.IsPlaying then
+				run:Stop()
+			end
+		end
+	end)
 	)
 
 	-- BLOCK
