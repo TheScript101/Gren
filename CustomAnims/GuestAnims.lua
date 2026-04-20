@@ -241,20 +241,49 @@ if not currentIdle.IsPlaying then
 			injured = not injured
 
 			if injured then
-				hum.WalkSpeed = 0
-				stopMovementAnims()
+	if moving then
+		-- force speed
+		hum.WalkSpeed = 7
 
-				task.delay(1, function()
-					if injured then
-						hum.WalkSpeed = WalkSpeed
-					end
-				end)
+		-- stop idles
+		idle:Stop()
+		injuredIdle:Stop()
 
-				injuredBtn.Text = "Normal"
-			else
-				hum.WalkSpeed = WalkSpeed
-				injuredBtn.Text = "Injured"
-			end
+		-- PLAY ALL 3 LAYERS
+		if not walk.IsPlaying then
+			walk:Play()
+		end
+
+		if not injuredWalk.IsPlaying then
+			injuredWalk:Play()
+		end
+
+		if not injuredIdle.IsPlaying then
+			injuredIdle:Play()
+		end
+
+		-- APPLY WEIGHTS
+		walk:AdjustWeight(0.7)           -- normal walk (light influence)
+		injuredWalk:AdjustWeight(1)      -- limp legs
+		injuredIdle:AdjustWeight(1.1)    -- strong upper body
+
+		-- make sure run never plays
+		if run.IsPlaying then
+			run:Stop()
+		end
+	else
+		-- idle injured
+		walk:Stop()
+		injuredWalk:Stop()
+
+		if idle.IsPlaying then idle:Stop() end
+
+		if not injuredIdle.IsPlaying then
+			injuredIdle:Play()
+			injuredIdle:AdjustWeight(1.1)
+		end
+	end
+end
 		end)
 	)
 
