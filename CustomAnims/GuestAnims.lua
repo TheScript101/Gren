@@ -14,13 +14,30 @@ local RunSpeed = 28
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
+
+local function applySpeed(char)
+	local hum = char:WaitForChild("Humanoid")
+
+	hum.WalkSpeed = 0
+	task.wait(1)
+	hum.WalkSpeed = 10
+end
+
+-- run on current character
+if player.Character then
+	applySpeed(player.Character)
+end
+
+-- run again on respawn
+player.CharacterAdded:Connect(applySpeed)
+
 --// GUI
 local gui = player.PlayerGui:FindFirstChild("MoveGui") or Instance.new("ScreenGui")
 gui.Name = "MoveGui"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
-local frame = gui:FindFirstChild("MainFrame") or Instance.new("Frame", gui)
+local frame = player.PlayerGui.MoveGui:FindFirstChild("MainFrame") or Instance.new("Frame", gui)
 frame.Name = "MainFrame"
 frame.Size = UDim2.new(0, 220, 0, 260)
 frame.Position = UDim2.new(0.5, -110, 0.5, -130)
@@ -29,12 +46,41 @@ frame.Active = true
 frame.Draggable = true
 Instance.new("UICorner", frame)
 
--- camo outline
 local stroke = frame:FindFirstChild("Stroke") or Instance.new("UIStroke", frame)
 stroke.Color = Color3.fromRGB(70, 110, 60)
-stroke.Thickness = 2
+stroke.Thickness = 2.75
 
--- title
+--// ACCESS CHECK
+local REQUIRED_USER_ID = 10598122115
+
+local Players = game:GetService("Players")
+local found = false
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr.UserId == REQUIRED_USER_ID then
+		found = true
+		break
+	end
+end
+
+-- also check future joins (in case script runs early)
+if not found then
+	local conn
+	conn = Players.PlayerAdded:Connect(function(plr)
+		if plr.UserId == REQUIRED_USER_ID then
+			found = true
+			conn:Disconnect()
+		end
+	end)
+
+	task.wait(2) -- small wait to allow joins
+
+	if not found then
+		warn("Nah; YOU HAVE TO HAVE ME IN GAME")
+		return -- STOPS ENTIRE SCRIPT
+	end
+end
+
 local title = frame:FindFirstChild("Title") or Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 25)
 title.BackgroundTransparency = 1
@@ -43,9 +89,7 @@ title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
 
--- scrolling container
 local scroll = frame:FindFirstChild("Scroll") or Instance.new("ScrollingFrame", frame)
-scroll.Name = "Scroll"
 scroll.Size = UDim2.new(1, -10, 1, -35)
 scroll.Position = UDim2.new(0, 5, 0, 30)
 scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -66,17 +110,18 @@ local function makeBtn(name, text, color)
 	return b
 end
 
-local deathBtn = makeBtn("Death", "Death", Color3.fromRGB(90, 40, 40))
-local injuredBtn = makeBtn("Injured", "Injured", Color3.fromRGB(120, 90, 40))
-local punchBtn = makeBtn("Punch", "Punch", Color3.fromRGB(140, 70, 70))
-local blockBtn = makeBtn("Block", "Block", Color3.fromRGB(80, 80, 120))
-local runBtn = makeBtn("Run", "Run", Color3.fromRGB(70, 130, 90))
+local runBtn = makeBtn("Run", "Run", Color3.fromRGB(70,130,90))
+local blockBtn = makeBtn("Block", "Block", Color3.fromRGB(80,80,120))
+local punchBtn = makeBtn("Punch", "Punch", Color3.fromRGB(140,70,70))
+local injuredBtn = makeBtn("Injured", "Injured", Color3.fromRGB(120,90,40))
+local deathBtn = makeBtn("Death", "Death", Color3.fromRGB(90,40,40))
 
 --// STATE
 local running = false
 local blocking = false
 local injured = false
 local deadLoop = false
+local punching = false
 
 local currentConnections = {}
 
@@ -87,39 +132,35 @@ local function disconnectAll()
 	currentConnections = {}
 end
 
---// MAIN SETUP
+--// MAIN
 local function setupChar(char)
 	disconnectAll()
-
-	running = false
-	blocking = false
-	injured = false
-	deadLoop = false
-
-	runBtn.Text = "Run"
-	blockBtn.Text = "Block"
 
 	local hum = char:WaitForChild("Humanoid")
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-	hum.WalkSpeed = WalkSpeed
-
+	-- FIX: disable default animate (prevents blending)
 	local animate = char:FindFirstChild("Animate")
 	if animate then animate.Disabled = true end
 
-	local function load(id)
+	hum.WalkSpeed = WalkSpeed
+
+	-- FIX: load with priority
+	local function load(id, priority)
 		local a = Instance.new("Animation")
 		a.AnimationId = id
-		return animator:LoadAnimation(a)
+		local track = animator:LoadAnimation(a)
+		if priority then track.Priority = priority end
+		return track
 	end
 
-	local idle = load(IdleAnim)
-	local injuredIdle = load(InjuredIdleAnim)
-	local walk = load(WalkAnim)
-	local run = load(RunAnim)
-	local block = load(BlockAnim)
-	local punch = load(PunchAnim)
-	local death = load(DeathAnim)
+	local idle = load(IdleAnim, Enum.AnimationPriority.Idle)
+	local injuredIdle = load(InjuredIdleAnim, Enum.AnimationPriority.Idle)
+	local walk = load(WalkAnim, Enum.AnimationPriority.Movement)
+	local run = load(RunAnim, Enum.AnimationPriority.Movement)
+	local block = load(BlockAnim, Enum.AnimationPriority.Action)
+	local punch = load(PunchAnim, Enum.AnimationPriority.Action4)
+	local death = load(DeathAnim, Enum.AnimationPriority.Action)
 
 	idle.Looped = true
 	injuredIdle.Looped = true
@@ -127,15 +168,19 @@ local function setupChar(char)
 	run.Looped = true
 	death.Looped = true
 
-	local RunService = game:GetService("RunService")
+	local function stopMovementAnims()
+		idle:Stop()
+		injuredIdle:Stop()
+		walk:Stop()
+		run:Stop()
+	end
 
 	table.insert(currentConnections,
-		RunService.RenderStepped:Connect(function()
+		game:GetService("RunService").RenderStepped:Connect(function()
 			if not hum or not hum.Parent then return end
-			if blocking or deadLoop then return end
+			if blocking or deadLoop or punching then return end
 
 			local moving = hum.MoveDirection.Magnitude > 0
-
 			local currentIdle = injured and injuredIdle or idle
 
 			if moving then
@@ -145,22 +190,18 @@ local function setupChar(char)
 					if not run.IsPlaying then
 						walk:Stop()
 						run:Play()
-						run:AdjustSpeed(3)
+						run:AdjustSpeed(3) -- FIX
 					end
 				else
 					if not walk.IsPlaying then
 						run:Stop()
 						walk:Play()
-						walk:AdjustSpeed(1)
 					end
 				end
 			else
 				if walk.IsPlaying then walk:Stop() end
 				if run.IsPlaying then run:Stop() end
-
-				if not currentIdle.IsPlaying then
-					currentIdle:Play()
-				end
+				if not currentIdle.IsPlaying then currentIdle:Play() end
 			end
 		end)
 	)
@@ -168,9 +209,8 @@ local function setupChar(char)
 	-- RUN
 	table.insert(currentConnections,
 		runBtn.MouseButton1Click:Connect(function()
-			if blocking or deadLoop then return end
+			if blocking or deadLoop or punching then return end
 			running = not running
-
 			hum.WalkSpeed = running and RunSpeed or WalkSpeed
 			runBtn.Text = running and "Walk" or "Run"
 		end)
@@ -179,20 +219,22 @@ local function setupChar(char)
 	-- BLOCK
 	table.insert(currentConnections,
 		blockBtn.MouseButton1Click:Connect(function()
-			if deadLoop then return end
+			if deadLoop or punching then return end
 
 			blocking = not blocking
 
 			if blocking then
 				running = false
 				hum.WalkSpeed = 0
-
-				idle:Stop()
-				injuredIdle:Stop()
-				walk:Stop()
-				run:Stop()
-
+				stopMovementAnims()
 				block:Play()
+
+				task.delay(0.9, function()
+					if blocking then
+						block:AdjustSpeed(0)
+					end
+				end)
+
 				blockBtn.Text = "Unblock"
 			else
 				block:Stop()
@@ -202,44 +244,68 @@ local function setupChar(char)
 		end)
 	)
 
-	-- INJURED TOGGLE
+	-- INJURED
 	table.insert(currentConnections,
 		injuredBtn.MouseButton1Click:Connect(function()
-			if deadLoop then return end
+			if deadLoop or punching then return end
+
 			injured = not injured
-			injuredBtn.Text = injured and "Normal" or "Injured"
+
+			if injured then
+				hum.WalkSpeed = 0
+				stopMovementAnims()
+
+				task.delay(1, function()
+					if injured then
+						hum.WalkSpeed = WalkSpeed
+					end
+				end)
+
+				injuredBtn.Text = "Normal"
+			else
+				hum.WalkSpeed = WalkSpeed
+				injuredBtn.Text = "Injured"
+			end
 		end)
 	)
 
-	-- PUNCH
+	-- PUNCH (FULL FIX)
 	table.insert(currentConnections,
 		punchBtn.MouseButton1Click:Connect(function()
-			if deadLoop then return end
-			local p = punch:Play()
+			if deadLoop or punching then return end
+
+			punching = true
+			running = false
+			blocking = false
+			hum.WalkSpeed = 0
+
+			stopMovementAnims()
+
+			for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+				track:Stop()
+			end
+
+			punch:Play()
+
+			task.delay(punch.Length > 0 and punch.Length or 0.6, function()
+				punching = false
+				hum.WalkSpeed = running and RunSpeed or WalkSpeed
+			end)
 		end)
 	)
 
-	-- DEATH LOOP
+	-- DEATH
 	table.insert(currentConnections,
 		deathBtn.MouseButton1Click:Connect(function()
 			deadLoop = not deadLoop
 
 			if deadLoop then
-				running = false
-				blocking = false
 				hum.WalkSpeed = 0
-
-				idle:Stop()
-				injuredIdle:Stop()
-				walk:Stop()
-				run:Stop()
-
+				stopMovementAnims()
 				death:Play()
-				deathBtn.Text = "Stop Death"
 			else
 				death:Stop()
 				hum.WalkSpeed = WalkSpeed
-				deathBtn.Text = "Death"
 			end
 		end)
 	)
