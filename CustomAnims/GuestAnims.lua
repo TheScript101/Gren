@@ -14,50 +14,6 @@ local RunSpeed = 28
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-local function applyFreeze(char)
-	local hum = char:WaitForChild("Humanoid")
-	local root = char:WaitForChild("HumanoidRootPart")
-	local animator = hum:FindFirstChildOfClass("Animator")
-
-	-- store old speed
-	local oldSpeed = hum.WalkSpeed
-
-	-- stop all current animations
-	if animator then
-		for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-			track:Stop()
-		end
-	end
-
-	-- block new animations during freeze
-	local animBlock
-	animBlock = hum.AnimationPlayed:Connect(function(track)
-		track:Stop()
-	end)
-
-	-- freeze player
-	hum.WalkSpeed = 0
-	root.Anchored = true
-
-	task.wait(1)
-
-	-- restore
-	root.Anchored = false
-	hum.WalkSpeed = 10
-
-	if animBlock then
-		animBlock:Disconnect()
-	end
-end
-
--- run now
-if player.Character then
-	applyFreeze(player.Character)
-end
-
--- run on respawn
-player.CharacterAdded:Connect(applyFreeze)
-
 --// GUI
 local gui = player.PlayerGui:FindFirstChild("MoveGui") or Instance.new("ScreenGui")
 gui.Name = "MoveGui"
@@ -208,13 +164,10 @@ local function setupChar(char)
 			if blocking or deadLoop or punching then return end
 
 			local moving = hum.MoveDirection.Magnitude > 0
-local currentIdle = injured and injuredIdle or idle
-local otherIdle = injured and idle or injuredIdle
+			local currentIdle = injured and injuredIdle or idle
 
-if moving then
-	-- FIX: stop BOTH idles to prevent blending
-	if currentIdle.IsPlaying then currentIdle:Stop() end
-	if otherIdle.IsPlaying then otherIdle:Stop() end
+			if moving then
+				if currentIdle.IsPlaying then currentIdle:Stop() end
 
 				if running then
 					if not run.IsPlaying then
@@ -231,11 +184,7 @@ if moving then
 			else
 				if walk.IsPlaying then walk:Stop() end
 				if run.IsPlaying then run:Stop() end
-				-- FIX: ensure only ONE idle plays
-if otherIdle.IsPlaying then otherIdle:Stop() end
-if not currentIdle.IsPlaying then
-	currentIdle:Play()
-					end
+				if not currentIdle.IsPlaying then currentIdle:Play() end
 			end
 		end)
 	)
@@ -296,15 +245,10 @@ if not currentIdle.IsPlaying then
 				end)
 
 				injuredBtn.Text = "Normal"
-else
-	hum.WalkSpeed = WalkSpeed
-	injuredBtn.Text = "Injured"
-
-	-- FIX: instantly clear injured animation
-	injuredIdle:Stop()
-	idle:Stop()
-	idle:Play()
-end
+			else
+				hum.WalkSpeed = WalkSpeed
+				injuredBtn.Text = "Injured"
+			end
 		end)
 	)
 
