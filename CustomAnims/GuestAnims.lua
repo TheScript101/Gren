@@ -170,37 +170,43 @@ table.insert(currentConnections,
         local otherIdle = injured and idle or injuredIdle
 
 -- INJURED MOVEMENT SYSTEM
+-- INJURED MOVEMENT SYSTEM
 if injured then
     hum.WalkSpeed = 7
 
+    -- ALWAYS PLAY IDLE (BASE LAYER)
+    if not idle.IsPlaying then
+        idle:Play()
+    end
+    idle:AdjustWeight(3) -- your request
+
+    -- ALWAYS PLAY INJURED IDLE OVERLAY
+    if not injuredIdle.IsPlaying then
+        injuredIdle:Play()
+    end
+    injuredIdle:AdjustWeight(1.2)
+
     if moving then
-        -- walking injured
+        -- WALKING INJURED
+
+        -- walk layer
         if not walk.IsPlaying then
             walk:Play()
-            walk:AdjustWeight(0.65)
         end
+        walk:AdjustWeight(0.7)
 
+        -- injured walk overlay
         if not injuredWalk.IsPlaying then
             injuredWalk:Play()
-            injuredWalk:AdjustWeight(1.0)
         end
-
-        if not injuredIdle.IsPlaying then
-            injuredIdle:Play()
-            injuredIdle:AdjustWeight(1.2)
-        end
+        injuredWalk:AdjustWeight(1.0)
 
     else
-        -- idle injured
-        walk:Stop()
-        injuredWalk:Stop()
+        -- IDLE INJURED
 
-        if not idle.IsPlaying then idle:Play() end
-
-        if not injuredIdle.IsPlaying then
-            injuredIdle:Play()
-            injuredIdle:AdjustWeight(1.1)
-        end
+        -- stop walk layers ONLY
+        if walk.IsPlaying then walk:Stop() end
+        if injuredWalk.IsPlaying then injuredWalk:Stop() end
     end
 
 else
@@ -210,6 +216,7 @@ else
 
     if moving then
         if not walk.IsPlaying then walk:Play() end
+        idle:Stop()
     else
         walk:Stop()
         if not idle.IsPlaying then idle:Play() end
