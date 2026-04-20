@@ -145,7 +145,7 @@ local walk = load(WalkAnim, Enum.AnimationPriority.Movement)
 local injuredIdle = load(InjuredIdleAnim, Enum.AnimationPriority.Action)
 local injuredWalk = load(InjuredWalkAnim, Enum.AnimationPriority.Action)
 
-	local run = load(RunAnim, Enum.AnimationPriority.Movement)
+local run = load(RunAnim, Enum.AnimationPriority.Action)
 	local block = load(BlockAnim, Enum.AnimationPriority.Action)
 	local punch = load(PunchAnim, Enum.AnimationPriority.Action4)
 	local death = load(DeathAnim, Enum.AnimationPriority.Action)
@@ -169,8 +169,24 @@ table.insert(currentConnections,
         if blocking or deadLoop or punching then return end
 
         local moving = hum.MoveDirection.Magnitude > 0
-        local currentIdle = injured and injuredIdle or idle
-        local otherIdle = injured and idle or injuredIdle
+
+        -- RUN MODE (highest priority)
+        if running and moving and not injured then
+            hum.WalkSpeed = RunSpeed
+
+            -- stop all lower layers
+            if walk.IsPlaying then walk:Stop() end
+            if injuredWalk.IsPlaying then injuredWalk:Stop() end
+            if injuredIdle.IsPlaying then injuredIdle:Stop() end
+
+            -- play run
+            if not run.IsPlaying then
+                run:Play()
+                run:AdjustWeight(1.5)
+            end
+
+            return -- IMPORTANT: prevents walk/idle logic from overriding run
+        end
 
 -- INJURED MOVEMENT SYSTEM
 -- INJURED MOVEMENT SYSTEM
