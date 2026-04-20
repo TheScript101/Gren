@@ -169,31 +169,52 @@ table.insert(currentConnections,
         local currentIdle = injured and injuredIdle or idle
         local otherIdle = injured and idle or injuredIdle
 
-        if moving then
-            if currentIdle.IsPlaying then currentIdle:Stop() end
-            if otherIdle.IsPlaying then otherIdle:Stop() end
+-- INJURED MOVEMENT SYSTEM
+if injured then
+    hum.WalkSpeed = 7
 
-            if running then
-                if not run.IsPlaying then
-                    walk:Stop()
-                    run:Play()
-                    run:AdjustSpeed(3.2)
-                end
-            else
-                if not walk.IsPlaying then
-                    run:Stop()
-                    walk:Play()
-                end
-            end
-        else
-            if walk.IsPlaying then walk:Stop() end
-            if run.IsPlaying then run:Stop() end
-
-            if otherIdle.IsPlaying then otherIdle:Stop() end
-            if not currentIdle.IsPlaying then
-                currentIdle:Play()
-            end
+    if moving then
+        -- walking injured
+        if not walk.IsPlaying then
+            walk:Play()
+            walk:AdjustWeight(0.65)
         end
+
+        if not injuredWalk.IsPlaying then
+            injuredWalk:Play()
+            injuredWalk:AdjustWeight(1.0)
+        end
+
+        if not injuredIdle.IsPlaying then
+            injuredIdle:Play()
+            injuredIdle:AdjustWeight(1.2)
+        end
+
+    else
+        -- idle injured
+        walk:Stop()
+        injuredWalk:Stop()
+
+        if not idle.IsPlaying then idle:Play() end
+
+        if not injuredIdle.IsPlaying then
+            injuredIdle:Play()
+            injuredIdle:AdjustWeight(1.1)
+        end
+    end
+
+else
+    -- NORMAL MODE
+    injuredIdle:Stop()
+    injuredWalk:Stop()
+
+    if moving then
+        if not walk.IsPlaying then walk:Play() end
+    else
+        walk:Stop()
+        if not idle.IsPlaying then idle:Play() end
+    end
+end
     end)
 )
 
@@ -239,47 +260,38 @@ table.insert(currentConnections,
 
 -- INJURED
 table.insert(currentConnections,
-    injuredBtn.MouseButton1Click:Connect(function()
-        if deadLoop or punching then return end
+injuredBtn.MouseButton1Click:Connect(function()
+    if deadLoop or punching then return end
 
-        injured = not injured
-        local moving = hum.MoveDirection.Magnitude > 0
+    injured = not injured
 
-        if injured then
-            if moving then
-                hum.WalkSpeed = 7
+    if injured then
+        hum.WalkSpeed = 7
+        injuredBtn.Text = "Normal"
 
-                idle:Stop()
-                injuredIdle:Stop()
-
-                if not walk.IsPlaying then walk:Play() end
-                if not injuredWalk.IsPlaying then injuredWalk:Play() end
-                if not injuredIdle.IsPlaying then injuredIdle:Play() end
-
-                walk:AdjustWeight(0.7)
-                injuredWalk:AdjustWeight(1)
-                injuredIdle:AdjustWeight(1.1)
-
-                if run.IsPlaying then run:Stop() end
-            else
-                walk:Stop()
-                injuredWalk:Stop()
-
-                if idle.IsPlaying then idle:Stop() end
-
-                if not injuredIdle.IsPlaying then
-                    injuredIdle:Play()
-                    injuredIdle:AdjustWeight(1.1)
-                end
-            end
-        else
-            -- leaving injured mode
-            injuredIdle:Stop()
-            idle:Play()
-            hum.WalkSpeed = WalkSpeed
+        -- force injured overlay ON
+        if not injuredIdle.IsPlaying then
+            injuredIdle:Play()
+            injuredIdle:AdjustWeight(1.1)
         end
-    end)
+
+        -- force injured walk ON
+        if not injuredWalk.IsPlaying then
+            injuredWalk:Play()
+            injuredWalk:AdjustWeight(1.0)
+        end
+
+    else
+        -- leaving injured mode
+        hum.WalkSpeed = WalkSpeed
+        injuredBtn.Text = "Injured"
+
+        injuredIdle:Stop()
+        injuredWalk:Stop()
+    end
+end)
 )
+
 
 	-- PUNCH (FULL FIX)
 	table.insert(currentConnections,
