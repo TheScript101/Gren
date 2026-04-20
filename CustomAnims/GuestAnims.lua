@@ -306,29 +306,29 @@ table.insert(currentConnections,
 		end)
 	)
 
-	-- DEATH
-	table.insert(currentConnections,
-		deathBtn.MouseButton1Click:Connect(function()
-			deadLoop = not deadLoop
+-- DEATH
+table.insert(currentConnections,
+    deathBtn.MouseButton1Click:Connect(function()
+        deadLoop = not deadLoop
 
-			if deadLoop then
-				hum.WalkSpeed = 0
-				stopMovementAnims()
-				death:Play()
-			else
-	hum.WalkSpeed = WalkSpeed
-	injuredBtn.Text = "Injured"
+        if deadLoop then
+            hum.WalkSpeed = 0
+            stopMovementAnims()
+            death:Play()
+        else
+            death:Stop() -- FIX
+            hum.WalkSpeed = WalkSpeed
 
-	-- FIX: instantly clear injured animation
-	injuredIdle:Stop()
-	idle:Stop()
-	idle:Play()
-					end
-		end)
-	)
+            injuredIdle:Stop()
+            idle:Stop()
+            idle:Play()
+        end
+    end)
+)
 
-	idle:Play()
-end
+idle:Play()
+end -- closes setupChar()
+
 
 -- INIT
 if player.Character then
