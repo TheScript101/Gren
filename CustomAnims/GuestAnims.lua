@@ -213,6 +213,14 @@ table.insert(currentConnections,
             return -- IMPORTANT: prevents walk/idle logic from overriding run
         end
 
+-- STOP RUN WHEN NOT MOVING
+if running and not moving then
+    if run.IsPlaying then
+        run:Stop()
+    end
+end
+
+
 -- INJURED MOVEMENT SYSTEM
 -- INJURED MOVEMENT SYSTEM
 if injured then
