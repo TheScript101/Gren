@@ -9,7 +9,7 @@ local PunchAnim = "rbxassetid://87725149616750"
 local DeathAnim = "rbxassetid://76861507413325"
 
 local WalkSpeed = 10
-local RunSpeed = 25
+local RunSpeed = 21
 
 --// SERVICES
 local Players = game:GetService("Players")
@@ -207,6 +207,7 @@ table.insert(currentConnections,
             if not run.IsPlaying then
                 run:Play()
                 run:AdjustWeight(1.5)
+				run:AdjustSpeed(3.2)
             end
 
             return -- IMPORTANT: prevents walk/idle logic from overriding run
