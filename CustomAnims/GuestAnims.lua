@@ -129,6 +129,30 @@ local function setupChar(char)
 
 	hum.WalkSpeed = WalkSpeed
 
+
+	-- disable jump safely
+	hum.JumpPower = 0
+	hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+
+	table.insert(currentConnections,
+		hum:GetPropertyChangedSignal("Jump"):Connect(function()
+			hum.Jump = false
+		end)
+	)
+
+	-- remove mobile jump (wait properly)
+	task.spawn(function()
+		local pg = player:WaitForChild("PlayerGui")
+		local touch = pg:WaitForChild("TouchGui", 5)
+		if touch then
+			local frame = touch:WaitForChild("TouchControlFrame", 5)
+			if frame then
+				local jump = frame:FindFirstChild("JumpButton")
+				if jump then jump:Destroy() end
+			end
+		end
+	end)
+
 	-- FIX: load with priority
 	local function load(id, priority)
 		local a = Instance.new("Animation")
