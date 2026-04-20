@@ -164,10 +164,13 @@ local function setupChar(char)
 			if blocking or deadLoop or punching then return end
 
 			local moving = hum.MoveDirection.Magnitude > 0
-			local currentIdle = injured and injuredIdle or idle
+local currentIdle = injured and injuredIdle or idle
+local otherIdle = injured and idle or injuredIdle
 
-			if moving then
-				if currentIdle.IsPlaying then currentIdle:Stop() end
+if moving then
+	-- FIX: stop BOTH idles to prevent blending
+	if currentIdle.IsPlaying then currentIdle:Stop() end
+	if otherIdle.IsPlaying then otherIdle:Stop() end
 
 				if running then
 					if not run.IsPlaying then
@@ -184,8 +187,11 @@ local function setupChar(char)
 			else
 				if walk.IsPlaying then walk:Stop() end
 				if run.IsPlaying then run:Stop() end
-				if not currentIdle.IsPlaying then currentIdle:Play() end
-			end
+				-- FIX: ensure only ONE idle plays
+if otherIdle.IsPlaying then otherIdle:Stop() end
+if not currentIdle.IsPlaying then
+	currentIdle:Play()
+					end
 		end)
 	)
 
@@ -287,9 +293,14 @@ local function setupChar(char)
 				stopMovementAnims()
 				death:Play()
 			else
-				death:Stop()
-				hum.WalkSpeed = WalkSpeed
-			end
+	hum.WalkSpeed = WalkSpeed
+	injuredBtn.Text = "Injured"
+
+	-- FIX: instantly clear injured animation
+	injuredIdle:Stop()
+	idle:Stop()
+	idle:Play()
+					end
 		end)
 	)
 
