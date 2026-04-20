@@ -140,6 +140,7 @@ local function setupChar(char)
 
 	local idle = load(IdleAnim, Enum.AnimationPriority.Idle)
 	local injuredIdle = load(InjuredIdleAnim, Enum.AnimationPriority.Idle)
+	local injuredWalk = load(InjuredWalkAnim, Enum.AnimationPriority.Movement) -- FIX
 	local walk = load(WalkAnim, Enum.AnimationPriority.Movement)
 	local run = load(RunAnim, Enum.AnimationPriority.Movement)
 	local block = load(BlockAnim, Enum.AnimationPriority.Action)
