@@ -237,48 +237,49 @@ table.insert(currentConnections,
 		end)
 	)
 
-	-- INJURED
-	table.insert(currentConnections,
-injuredBtn.MouseButton1Click:Connect(function()
-    if deadLoop or punching then return end
+-- INJURED
+table.insert(currentConnections,
+    injuredBtn.MouseButton1Click:Connect(function()
+        if deadLoop or punching then return end
 
-    injured = not injured
-    local moving = hum.MoveDirection.Magnitude > 0
+        injured = not injured
+        local moving = hum.MoveDirection.Magnitude > 0
 
-    if injured then
-        if moving then
-            hum.WalkSpeed = 7
+        if injured then
+            if moving then
+                hum.WalkSpeed = 7
 
-            idle:Stop()
-            injuredIdle:Stop()
+                idle:Stop()
+                injuredIdle:Stop()
 
-            if not walk.IsPlaying then walk:Play() end
-            if not injuredWalk.IsPlaying then injuredWalk:Play() end
-            if not injuredIdle.IsPlaying then injuredIdle:Play() end
+                if not walk.IsPlaying then walk:Play() end
+                if not injuredWalk.IsPlaying then injuredWalk:Play() end
+                if not injuredIdle.IsPlaying then injuredIdle:Play() end
 
-            walk:AdjustWeight(0.7)
-            injuredWalk:AdjustWeight(1)
-            injuredIdle:AdjustWeight(1.1)
-
-            if run.IsPlaying then run:Stop() end
-        else
-            walk:Stop()
-            injuredWalk:Stop()
-
-            if idle.IsPlaying then idle:Stop() end
-
-            if not injuredIdle.IsPlaying then
-                injuredIdle:Play()
+                walk:AdjustWeight(0.7)
+                injuredWalk:AdjustWeight(1)
                 injuredIdle:AdjustWeight(1.1)
+
+                if run.IsPlaying then run:Stop() end
+            else
+                walk:Stop()
+                injuredWalk:Stop()
+
+                if idle.IsPlaying then idle:Stop() end
+
+                if not injuredIdle.IsPlaying then
+                    injuredIdle:Play()
+                    injuredIdle:AdjustWeight(1.1)
+                end
             end
+        else
+            -- leaving injured mode
+            injuredIdle:Stop()
+            idle:Play()
+            hum.WalkSpeed = WalkSpeed
         end
-    else
-        -- leaving injured mode
-        injuredIdle:Stop()
-        idle:Play()
-        hum.WalkSpeed = WalkSpeed
-    end
-end)
+    end)
+)
 
 	-- PUNCH (FULL FIX)
 	table.insert(currentConnections,
