@@ -160,42 +160,44 @@ local function setupChar(char)
 		run:Stop()
 	end
 
-	table.insert(currentConnections,
-		game:GetService("RunService").RenderStepped:Connect(function()
-			if not hum or not hum.Parent then return end
-			if blocking or deadLoop or punching then return end
+table.insert(currentConnections,
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if not hum or not hum.Parent then return end
+        if blocking or deadLoop or punching then return end
 
-			local moving = hum.MoveDirection.Magnitude > 0
-local currentIdle = injured and injuredIdle or idle
-local otherIdle = injured and idle or injuredIdle
+        local moving = hum.MoveDirection.Magnitude > 0
+        local currentIdle = injured and injuredIdle or idle
+        local otherIdle = injured and idle or injuredIdle
 
-if moving then
-	-- FIX: stop BOTH idles to prevent blending
-	if currentIdle.IsPlaying then currentIdle:Stop() end
-	if otherIdle.IsPlaying then otherIdle:Stop() end
+        if moving then
+            if currentIdle.IsPlaying then currentIdle:Stop() end
+            if otherIdle.IsPlaying then otherIdle:Stop() end
 
-				if running then
-					if not run.IsPlaying then
-						walk:Stop()
-						run:Play()
-						run:AdjustSpeed(3.2) -- FIX
-					end
-				else
-					if not walk.IsPlaying then
-						run:Stop()
-						walk:Play()
-					end
-				end
-			else
-				if walk.IsPlaying then walk:Stop() end
-				if run.IsPlaying then run:Stop() end
-				-- FIX: ensure only ONE idle plays
-if otherIdle.IsPlaying then otherIdle:Stop() end
-if not currentIdle.IsPlaying then
-	currentIdle:Play()
-					end
-		end)
-	)
+            if running then
+                if not run.IsPlaying then
+                    walk:Stop()
+                    run:Play()
+                    run:AdjustSpeed(3.2)
+                end
+            else
+                if not walk.IsPlaying then
+                    run:Stop()
+                    walk:Play()
+                end
+            end
+        else
+            if walk.IsPlaying then walk:Stop() end
+            if run.IsPlaying then run:Stop() end
+
+            if otherIdle.IsPlaying then otherIdle:Stop() end
+            if not currentIdle.IsPlaying then
+                currentIdle:Play()
+            end
+        end
+    end)
+)
+
+
 
 	-- RUN
 	table.insert(currentConnections,
