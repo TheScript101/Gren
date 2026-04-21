@@ -492,7 +492,7 @@ end)
 			punch:Play()
 
 if noWindup then
-	punch.TimePosition = 1
+	punch.TimePosition = 1.2
 				end
 
 			task.delay(punch.Length > 0 and punch.Length or 0.6, function()
