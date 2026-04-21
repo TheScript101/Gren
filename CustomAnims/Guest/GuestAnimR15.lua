@@ -5,7 +5,7 @@ local InjuredWalkAnim = "rbxassetid://85811471336028" -- FIX (added)
 local WalkAnim = "rbxassetid://119545916455209"
 local RunAnim = "rbxassetid://102622695004986"
 local BlockAnim = "rbxassetid://105310177683245"
-local PunchAnim = "rbxassetid://87725149616750"
+local PunchAnim = "rbxassetid://120660579076199"
 local DeathAnim = "rbxassetid://76861507413325"
 
 local WalkSpeed = 10
@@ -363,10 +363,10 @@ table.insert(currentConnections,
         punch:Play()
 
 if noWindup then
-	punch.TimePosition = 0.98
+	punch.TimePosition = 3
 end
 
-punch:AdjustSpeed(2)
+punch:AdjustSpeed(7)
 
         task.delay((punch.Length > 0 and punch.Length or 0.6) / 2, function()
             punching = false
@@ -490,9 +490,10 @@ end)
 			end
 
 			punch:Play()
+			punch:AdjustSpeed(3)
 
 if noWindup then
-	punch.TimePosition = 1.2
+	punch.TimePosition = 3
 				end
 
 			task.delay(punch.Length > 0 and punch.Length or 0.6, function()
