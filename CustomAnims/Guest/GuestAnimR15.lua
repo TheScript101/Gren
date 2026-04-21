@@ -10,6 +10,7 @@ local DeathAnim = "rbxassetid://76861507413325"
 
 local WalkSpeed = 10
 local RunSpeed = 21
+local noWindup = false -- SETTINGS TOGGLE
 
 --// SERVICES
 local Players = game:GetService("Players")
@@ -72,6 +73,63 @@ title.Text = "Guest 1337"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
+
+-- SETTINGS BUTTON (top-left)
+local settingsBtn = Instance.new("TextButton", frame)
+settingsBtn.Size = UDim2.new(0, 25, 0, 25)
+settingsBtn.Position = UDim2.new(0, 5, 0, 0)
+settingsBtn.Text = "⚙"
+settingsBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+settingsBtn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", settingsBtn)
+
+-- SETTINGS PANEL
+local settingsPanel = Instance.new("Frame", frame)
+settingsPanel.Size = UDim2.new(0, 180, 1, 0)
+settingsPanel.Position = UDim2.new(1, 5, 0, 0) -- sits to the right
+settingsPanel.BackgroundColor3 = Color3.fromRGB(25,25,25)
+settingsPanel.Visible = false
+Instance.new("UICorner", settingsPanel)
+
+local panelStroke = Instance.new("UIStroke", settingsPanel)
+panelStroke.Color = Color3.fromRGB(70,110,60)
+panelStroke.Thickness = 2
+
+-- TITLE
+local settingsTitle = Instance.new("TextLabel", settingsPanel)
+settingsTitle.Size = UDim2.new(1, 0, 0, 25)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "Settings"
+settingsTitle.TextColor3 = Color3.new(1,1,1)
+settingsTitle.Font = Enum.Font.SourceSansBold
+settingsTitle.TextSize = 18
+
+-- TOGGLE BUTTON
+local windupToggle = Instance.new("TextButton", settingsPanel)
+windupToggle.Size = UDim2.new(1, -10, 0, 40)
+windupToggle.Position = UDim2.new(0, 5, 0, 35)
+windupToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+windupToggle.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", windupToggle)
+
+local function updateToggle()
+	if noWindup then
+		windupToggle.Text = "No Punch Wind-Up: ON"
+	else
+		windupToggle.Text = "No Punch Wind-Up: OFF"
+	end
+end
+
+updateToggle()
+
+windupToggle.MouseButton1Click:Connect(function()
+	noWindup = not noWindup
+	updateToggle()
+end)
+
+settingsBtn.MouseButton1Click:Connect(function()
+	settingsPanel.Visible = not settingsPanel.Visible
+end)
 
 local scroll = frame:FindFirstChild("Scroll") or Instance.new("ScrollingFrame", frame)
 scroll.Size = UDim2.new(1, -10, 1, -35)
@@ -303,7 +361,12 @@ table.insert(currentConnections,
         end
 
         punch:Play()
-        punch:AdjustSpeed(2) -- 2x speed
+
+if noWindup then
+	punch.TimePosition = 0.8
+end
+
+punch:AdjustSpeed(2)
 
         task.delay((punch.Length > 0 and punch.Length or 0.6) / 2, function()
             punching = false
@@ -427,6 +490,10 @@ end)
 			end
 
 			punch:Play()
+
+if noWindup then
+	punch.TimePosition = 0.8
+				end
 
 			task.delay(punch.Length > 0 and punch.Length or 0.6, function()
 				punching = false
