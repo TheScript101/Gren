@@ -363,7 +363,7 @@ table.insert(currentConnections,
         punch:Play()
 
 if noWindup then
-	punch.TimePosition = 0.8
+	punch.TimePosition = 0.98
 end
 
 punch:AdjustSpeed(2)
@@ -492,7 +492,7 @@ end)
 			punch:Play()
 
 if noWindup then
-	punch.TimePosition = 0.8
+	punch.TimePosition = 1
 				end
 
 			task.delay(punch.Length > 0 and punch.Length or 0.6, function()
