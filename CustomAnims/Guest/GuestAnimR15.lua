@@ -361,6 +361,7 @@ table.insert(currentConnections,
         end
 
         punch:Play()
+		punch.Looped = false
 
 if noWindup then
 	punch.TimePosition = 3
@@ -491,6 +492,7 @@ end)
 
 			punch:Play()
 			punch:AdjustSpeed(3)
+			punch.Looped = false
 
 if noWindup then
 	punch.TimePosition = 3
