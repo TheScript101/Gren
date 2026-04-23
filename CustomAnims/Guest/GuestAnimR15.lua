@@ -8,6 +8,18 @@ local BlockAnim = "rbxassetid://105310177683245"
 local PunchAnim = "rbxassetid://120660579076199"
 local DeathAnim = "rbxassetid://76861507413325"
 
+
+--// SOUND SETUP
+local PunchWindSFX = Instance.new("Sound")
+PunchWindSFX.SoundId = "rbxassetid://117399667638017"
+PunchWindSFX.Volume = 1
+PunchWindSFX.Parent = char:WaitForChild("HumanoidRootPart")
+
+local BlockSFX = Instance.new("Sound")
+BlockSFX.SoundId = "rbxassetid://107377700484732"
+BlockSFX.Volume = 1
+BlockSFX.Parent = char:WaitForChild("HumanoidRootPart")
+
 local WalkSpeed = 10
 local RunSpeed = 21
 local noWindup = false -- SETTINGS TOGGLE
@@ -423,6 +435,8 @@ table.insert(currentConnections,
 				hum.WalkSpeed = 0
 				stopMovementAnims()
 				block:Play()
+
+			    BlockSFX:Play()
 
 				task.delay(0.9, function()
 					if blocking then
