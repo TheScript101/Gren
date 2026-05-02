@@ -2,7 +2,7 @@
 local IdleAnim = "rbxassetid://98946450554814"
 local InjuredIdleAnim = "rbxassetid://73905365652295"
 local InjuredWalkAnim = "rbxassetid://85811471336028" -- FIX (added)
-local WalkAnim = "rbxassetid://119545916455209"
+local WalkAnim = "rbxassetid://117819103741451"
 local RunAnim = "rbxassetid://102622695004986"
 local BlockAnim = "rbxassetid://105310177683245"
 local PunchAnim = "rbxassetid://120660579076199"
@@ -340,6 +340,7 @@ else
 
     if moving then
         if not walk.IsPlaying then walk:Play() end
+		walk:AdjustSpeed(0.6) -- normal speed
         idle:Stop()
     else
         walk:Stop()
