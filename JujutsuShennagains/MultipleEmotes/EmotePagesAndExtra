@@ -1,0 +1,61 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local emoteGui = playerGui:WaitForChild("Emotes"):WaitForChild("Emote")
+
+-- ImageButton 1 (Right Arrow)
+local nextButton = Instance.new("ImageButton")
+nextButton.Name = "NextPageButton"
+nextButton.Parent = emoteGui
+nextButton.AutomaticSize = Enum.AutomaticSize.None
+nextButton.BackgroundTransparency = 1
+nextButton.BorderSizePixel = 0
+nextButton.Position = UDim2.new(0.65, 0, 0.569999993, 0)
+nextButton.Size = UDim2.new(0.2, 0, 0.2, 0)
+-- Right Arrow
+nextButton.Image = "rbxthumb://type=Asset&id=2418686959&w=420&h=420"
+nextButton.ImageTransparency = 0.5
+nextButton.Visible = emoteGui.Visible
+
+-- ImageButton 2 (Left Arrow)
+local previousButton = Instance.new("ImageButton")
+previousButton.Name = "PreviousPageButton"
+previousButton.Parent = emoteGui
+previousButton.AutomaticSize = Enum.AutomaticSize.None
+previousButton.BackgroundTransparency = 1
+previousButton.BorderSizePixel = 0
+previousButton.Position = UDim2.new(0.35, 0, 0.569999993, 0)
+previousButton.Size = UDim2.new(0.2, 0, 0.2, 0)
+previousButton.Image = "rbxthumb://type=Asset&id=2418687617&w=420&h=420"
+previousButton.ImageTransparency = 0.5
+previousButton.Visible = emoteGui.Visible
+
+-- Page Counter TextBox
+local pageCounter = Instance.new("TextBox")
+pageCounter.Font = Enum.Font.Fingerpaint
+pageCounter.Text = "1/10"
+
+pageCounter.TextSize = 25
+
+pageCounter.TextColor3 = Color3.new(1,1,1)
+
+pageCounter.TextStrokeTransparency = 0
+pageCounter.TextStrokeColor3 = Color3.new(0,0,0)
+
+pageCounter.BackgroundTransparency = 1
+pageCounter.BorderSizePixel = 0
+
+pageCounter.Visible = emoteGui.Visible
+
+-- Visibility updater
+local function updateVisibility()
+	local visible = emoteGui.Visible
+
+	nextButton.Visible = visible
+	previousButton.Visible = visible
+	pageCounter.Visible = visible
+end
+
+updateVisibility()
+emoteGui:GetPropertyChangedSignal("Visible"):Connect(updateVisibility)
