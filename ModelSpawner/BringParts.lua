@@ -253,7 +253,8 @@ toggleButton.Parent = screenGui
 
 toggleButton.MouseButton1Click:Connect(function()
 	frame.Visible = not frame.Visible
-end)    else
+end)
+      else
         Thumbnail.Image = ""
     end
 end)
