@@ -188,10 +188,8 @@ local function buildModelSimple(assetId)
         break
     end
 
-    -- Update GUI while waiting
-    statusLabel.Text = string.format("Placing part %d/%d...", i, total)
-
-    local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+    -- Update GUI while waitin
+        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
 
     -- Count parts before placing
     local beforeList = partsFolder:GetChildren()
