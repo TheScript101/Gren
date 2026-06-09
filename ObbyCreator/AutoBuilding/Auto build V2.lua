@@ -231,14 +231,80 @@ statusLabel.Text = "Waiting..."
 -- PREVIEW TAB CONTENT (for ghost model later)
 --========================================================--
 
+--========================================================--
+-- PREVIEW TAB CONTENT (Toggle for Ghost Preview)
+--========================================================--
+
 local previewLabel = Instance.new("TextLabel", previewPage)
 previewLabel.Size = UDim2.new(1, -20, 0, 20)
 previewLabel.Position = UDim2.new(0, 10, 0, 0)
 previewLabel.BackgroundTransparency = 1
-previewLabel.Font = Enum.Font.Gotham
-previewLabel.TextSize = 14
-previewLabel.TextColor3 = Color3.fromRGB(200,200,200)
-previewLabel.Text = "Preview will appear here."
+previewLabel.Font = Enum.Font.GothamBold
+previewLabel.TextSize = 15
+previewLabel.TextColor3 = Color3.fromRGB(220,220,220)
+previewLabel.Text = "Ghost Preview"
+
+-- Toggle Container
+local toggleFrame = Instance.new("Frame", previewPage)
+toggleFrame.Size = UDim2.new(0, 60, 0, 28)
+toggleFrame.Position = UDim2.new(0, 10, 0, 30)
+toggleFrame.BackgroundColor3 = Color3.fromRGB(45,45,50)
+toggleFrame.BorderSizePixel = 0
+Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 14)
+
+-- Toggle Circle
+local toggleCircle = Instance.new("Frame", toggleFrame)
+toggleCircle.Size = UDim2.new(0, 24, 0, 24)
+toggleCircle.Position = UDim2.new(0, 2, 0, 2)
+toggleCircle.BackgroundColor3 = Color3.fromRGB(200,200,200)
+toggleCircle.BorderSizePixel = 0
+Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
+
+-- Toggle State
+local previewEnabled = false
+
+-- Toggle Logic
+local function updateToggle()
+    if previewEnabled then
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(60,160,70)
+        toggleCircle:TweenPosition(UDim2.new(1, -26, 0, 2), "Out", "Quad", 0.15, true)
+    else
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        toggleCircle:TweenPosition(UDim2.new(0, 2, 0, 2), "Out", "Quad", 0.15, true)
+    end
+end
+
+toggleFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        previewEnabled = not previewEnabled
+        updateToggle()
+    end
+end)
+
+-- Label showing ON/OFF
+local toggleText = Instance.new("TextLabel", previewPage)
+toggleText.Size = UDim2.new(0, 100, 0, 20)
+toggleText.Position = UDim2.new(0, 80, 0, 34)
+toggleText.BackgroundTransparency = 1
+toggleText.Font = Enum.Font.Gotham
+toggleText.TextSize = 14
+toggleText.TextColor3 = Color3.fromRGB(200,200,200)
+toggleText.Text = "Off"
+
+-- Update label when toggled
+local function updateLabel()
+    toggleText.Text = previewEnabled and "On" or "Off"
+end
+
+toggleFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        updateLabel()
+    end
+end)
+
+updateToggle()
+updateLabel()
+
 
 --========================================================--
 -- SETTINGS TAB CONTENT
