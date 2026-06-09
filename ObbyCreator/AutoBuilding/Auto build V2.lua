@@ -16,6 +16,14 @@ local MoveObjectRemote = Events:WaitForChild("MoveObject")
 local cancelBuild = false
 
 --========================================================--
+-- GHOST PREVIEW SYSTEM
+--========================================================--
+
+local ghostModel = nil
+local ghostConnection = nil
+local previewEnabled = false -- controlled by the toggle
+
+--========================================================--
 -- PLAYER PARTS FOLDER
 --========================================================--
 
@@ -278,8 +286,14 @@ toggleFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         previewEnabled = not previewEnabled
         updateToggle()
+        updateLabel()
+
+        if not previewEnabled then
+            destroyGhost()
+        end
     end
 end)
+
 
 -- Label showing ON/OFF
 local toggleText = Instance.new("TextLabel", previewPage)
@@ -336,6 +350,7 @@ end)
 cancelBtn.MouseButton1Click:Connect(function()
     cancelBuild = true
     statusLabel.Text = "Cancelling..."
+    destroyGhost()
 end)
 
 --========================================================--
@@ -351,6 +366,53 @@ end
 local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
     local rel = primaryCF:ToObjectSpace(partCF)
     return buildOriginCF * rel
+end
+
+--========================================================--
+-- GHOST PREVIEW FUNCTIONS
+--========================================================--
+
+local function destroyGhost()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+        ghostConnection = nil
+    end
+    if ghostModel then
+        ghostModel:Destroy()
+        ghostModel = nil
+    end
+end
+
+local function createGhost(model)
+    destroyGhost()
+
+    ghostModel = model:Clone()
+    ghostModel.Parent = workspace
+
+    -- Make ghost transparent + anchored
+    for _, p in ipairs(ghostModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.Transparency = 0.6
+            p.Color = Color3.fromRGB(120, 200, 255)
+            p.Material = Enum.Material.ForceField
+            p.CanCollide = false
+            p.Anchored = true
+        end
+    end
+
+    return ghostModel
+end
+
+local function updateGhost()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+    end
+
+    ghostConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if not ghostModel or not ghostModel.PrimaryPart then return end
+        local origin = getBuildOriginCFrame()
+        ghostModel:SetPrimaryPartCFrame(origin)
+    end)
 end
 
 --========================================================--
@@ -370,6 +432,13 @@ local function buildModelSimple(assetId)
     end
 
     local model = arr[1]
+
+    -- PREVIEW SYSTEM
+if previewEnabled then
+    local ghost = createGhost(model)
+    updateGhost()
+end
+
 
     if not model.PrimaryPart then
         for _, v in ipairs(model:GetDescendants()) do
@@ -623,5 +692,6 @@ buildBtn.MouseButton1Click:Connect(function()
     statusLabel.Text = "Starting..."
     task.spawn(function()
         buildModelSimple(id)
+        destroyGhost()
     end)
 end)
