@@ -237,6 +237,52 @@ statusLabel.Text = "Waiting..."
 
 --========================================================--
 --========================================================--
+-- GHOST PREVIEW FUNCTIONS
+--========================================================--
+
+local function destroyGhost()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+        ghostConnection = nil
+    end
+    if ghostModel then
+        ghostModel:Destroy()
+        ghostModel = nil
+    end
+end
+
+local function createGhost(model)
+    destroyGhost()
+
+    ghostModel = model:Clone()
+    ghostModel.Parent = workspace
+
+    -- Make ghost transparent + anchored
+    for _, p in ipairs(ghostModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.Transparency = 0.6
+            p.Color = Color3.fromRGB(120, 200, 255)
+            p.Material = Enum.Material.ForceField
+            p.CanCollide = false
+            p.Anchored = true
+        end
+    end
+
+    return ghostModel
+end
+
+local function updateGhost()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+    end
+
+    ghostConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if not ghostModel or not ghostModel.PrimaryPart then return end
+        local origin = getBuildOriginCFrame()
+        ghostModel:SetPrimaryPartCFrame(origin)
+    end)
+end
+--========================================================--
 -- PREVIEW TAB CONTENT (CLEAN + WORKING)
 --========================================================--
 
@@ -363,52 +409,7 @@ local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
     return buildOriginCF * rel
 end
 
---========================================================--
--- GHOST PREVIEW FUNCTIONS
---========================================================--
-
-local function destroyGhost()
-    if ghostConnection then
-        ghostConnection:Disconnect()
-        ghostConnection = nil
-    end
-    if ghostModel then
-        ghostModel:Destroy()
-        ghostModel = nil
-    end
-end
-
-local function createGhost(model)
-    destroyGhost()
-
-    ghostModel = model:Clone()
-    ghostModel.Parent = workspace
-
-    -- Make ghost transparent + anchored
-    for _, p in ipairs(ghostModel:GetDescendants()) do
-        if p:IsA("BasePart") then
-            p.Transparency = 0.6
-            p.Color = Color3.fromRGB(120, 200, 255)
-            p.Material = Enum.Material.ForceField
-            p.CanCollide = false
-            p.Anchored = true
-        end
-    end
-
-    return ghostModel
-end
-
-local function updateGhost()
-    if ghostConnection then
-        ghostConnection:Disconnect()
-    end
-
-    ghostConnection = game:GetService("RunService").RenderStepped:Connect(function()
-        if not ghostModel or not ghostModel.PrimaryPart then return end
-        local origin = getBuildOriginCFrame()
-        ghostModel:SetPrimaryPartCFrame(origin)
-    end)
-end
+--e 
 
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
