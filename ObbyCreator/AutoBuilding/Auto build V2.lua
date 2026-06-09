@@ -264,7 +264,7 @@ toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
 toggleGuiBtn.TextColor3 = Color3.fromRGB(255,255,255)
 
 toggleGuiBtn.MouseButton1Click:Connect(function()
-    frame.Visible = not frame.Visible
+    mainFrame.Visible = not mainFrame.Visible
 end)
 
 cancelBtn.MouseButton1Click:Connect(function()
