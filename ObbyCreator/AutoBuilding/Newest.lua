@@ -188,8 +188,10 @@ local function buildModelSimple(assetId)
         break
     end
 
-    -- Update GUI while waitin
-        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+    -- GUI updates ONCE per part
+    statusLabel.Text = string.format("Building.. %d/%d", i, total)
+
+    local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
 
     -- Count parts before placing
     local beforeList = partsFolder:GetChildren()
@@ -235,11 +237,10 @@ local function buildModelSimple(assetId)
 
     if not newPart then
         warn("Part failed to appear, skipping")
-        statusLabel.Text = string.format("Failed on %d/%d, skipping...", i, total)
         continue
     end
 
-    -- Now move/resize the part
+    -- Move/resize the part
     local argsMove = {
         {
             {
@@ -253,9 +254,6 @@ local function buildModelSimple(assetId)
     pcall(function()
         MoveObjectRemote:InvokeServer(unpack(argsMove))
     end)
-
-    -- GUI updates ONLY after successful placement
-    statusLabel.Text = string.format("Building.. %d/%d", i, total)
 end
 
     if not cancelBuild then
