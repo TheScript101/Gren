@@ -163,7 +163,6 @@ local function buildModelSimple(assetId)
         return
     end
     
-    local class = part.ClassName
     local function detectShape(part)
     if part:IsA("Ball") or part.Shape == Enum.PartType.Ball then
         return "Ball"
@@ -179,6 +178,7 @@ local function buildModelSimple(assetId)
 
     return "Part"
 end
+
 
 
     local buildOriginCF = getBuildOriginCFrame()
