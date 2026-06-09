@@ -162,19 +162,18 @@ local function buildModelSimple(assetId)
         model:Destroy()
         return
     end
-
-    local function detectShape(part)
+    
     local class = part.ClassName
-
-    if class == "Ball" or class == "Sphere" then
+    local function detectShape(part)
+    if part:IsA("Ball") or part.Shape == Enum.PartType.Ball then
         return "Ball"
-    elseif class == "Cylinder" or class == "CylinderMesh" then
+    elseif part.Shape == Enum.PartType.Cylinder then
         return "Cylinder"
-    elseif class == "WedgePart" then
+    elseif part:IsA("WedgePart") then
         return "Wedge"
-    elseif class == "CornerWedgePart" then
+    elseif part:IsA("CornerWedgePart") then
         return "CornerWedge"
-    elseif class == "TrussPart" then
+    elseif part:IsA("TrussPart") then
         return "Truss"
     end
 
@@ -221,12 +220,13 @@ for _, src in ipairs(sourceParts) do
 
     -- Request server to create the part
     pcall(function()
-        if AddObjectRemote.ClassName == "RemoteEvent" then
-            AddObjectRemote:FireServer(shape, targetCF)
-        else
-            AddObjectRemote:FireServer(shape, targetCF)
-        end
-    end)
+    if AddObjectRemote.ClassName == "RemoteEvent" then
+        AddObjectRemote:FireServer(shape, targetCF)
+    else
+        AddObjectRemote:InvokeServer(shape, targetCF)
+    end
+end)
+
 
     -- Wait for the new part to appear (server rate limit = 1 second)
     local newPart = nil
