@@ -236,18 +236,8 @@ statusLabel.TextColor3 = Color3.fromRGB(200,200,200)
 statusLabel.Text = "Waiting..."
 
 --========================================================--
--- PREVIEW TAB CONTENT (for ghost model later)
 --========================================================--
-
---========================================================--
--- PREVIEW TAB CONTENT (Toggle for Ghost Preview)
---========================================================--
-
---========================================================--
--- PREVIEW TAB CONTENT (Fixed + Improved Toggle)
---========================================================--
---========================================================--
--- PREVIEW TAB CONTENT (Simple, Reliable Toggle)
+-- PREVIEW TAB CONTENT (CLEAN + WORKING)
 --========================================================--
 
 local previewLabel = Instance.new("TextLabel", previewPage)
@@ -438,12 +428,6 @@ local function buildModelSimple(assetId)
 
     local model = arr[1]
 
-    -- PREVIEW SYSTEM
-if previewEnabled then
-    local ghost = createGhost(model)
-    updateGhost()
-end
-
 
     if not model.PrimaryPart then
         for _, v in ipairs(model:GetDescendants()) do
@@ -458,6 +442,12 @@ end
             return
         end
     end
+
+        -- PREVIEW SYSTEM
+if previewEnabled then
+    local ghost = createGhost(model)
+    updateGhost()
+end
 
     local partsFolder = getPartsFolder()
     if not partsFolder then
