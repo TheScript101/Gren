@@ -183,48 +183,82 @@ local function buildModelSimple(assetId)
     statusLabel.Text = "Building.."
 
     for i, src in ipairs(sourceParts) do
-        if cancelBuild then
-            statusLabel.Text = "Cancelled"
-            break
-        end
-
-        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
-
-        -- 1) spawn plain Part
-        local argsAdd = { "Part", targetCF }
-        pcall(function()
-            if AddObjectRemote.ClassName == "RemoteEvent" then
-                AddObjectRemote:FireServer(unpack(argsAdd))
-            else
-                AddObjectRemote:InvokeServer(unpack(argsAdd))
-            end
-        end)
-
-        task.wait(0.25)
-
-        -- 2) grab newest part
-        local children = partsFolder:GetChildren()
-        local newPart = children[#children]
-
-        if newPart then
-            -- 3) move / size (EXACT same structure as your working test)
-            local argsMove = {
-                [1] = {
-                    [1] = {
-                        [1] = newPart,
-                        [2] = targetCF,
-                        [3] = src.Size
-                    }
-                }
-            }
-            pcall(function()
-                MoveObjectRemote:InvokeServer(unpack(argsMove))
-            end)
-        end
-
-        statusLabel.Text = string.format("Building.. %d/%d", i, total)
-        task.wait(0.3)
+    if cancelBuild then
+        statusLabel.Text = "Cancelled"
+        break
     end
+
+    -- Update GUI while waiting
+    statusLabel.Text = string.format("Placing part %d/%d...", i, total)
+
+    local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+
+    -- Count parts before placing
+    local beforeList = partsFolder:GetChildren()
+    local beforeCount = #beforeList
+
+    -- Request server to create the part
+    pcall(function()
+        if AddObjectRemote.ClassName == "RemoteEvent" then
+            AddObjectRemote:FireServer("Part", targetCF)
+        else
+            AddObjectRemote:InvokeServer("Part", targetCF)
+        end
+    end)
+
+    -- Wait for the new part to appear
+    local newPart = nil
+    local timeout = 5
+    local start = os.clock()
+
+    repeat
+        task.wait(0.05)
+        local current = partsFolder:GetChildren()
+
+        if #current > beforeCount then
+            -- Find the part that wasn't in beforeList
+            local lookup = {}
+            for _, p in ipairs(beforeList) do
+                lookup[p] = true
+            end
+            for _, p in ipairs(current) do
+                if not lookup[p] then
+                    newPart = p
+                    break
+                end
+            end
+        end
+    until newPart or os.clock() - start > timeout or cancelBuild
+
+    if cancelBuild then
+        statusLabel.Text = "Cancelled"
+        break
+    end
+
+    if not newPart then
+        warn("Part failed to appear, skipping")
+        statusLabel.Text = string.format("Failed on %d/%d, skipping...", i, total)
+        continue
+    end
+
+    -- Now move/resize the part
+    local argsMove = {
+        {
+            {
+                newPart,
+                targetCF,
+                src.Size
+            }
+        }
+    }
+
+    pcall(function()
+        MoveObjectRemote:InvokeServer(unpack(argsMove))
+    end)
+
+    -- GUI updates ONLY after successful placement
+    statusLabel.Text = string.format("Building.. %d/%d", i, total)
+end
 
     if not cancelBuild then
         statusLabel.Text = "Finished"
