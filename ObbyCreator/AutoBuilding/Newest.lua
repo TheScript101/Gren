@@ -182,14 +182,16 @@ local function buildModelSimple(assetId)
 
     statusLabel.Text = "Building.."
 
-    for i, src in ipairs(sourceParts) do
+    local placedCount = 0
+
+for _, src in ipairs(sourceParts) do
     if cancelBuild then
         statusLabel.Text = "Cancelled"
         break
     end
 
-    -- GUI updates ONCE per part
-    statusLabel.Text = string.format("Building.. %d/%d", i, total)
+    -- Show REAL progress
+    statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
     local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
 
@@ -206,9 +208,9 @@ local function buildModelSimple(assetId)
         end
     end)
 
-    -- Wait for the new part to appear
+    -- Wait for the new part to appear (server rate limit = 1 second)
     local newPart = nil
-    local timeout = 5
+    local timeout = 2 -- 2 seconds is safe for 1/sec rate limit
     local start = os.clock()
 
     repeat
@@ -216,7 +218,7 @@ local function buildModelSimple(assetId)
         local current = partsFolder:GetChildren()
 
         if #current > beforeCount then
-            -- Find the part that wasn't in beforeList
+            -- Find the new part
             local lookup = {}
             for _, p in ipairs(beforeList) do
                 lookup[p] = true
@@ -236,9 +238,14 @@ local function buildModelSimple(assetId)
     end
 
     if not newPart then
-        warn("Part failed to appear, skipping")
+        -- Server rejected this placement due to rate limit
+        -- DO NOT increment placedCount
         continue
     end
+
+    -- We actually got a part -> count it
+    placedCount += 1
+    statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
     -- Move/resize the part
     local argsMove = {
@@ -254,11 +261,14 @@ local function buildModelSimple(assetId)
     pcall(function()
         MoveObjectRemote:InvokeServer(unpack(argsMove))
     end)
+
+    -- IMPORTANT: wait for the rate limit
+    task.wait(1.05)
 end
 
-    if not cancelBuild then
-        statusLabel.Text = "Finished"
-    end
+if not cancelBuild then
+    statusLabel.Text = string.format("Finished (%d/%d)", placedCount, total)
+end
 
     model:Destroy()
 end
