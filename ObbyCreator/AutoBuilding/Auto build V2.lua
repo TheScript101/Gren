@@ -268,8 +268,7 @@ toggleCircle.BackgroundColor3 = Color3.fromRGB(200,200,200)
 toggleCircle.BorderSizePixel = 0
 Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
 
--- Toggle State
-local previewEnabled = false
+-- Yes
 
 -- Toggle Logic
 local function updateToggle()
