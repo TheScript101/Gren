@@ -243,6 +243,10 @@ statusLabel.Text = "Waiting..."
 -- PREVIEW TAB CONTENT (Toggle for Ghost Preview)
 --========================================================--
 
+--========================================================--
+-- PREVIEW TAB CONTENT (Fixed + Improved Toggle)
+--========================================================--
+
 local previewLabel = Instance.new("TextLabel", previewPage)
 previewLabel.Size = UDim2.new(1, -20, 0, 20)
 previewLabel.Position = UDim2.new(0, 10, 0, 0)
@@ -268,9 +272,17 @@ toggleCircle.BackgroundColor3 = Color3.fromRGB(200,200,200)
 toggleCircle.BorderSizePixel = 0
 Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
 
--- Yes
+-- Label showing ON/OFF
+local toggleText = Instance.new("TextLabel", previewPage)
+toggleText.Size = UDim2.new(0, 200, 0, 20)
+toggleText.Position = UDim2.new(0, 80, 0, 34)
+toggleText.BackgroundTransparency = 1
+toggleText.Font = Enum.Font.Gotham
+toggleText.TextSize = 14
+toggleText.TextColor3 = Color3.fromRGB(200,200,200)
+toggleText.Text = "Enter model ID to enable preview"
 
--- Toggle Logic
+-- FUNCTIONS
 local function updateToggle()
     if previewEnabled then
         toggleFrame.BackgroundColor3 = Color3.fromRGB(60,160,70)
@@ -281,8 +293,24 @@ local function updateToggle()
     end
 end
 
+local function updateLabel()
+    if not tonumber(idBox.Text) then
+        toggleText.Text = "Enter model ID to enable preview"
+    else
+        toggleText.Text = previewEnabled and "On" or "Off"
+    end
+end
+
+-- TOGGLE CLICK
 toggleFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        
+        -- Require valid ID
+        if not tonumber(idBox.Text) then
+            toggleText.Text = "Enter model ID to enable preview"
+            return
+        end
+
         previewEnabled = not previewEnabled
         updateToggle()
         updateLabel()
@@ -292,6 +320,21 @@ toggleFrame.InputBegan:Connect(function(input)
         end
     end
 end)
+
+-- Update toggle when ID changes
+idBox:GetPropertyChangedSignal("Text"):Connect(function()
+    if not tonumber(idBox.Text) then
+        previewEnabled = false
+        updateToggle()
+        updateLabel()
+        destroyGhost()
+    else
+        updateLabel()
+    end
+end)
+
+updateToggle()
+updateLabel()
 
 
 -- Label showing ON/OFF
