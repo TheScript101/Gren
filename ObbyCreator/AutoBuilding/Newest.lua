@@ -357,6 +357,16 @@ end)
         MoveObjectRemote:InvokeServer(unpack(argsMove))
     end)
 
+        -- AUTO COLOR
+pcall(function()
+    Events.PaintObject:InvokeServer(
+        { newPart },      -- array of parts
+        "Color",          -- property
+        src.Color         -- original color
+    )
+end)
+
+
     -- IMPORTANT: wait for the rate limit
     task.wait(1.05)
 end
