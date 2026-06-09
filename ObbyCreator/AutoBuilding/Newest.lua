@@ -1,0 +1,253 @@
+--========================================================--
+-- SIMPLE AUTO BUILDER (AddObject + MoveObject only)
+-- Builds the model 5 studs in front of your character
+--========================================================--
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+local Events = ReplicatedStorage:WaitForChild("Events")
+local AddObjectRemote = Events:WaitForChild("AddObject")
+local MoveObjectRemote = Events:WaitForChild("MoveObject")
+
+local cancelBuild = false
+
+--========================================================--
+-- PLAYER PARTS FOLDER
+--========================================================--
+
+local function getPartsFolder()
+    local obbies = workspace:FindFirstChild("Obbies")
+    if not obbies then return nil end
+
+    local playerFolder = obbies:FindFirstChild(LocalPlayer.Name)
+    if not playerFolder then return nil end
+
+    local items = playerFolder:FindFirstChild("Items")
+    if not items then return nil end
+
+    local parts = items:FindFirstChild("Parts")
+    return parts
+end
+
+--========================================================--
+-- GUI
+--========================================================--
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SimpleAutoBuilder"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 320, 0, 180)
+frame.Position = UDim2.new(0.5, -160, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(28, 28, 30)
+frame.BorderSizePixel = 0
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -20, 0, 28)
+title.Position = UDim2.new(0, 10, 0, 8)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Text = "Auto Build (Simple)"
+
+local idBox = Instance.new("TextBox", frame)
+idBox.Size = UDim2.new(1, -20, 0, 30)
+idBox.Position = UDim2.new(0, 10, 0, 42)
+idBox.PlaceholderText = "Insert Model Id (Numbers Only)"
+idBox.ClearTextOnFocus = false
+idBox.Text = ""
+
+local buildBtn = Instance.new("TextButton", frame)
+buildBtn.Size = UDim2.new(0.48, -10, 0, 34)
+buildBtn.Position = UDim2.new(0, 10, 0, 80)
+buildBtn.Text = "Build"
+buildBtn.Font = Enum.Font.GothamBold
+buildBtn.TextSize = 15
+buildBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
+buildBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local cancelBtn = Instance.new("TextButton", frame)
+cancelBtn.Size = UDim2.new(0.48, -10, 0, 34)
+cancelBtn.Position = UDim2.new(0.52, 0, 0, 80)
+cancelBtn.Text = "Cancel"
+cancelBtn.Font = Enum.Font.GothamBold
+cancelBtn.TextSize = 15
+cancelBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+cancelBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+local statusLabel = Instance.new("TextLabel", frame)
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 124)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 13
+statusLabel.TextColor3 = Color3.fromRGB(200,200,200)
+statusLabel.Text = "Waiting"
+
+local toggleGuiBtn = Instance.new("TextButton", screenGui)
+toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
+toggleGuiBtn.Position = UDim2.new(1, -60, 0.35, 0)
+toggleGuiBtn.Text = "⚙️"
+toggleGuiBtn.Font = Enum.Font.Gotham
+toggleGuiBtn.TextSize = 20
+toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+toggleGuiBtn.TextColor3 = Color3.fromRGB(255,255,255)
+
+toggleGuiBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+cancelBtn.MouseButton1Click:Connect(function()
+    cancelBuild = true
+    statusLabel.Text = "Cancelling..."
+end)
+
+--========================================================--
+-- HELPERS
+--========================================================--
+
+local function getBuildOriginCFrame()
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return CFrame.new() end
+    return hrp.CFrame * CFrame.new(0, 0, -5)
+end
+
+local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
+    local rel = primaryCF:ToObjectSpace(partCF)
+    return buildOriginCF * rel
+end
+
+--========================================================--
+-- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
+--========================================================--
+
+local function buildModelSimple(assetId)
+    cancelBuild = false
+    statusLabel.Text = "Loading asset..."
+
+    local ok, arr = pcall(function()
+        return game:GetObjects("rbxassetid://" .. tostring(assetId))
+    end)
+    if not ok or not arr or #arr == 0 then
+        statusLabel.Text = "Failed to load asset."
+        return
+    end
+
+    local model = arr[1]
+
+    if not model.PrimaryPart then
+        for _, v in ipairs(model:GetDescendants()) do
+            if v:IsA("BasePart") then
+                model.PrimaryPart = v
+                break
+            end
+        end
+        if not model.PrimaryPart then
+            statusLabel.Text = "Model has no parts."
+            model:Destroy()
+            return
+        end
+    end
+
+    local partsFolder = getPartsFolder()
+    if not partsFolder then
+        statusLabel.Text = "Parts folder not found."
+        model:Destroy()
+        return
+    end
+
+    local buildOriginCF = getBuildOriginCFrame()
+    local primaryCF = model.PrimaryPart.CFrame
+
+    local sourceParts = {}
+    for _, p in ipairs(model:GetDescendants()) do
+        if p:IsA("BasePart") then
+            table.insert(sourceParts, p)
+        end
+    end
+
+    local total = #sourceParts
+    if total == 0 then
+        statusLabel.Text = "No parts to build."
+        model:Destroy()
+        return
+    end
+
+    statusLabel.Text = "Building.."
+
+    for i, src in ipairs(sourceParts) do
+        if cancelBuild then
+            statusLabel.Text = "Cancelled"
+            break
+        end
+
+        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+
+        -- 1) spawn plain Part
+        local argsAdd = { "Part", targetCF }
+        pcall(function()
+            if AddObjectRemote.ClassName == "RemoteEvent" then
+                AddObjectRemote:FireServer(unpack(argsAdd))
+            else
+                AddObjectRemote:InvokeServer(unpack(argsAdd))
+            end
+        end)
+
+        task.wait(0.25)
+
+        -- 2) grab newest part
+        local children = partsFolder:GetChildren()
+        local newPart = children[#children]
+
+        if newPart then
+            -- 3) move / size (EXACT same structure as your working test)
+            local argsMove = {
+                [1] = {
+                    [1] = {
+                        [1] = newPart,
+                        [2] = targetCF,
+                        [3] = src.Size
+                    }
+                }
+            }
+            pcall(function()
+                MoveObjectRemote:InvokeServer(unpack(argsMove))
+            end)
+        end
+
+        statusLabel.Text = string.format("Building.. %d/%d", i, total)
+        task.wait(0.3)
+    end
+
+    if not cancelBuild then
+        statusLabel.Text = "Finished"
+    end
+
+    model:Destroy()
+end
+
+--========================================================--
+-- BUTTON BIND
+--========================================================--
+
+buildBtn.MouseButton1Click:Connect(function()
+    if cancelBuild then cancelBuild = false end
+
+    local id = tonumber(idBox.Text)
+    if not id then
+        statusLabel.Text = "ID must be numbers only"
+        return
+    end
+
+    statusLabel.Text = "Starting..."
+    task.spawn(function()
+        buildModelSimple(id)
+    end)
+end)
