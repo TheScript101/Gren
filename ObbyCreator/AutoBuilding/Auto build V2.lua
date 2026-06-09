@@ -237,6 +237,21 @@ statusLabel.Text = "Waiting..."
 
 --========================================================--
 --========================================================--
+-- HELPERS
+--========================================================--
+
+local function getBuildOriginCFrame()
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return CFrame.new() end
+    return hrp.CFrame * CFrame.new(0, 0, -5)
+end
+
+local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
+    local rel = primaryCF:ToObjectSpace(partCF)
+    return buildOriginCF * rel
+end
+
+--========================================================--
 -- GHOST PREVIEW FUNCTIONS
 --========================================================--
 
@@ -393,21 +408,6 @@ cancelBtn.MouseButton1Click:Connect(function()
     statusLabel.Text = "Cancelling..."
     destroyGhost()
 end)
-
---========================================================--
--- HELPERS
---========================================================--
-
-local function getBuildOriginCFrame()
-    local hrp = Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return CFrame.new() end
-    return hrp.CFrame * CFrame.new(0, 0, -5)
-end
-
-local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
-    local rel = primaryCF:ToObjectSpace(partCF)
-    return buildOriginCF * rel
-end
 
 --e 
 
