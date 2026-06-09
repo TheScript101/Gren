@@ -164,18 +164,32 @@ local function buildModelSimple(assetId)
     end
     
     local function detectShape(part)
-    if part:IsA("Ball") or part.Shape == Enum.PartType.Ball then
+    -- Ball
+    if part:IsA("Ball") or (part:IsA("Part") and part.Shape == Enum.PartType.Ball) then
         return "Ball"
-    elseif part.Shape == Enum.PartType.Cylinder then
+    end
+
+    -- Cylinder
+    if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
         return "Cylinder"
-    elseif part:IsA("WedgePart") then
+    end
+
+    -- Wedge
+    if part:IsA("WedgePart") then
         return "Wedge"
-    elseif part:IsA("CornerWedgePart") then
+    end
+
+    -- Corner Wedge
+    if part:IsA("CornerWedgePart") then
         return "CornerWedge"
-    elseif part:IsA("TrussPart") then
+    end
+
+    -- Truss
+    if part:IsA("TrussPart") then
         return "Truss"
     end
 
+    -- Default
     return "Part"
 end
 
