@@ -164,32 +164,42 @@ local function buildModelSimple(assetId)
     end
     
     local function detectShape(part)
-    -- 1) Built‑in Ball
-    if part:IsA("Ball") or (part:IsA("Part") and part.Shape == Enum.PartType.Ball) then
-        return "Ball"
+    --========================================================--
+    -- 1) PRIMARY: PART.SHAPE (ALL Enum.PartType SHAPES)
+    --========================================================--
+    if part:IsA("Part") then
+        local shape = part.Shape
+
+        if shape == Enum.PartType.Ball then
+            return "Ball"
+        elseif shape == Enum.PartType.Cylinder then
+            return "Cylinder"
+        elseif shape == Enum.PartType.Wedge then
+            return "Wedge"
+        else
+            -- Enum.PartType.Block or anything else
+            return "Part"
+        end
     end
 
-    -- 2) Built‑in Cylinder
-    if part:IsA("Part") and part.Shape == Enum.PartType.Cylinder then
-        return "Cylinder"
-    end
-
-    -- 3) Built‑in Wedge
+    --========================================================--
+    -- 2) BUILT-IN SPECIAL PARTS (NOT Part.Shape)
+    --========================================================--
     if part:IsA("WedgePart") then
         return "Wedge"
     end
 
-    -- 4) Built‑in Corner Wedge
     if part:IsA("CornerWedgePart") then
         return "CornerWedge"
     end
 
-    -- 5) Built‑in Truss
     if part:IsA("TrussPart") then
         return "Truss"
     end
 
-    -- 6) MeshPart shape detection
+    --========================================================--
+    -- 3) MESHPART SHAPES (MeshType)
+    --========================================================--
     if part:IsA("MeshPart") then
         local meshType = part.MeshType
 
@@ -200,29 +210,51 @@ local function buildModelSimple(assetId)
         elseif meshType == Enum.MeshType.Cylinder then
             return "Cylinder"
         end
+    end
 
-        -- FileMesh or custom mesh → fallback to name detection
-        local name = part.Name:lower()
-        if name:find("wedge") or name:find("triangle") or name:find("slope") then
+    --========================================================--
+    -- 4) MESHPART FALLBACK (MeshId)
+    --========================================================--
+    if part:IsA("MeshPart") then
+        local meshId = tostring(part.MeshId):lower()
+
+        if meshId:find("wedge") or meshId:find("tri") or meshId:find("slope") then
             return "Wedge"
-        elseif name:find("cyl") or name:find("tube") then
+        elseif meshId:find("cyl") or meshId:find("tube") then
             return "Cylinder"
-        elseif name:find("ball") or name:find("sphere") then
+        elseif meshId:find("ball") or meshId:find("sphere") then
             return "Ball"
         end
     end
 
-    -- 7) UnionOperation wedge detection
+    --========================================================--
+    -- 5) NAME-BASED FALLBACK (ANY PART TYPE)
+    --========================================================--
+    local name = part.Name:lower()
+
+    if name:find("wedge") or name:find("triangle") or name:find("tri") or name:find("slope") then
+        return "Wedge"
+    elseif name:find("cyl") or name:find("tube") then
+        return "Cylinder"
+    elseif name:find("ball") or name:find("sphere") then
+        return "Ball"
+    end
+
+    --========================================================--
+    -- 6) UNION WEDGE DETECTION
+    --========================================================--
     if part:IsA("UnionOperation") then
-        local name = part.Name:lower()
         if name:find("wedge") or name:find("triangle") or name:find("slope") then
             return "Wedge"
         end
     end
 
-    -- 8) Default fallback
+    --========================================================--
+    -- 7) DEFAULT
+    --========================================================--
     return "Part"
 end
+
 
     local buildOriginCF = getBuildOriginCFrame()
     local primaryCF = model.PrimaryPart.CFrame
