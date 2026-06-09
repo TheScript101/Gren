@@ -163,6 +163,25 @@ local function buildModelSimple(assetId)
         return
     end
 
+    local function detectShape(part)
+    local class = part.ClassName
+
+    if class == "Ball" or class == "Sphere" then
+        return "Ball"
+    elseif class == "Cylinder" or class == "CylinderMesh" then
+        return "Cylinder"
+    elseif class == "WedgePart" then
+        return "Wedge"
+    elseif class == "CornerWedgePart" then
+        return "CornerWedge"
+    elseif class == "TrussPart" then
+        return "Truss"
+    end
+
+    return "Part"
+end
+
+
     local buildOriginCF = getBuildOriginCFrame()
     local primaryCF = model.PrimaryPart.CFrame
 
@@ -198,13 +217,14 @@ for _, src in ipairs(sourceParts) do
     -- Count parts before placing
     local beforeList = partsFolder:GetChildren()
     local beforeCount = #beforeList
+    local shape = detectShape(src)
 
     -- Request server to create the part
     pcall(function()
         if AddObjectRemote.ClassName == "RemoteEvent" then
-            AddObjectRemote:FireServer("Part", targetCF)
+            AddObjectRemote:FireServer(shape, targetCF)
         else
-            AddObjectRemote:InvokeServer("Part", targetCF)
+            AddObjectRemote:FireServer(shape, targetCF)
         end
     end)
 
