@@ -41,67 +41,117 @@ end
 -- GUI (PROFESSIONAL TAB UI)
 --========================================================--
 
+--========================================================--
+-- GUI (MODERN, CENTERED, DRAGGABLE, SCROLLABLE TABS)
+--========================================================--
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoBuilderUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Main Window
+-- MAIN WINDOW
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 260)
-mainFrame.Position = UDim2.new(0.5, -180, 0.35, 0)
+mainFrame.Size = UDim2.new(0, 380, 0, 280)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- PERFECT CENTER
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
--- Rounded corners
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- Top Bar
+-- DRAGGABLE WINDOW
+local dragging, dragStart, startPos
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- TOP BAR
 local topBar = Instance.new("Frame", mainFrame)
-topBar.Size = UDim2.new(1, 0, 0, 36)
+topBar.Size = UDim2.new(1, 0, 0, 40)
 topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 topBar.BorderSizePixel = 0
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel", topBar)
 title.Size = UDim2.new(1, -20, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+title.TextSize = 17
 title.TextColor3 = Color3.fromRGB(240,240,240)
 title.Text = "Auto Builder Pro"
 
--- TAB BUTTONS
-local tabBar = Instance.new("Frame", mainFrame)
-tabBar.Size = UDim2.new(1, 0, 0, 32)
-tabBar.Position = UDim2.new(0, 0, 0, 36)
-tabBar.BackgroundTransparency = 1
+--========================================================--
+-- SCROLLABLE TAB BAR
+--========================================================--
 
-local function createTabButton(name, xPos)
+local tabScroll = Instance.new("ScrollingFrame", mainFrame)
+tabScroll.Size = UDim2.new(1, -20, 0, 36)
+tabScroll.Position = UDim2.new(0, 10, 0, 48)
+tabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+tabScroll.ScrollBarThickness = 4
+tabScroll.BackgroundTransparency = 1
+
+local tabLayout = Instance.new("UIListLayout", tabScroll)
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 6)
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function createTabButton(name)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 110, 1, 0)
-    btn.Position = UDim2.new(0, xPos, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
     btn.TextColor3 = Color3.fromRGB(220,220,220)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.Text = name
-    btn.Parent = tabBar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Parent = tabScroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     return btn
 end
 
-local buildTabBtn = createTabButton("Build", 10)
-local previewTabBtn = createTabButton("Preview", 125)
-local settingsTabBtn = createTabButton("Settings", 240)
+local buildTabBtn = createTabButton("Build")
+local previewTabBtn = createTabButton("Preview")
+local settingsTabBtn = createTabButton("Settings")
 
+-- Auto‑resize scroll area
+tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    tabScroll.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 10, 0, 0)
+end)
+
+--========================================================--
 -- TAB PAGES
+--========================================================--
+
 local function createTabPage()
     local page = Instance.new("Frame", mainFrame)
-    page.Size = UDim2.new(1, -20, 1, -90)
-    page.Position = UDim2.new(0, 10, 0, 70)
+    page.Size = UDim2.new(1, -20, 1, -100)
+    page.Position = UDim2.new(0, 10, 0, 90)
     page.BackgroundTransparency = 1
     page.Visible = false
     return page
@@ -111,7 +161,6 @@ local buildPage = createTabPage()
 local previewPage = createTabPage()
 local settingsPage = createTabPage()
 
--- TAB SWITCHING
 local function showTab(tab)
     buildPage.Visible = false
     previewPage.Visible = false
@@ -123,7 +172,8 @@ buildTabBtn.MouseButton1Click:Connect(function() showTab(buildPage) end)
 previewTabBtn.MouseButton1Click:Connect(function() showTab(previewPage) end)
 settingsTabBtn.MouseButton1Click:Connect(function() showTab(settingsPage) end)
 
-showTab(buildPage) -- default tab
+showTab(buildPage) -- default
+
 
 --========================================================--
 -- BUILD TAB CONTENT
