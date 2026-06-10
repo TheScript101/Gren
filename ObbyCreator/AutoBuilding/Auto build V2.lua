@@ -416,7 +416,7 @@ end
 -- Create ghost
 createGhost(previewModel)
 updateGhost()
-
+end
 
 -- When toggle changes
 previewToggle.MouseButton1Click:Connect(function()
