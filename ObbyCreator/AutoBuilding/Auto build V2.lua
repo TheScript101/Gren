@@ -397,6 +397,68 @@ rotZ.Parent = previewScroll
 -- MOVE CONTROLS
 --========================================================--
 
+--========================================================--
+-- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
+--========================================================--
+
+-- Make preview tab scrollable (bigger area)
+local previewScroll = Instance.new("ScrollingFrame", previewPage)
+previewScroll.Size = UDim2.new(1, -20, 1, -110)
+previewScroll.Position = UDim2.new(0, 10, 0, 100)
+previewScroll.CanvasSize = UDim2.new(0, 0, 0, 900) -- MUCH bigger
+previewScroll.ScrollBarThickness = 6
+previewScroll.BackgroundTransparency = 1
+
+local previewLayout = Instance.new("UIListLayout", previewScroll)
+previewLayout.Padding = UDim.new(0, 10)
+previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+
+-- Helper button creator
+local function makeButton(text)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 120, 0, 32)
+    b.BackgroundColor3 = Color3.fromRGB(45,45,50)
+    b.TextColor3 = Color3.fromRGB(230,230,230)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    b.Text = text
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    return b
+end
+
+
+--========================================================--
+-- ROTATION CONTROLS
+--========================================================--
+
+local rotTitle = Instance.new("TextLabel", previewScroll)
+rotTitle.Size = UDim2.new(1, 0, 0, 20)
+rotTitle.BackgroundTransparency = 1
+rotTitle.Font = Enum.Font.GothamBold
+rotTitle.TextSize = 15
+rotTitle.TextColor3 = Color3.fromRGB(220,220,220)
+rotTitle.Text = "Rotation Controls"
+
+local rotIncBox = Instance.new("TextBox", previewScroll)
+rotIncBox.Size = UDim2.new(0, 120, 0, 28)
+rotIncBox.PlaceholderText = "Rotation Increment"
+rotIncBox.Text = "5" -- DEFAULT
+rotIncBox.Font = Enum.Font.Gotham
+rotIncBox.TextSize = 14
+rotIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+rotIncBox.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", rotIncBox).CornerRadius = UDim.new(0, 6)
+
+local rotX = makeButton("Rotate X"); rotX.Parent = previewScroll
+local rotY = makeButton("Rotate Y"); rotY.Parent = previewScroll
+local rotZ = makeButton("Rotate Z"); rotZ.Parent = previewScroll
+
+
+--========================================================--
+-- MOVE CONTROLS
+--========================================================--
+
 local moveTitle = Instance.new("TextLabel", previewScroll)
 moveTitle.Size = UDim2.new(1, 0, 0, 20)
 moveTitle.BackgroundTransparency = 1
@@ -408,20 +470,16 @@ moveTitle.Text = "Move Controls"
 local moveIncBox = Instance.new("TextBox", previewScroll)
 moveIncBox.Size = UDim2.new(0, 120, 0, 28)
 moveIncBox.PlaceholderText = "Move Increment"
+moveIncBox.Text = "5" -- DEFAULT
 moveIncBox.Font = Enum.Font.Gotham
 moveIncBox.TextSize = 14
 moveIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
 moveIncBox.TextColor3 = Color3.fromRGB(240,240,240)
 Instance.new("UICorner", moveIncBox).CornerRadius = UDim.new(0, 6)
 
-local moveX = makeButton("Move X")
-moveX.Parent = previewScroll
-
-local moveY = makeButton("Move Y")
-moveY.Parent = previewScroll
-
-local moveZ = makeButton("Move Z")
-moveZ.Parent = previewScroll
+local moveX = makeButton("Move X"); moveX.Parent = previewScroll
+local moveY = makeButton("Move Y"); moveY.Parent = previewScroll
+local moveZ = makeButton("Move Z"); moveZ.Parent = previewScroll
 
 
 --========================================================--
@@ -439,6 +497,7 @@ sizeTitle.Text = "Size Controls"
 local sizeIncBox = Instance.new("TextBox", previewScroll)
 sizeIncBox.Size = UDim2.new(0, 120, 0, 28)
 sizeIncBox.PlaceholderText = "Scale Increment"
+sizeIncBox.Text = "1" -- DEFAULT
 sizeIncBox.Font = Enum.Font.Gotham
 sizeIncBox.TextSize = 14
 sizeIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
@@ -447,6 +506,7 @@ Instance.new("UICorner", sizeIncBox).CornerRadius = UDim.new(0, 6)
 
 local sizeBtn = makeButton("Scale Model")
 sizeBtn.Parent = previewScroll
+
 
 -- UPDATE UI
 local function refreshPreviewUI()
@@ -471,6 +531,83 @@ local function refreshPreviewUI()
 end
 
 refreshPreviewUI()
+
+--========================================================--
+-- ROTATION / MOVE / SCALE LOGIC
+--========================================================--
+
+local function getRotInc()
+    return tonumber(rotIncBox.Text) or 5
+end
+
+local function getMoveInc()
+    return tonumber(moveIncBox.Text) or 5
+end
+
+local function getScaleInc()
+    return tonumber(sizeIncBox.Text) or 1
+end
+
+
+-- ROTATION
+local function rotateGhost(axis)
+    if not ghostModel or not ghostModel.PrimaryPart then return end
+    local inc = math.rad(getRotInc())
+
+    local cf = ghostModel.PrimaryPart.CFrame
+
+    if axis == "X" then
+        cf = cf * CFrame.Angles(inc, 0, 0)
+    elseif axis == "Y" then
+        cf = cf * CFrame.Angles(0, inc, 0)
+    elseif axis == "Z" then
+        cf = cf * CFrame.Angles(0, 0, inc)
+    end
+
+    ghostModel:SetPrimaryPartCFrame(cf)
+end
+
+rotX.MouseButton1Click:Connect(function() rotateGhost("X") end)
+rotY.MouseButton1Click:Connect(function() rotateGhost("Y") end)
+rotZ.MouseButton1Click:Connect(function() rotateGhost("Z") end)
+
+
+-- MOVE
+local function moveGhost(axis)
+    if not ghostModel or not ghostModel.PrimaryPart then return end
+    local inc = getMoveInc()
+
+    local cf = ghostModel.PrimaryPart.CFrame
+
+    if axis == "X" then
+        cf = cf + Vector3.new(inc, 0, 0)
+    elseif axis == "Y" then
+        cf = cf + Vector3.new(0, inc, 0)
+    elseif axis == "Z" then
+        cf = cf + Vector3.new(0, 0, inc)
+    end
+
+    ghostModel:SetPrimaryPartCFrame(cf)
+end
+
+moveX.MouseButton1Click:Connect(function() moveGhost("X") end)
+moveY.MouseButton1Click:Connect(function() moveGhost("Y") end)
+moveZ.MouseButton1Click:Connect(function() moveGhost("Z") end)
+
+
+-- SCALE
+local function scaleGhost()
+    if not ghostModel then return end
+    local inc = getScaleInc()
+
+    for _, p in ipairs(ghostModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.Size = p.Size + Vector3.new(inc, inc, inc)
+        end
+    end
+end
+
+sizeBtn.MouseButton1Click:Connect(scaleGhost)
 
 -- TOGGLE CLICK
 --========================================================--
@@ -706,8 +843,18 @@ end
 end
 
 
-    local buildOriginCF = getBuildOriginCFrame()
-    local primaryCF = model.PrimaryPart.CFrame
+    -- Build where the preview currently is
+local buildOriginCF
+
+if ghostModel and ghostModel.PrimaryPart then
+    buildOriginCF = ghostModel.PrimaryPart.CFrame
+else
+    -- fallback if preview is off
+    buildOriginCF = getBuildOriginCFrame()
+end
+
+local primaryCF = model.PrimaryPart.CFrame
+
 
     local sourceParts = {}
     for _, p in ipairs(model:GetDescendants()) do
@@ -736,7 +883,11 @@ for _, src in ipairs(sourceParts) do
     -- Show REAL progress
     statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
-    local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+    local previewPart = ghostModel:FindFirstChild(src.Name, true)
+local partCF = previewPart and previewPart.CFrame or src.CFrame
+
+local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
+
 
     -- Count parts before placing
     local beforeList = partsFolder:GetChildren()
@@ -793,15 +944,19 @@ end)
     statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
     -- Move/resize the part
-    local argsMove = {
+-- Match the preview's scaled size
+local previewPart = ghostModel:FindFirstChild(src.Name, true)
+local finalSize = previewPart and previewPart.Size or src.Size
+
+local argsMove = {
+    {
         {
-            {
-                newPart,
-                targetCF,
-                src.Size
-            }
+            newPart,
+            targetCF,
+            finalSize
         }
     }
+}
 
     pcall(function()
         MoveObjectRemote:InvokeServer(unpack(argsMove))
