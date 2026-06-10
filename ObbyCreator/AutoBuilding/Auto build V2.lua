@@ -355,6 +355,55 @@ local function refreshPreviewUI()
 end
 
 -- TOGGLE CLICK
+--========================================================--
+-- LIVE PREVIEW MODEL LOADER
+--========================================================--
+
+local previewModel = nil
+
+local function loadPreviewModel()
+    destroyGhost()
+    if previewModel then
+        previewModel:Destroy()
+        previewModel = nil
+    end
+
+    if not tonumber(idBox.Text) then return end
+    if not previewEnabled then return end
+
+    -- Load model
+    local ok, arr = pcall(function()
+        return game:GetObjects("rbxassetid://" .. idBox.Text)
+    end)
+
+    if not ok or not arr or #arr == 0 then
+        previewInfo.Text = "Invalid ID"
+        return
+    end
+
+    previewModel = arr[1]
+
+    -- Ensure PrimaryPart exists
+    if not previewModel.PrimaryPart then
+        for _, v in ipairs(previewModel:GetDescendants()) do
+            if v:IsA("BasePart") then
+                previewModel.PrimaryPart = v
+                break
+            end
+        end
+    end
+
+    if not previewModel.PrimaryPart then
+        previewInfo.Text = "Model has no parts"
+        return
+    end
+
+    -- Create ghost
+    createGhost(previewModel)
+    updateGhost()
+end
+
+-- When toggle changes
 previewToggle.MouseButton1Click:Connect(function()
     if not tonumber(idBox.Text) then
         previewInfo.Text = "Enter model ID to enable preview"
@@ -364,17 +413,20 @@ previewToggle.MouseButton1Click:Connect(function()
     previewEnabled = not previewEnabled
     refreshPreviewUI()
 
-    if not previewEnabled then
+    if previewEnabled then
+        loadPreviewModel()
+    else
         destroyGhost()
     end
 end)
 
--- UPDATE WHEN ID CHANGES
+-- When ID changes
 idBox:GetPropertyChangedSignal("Text"):Connect(function()
     refreshPreviewUI()
+    loadPreviewModel()
 end)
 
-refreshPreviewUI()
+
 
 --========================================================--
 -- SETTINGS TAB CONTENT
