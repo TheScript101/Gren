@@ -427,7 +427,7 @@ sizeTitle.BackgroundTransparency = 1
 sizeTitle.Font = Enum.Font.GothamBold
 sizeTitle.TextSize = 15
 sizeTitle.TextColor3 = Color3.fromRGB(220,220,220)
-sizeTitle.Text = "Size Controls"
+sizeTitle.Text = "Size Controls (Buggy)"
 
 local sizeIncBox = Instance.new("TextBox", previewScroll)
 sizeIncBox.Size = UDim2.new(0, 120, 0, 28)
