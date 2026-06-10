@@ -425,7 +425,9 @@ end)
 -- When ID changes
 idBox:GetPropertyChangedSignal("Text"):Connect(function()
     refreshPreviewUI()
-    loadPreviewModel()
+    if previewEnabled then
+        loadPreviewModel()
+    end
 end)
 
 
@@ -473,12 +475,13 @@ local function buildModelSimple(assetId)
     cancelBuild = false
     statusLabel.Text = "Loading asset..."
 
-    local ok, arr = pcall(function()
-        return game:GetObjects("rbxassetid://" .. tostring(assetId))
-    end)
-    if not ok or not arr or #arr == 0 then
-        statusLabel.Text = "Failed to load asset."
-        return
+local ok, arr = pcall(function()
+    return game:GetObjects("rbxassetid://" .. tostring(assetId))
+end)
+
+if not ok or not arr or #arr == 0 then
+    previewInfo.Text = "Invalid ID"
+    return
     end
 
     local model = arr[1]
@@ -498,12 +501,6 @@ local function buildModelSimple(assetId)
         end
     end
 
-        -- PREVIEW SYSTEM
-if previewEnabled then
-    local ghost = createGhost(model)
-    updateGhost()
-end
-
     local partsFolder = getPartsFolder()
     if not partsFolder then
         statusLabel.Text = "Parts folder not found."
@@ -511,95 +508,53 @@ end
         return
     end
     
-    local function detectShape(part)
-    --========================================================--
-    -- 1) PRIMARY: PART.SHAPE (ALL Enum.PartType SHAPES)
-    --========================================================--
+local function detectShape(part)
+    -- Ignore ghost parts
+    if part.Material == Enum.Material.ForceField then
+        return nil
+    end
+
+    -- 1) Primary Part.Shape
     if part:IsA("Part") then
         local shape = part.Shape
-
-        if shape == Enum.PartType.Ball then
-            return "Ball"
-        elseif shape == Enum.PartType.Cylinder then
-            return "Cylinder"
-        elseif shape == Enum.PartType.Wedge then
-            return "Wedge"
-        else
-            -- Enum.PartType.Block or anything else
-            return "Part"
-        end
+        if shape == Enum.PartType.Ball then return "Ball" end
+        if shape == Enum.PartType.Cylinder then return "Cylinder" end
+        if shape == Enum.PartType.Wedge then return "Wedge" end
+        return "Part"
     end
 
-    --========================================================--
-    -- 2) BUILT-IN SPECIAL PARTS (NOT Part.Shape)
-    --========================================================--
-    if part:IsA("WedgePart") then
-        return "Wedge"
-    end
+    -- 2) Special parts
+    if part:IsA("WedgePart") then return "Wedge" end
+    if part:IsA("CornerWedgePart") then return "CornerWedge" end
+    if part:IsA("TrussPart") then return "Truss" end
 
-    if part:IsA("CornerWedgePart") then
-        return "CornerWedge"
-    end
-
-    if part:IsA("TrussPart") then
-        return "Truss"
-    end
-
-    --========================================================--
-    -- 3) MESHPART SHAPES (MeshType)
-    --========================================================--
+    -- 3) MeshPart shapes
     if part:IsA("MeshPart") then
         local meshType = part.MeshType
-
-        if meshType == Enum.MeshType.Wedge then
-            return "Wedge"
-        elseif meshType == Enum.MeshType.Sphere then
-            return "Ball"
-        elseif meshType == Enum.MeshType.Cylinder then
-            return "Cylinder"
-        end
+        if meshType == Enum.MeshType.Wedge then return "Wedge" end
+        if meshType == Enum.MeshType.Sphere then return "Ball" end
+        if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
     end
 
-    --========================================================--
-    -- 4) MESHPART FALLBACK (MeshId)
-    --========================================================--
+    -- 4) MeshId fallback
     if part:IsA("MeshPart") then
-        local meshId = tostring(part.MeshId):lower()
-
-        if meshId:find("wedge") or meshId:find("tri") or meshId:find("slope") then
-            return "Wedge"
-        elseif meshId:find("cyl") or meshId:find("tube") then
-            return "Cylinder"
-        elseif meshId:find("ball") or meshId:find("sphere") then
-            return "Ball"
-        end
+        local id = part.MeshId:lower()
+        if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
+        if id:find("cyl") or id:find("tube") then return "Cylinder" end
+        if id:find("ball") or id:find("sphere") then return "Ball" end
     end
 
-    --========================================================--
-    -- 5) NAME-BASED FALLBACK (ANY PART TYPE)
-    --========================================================--
+    -- 5) Name fallback
     local name = part.Name:lower()
+    if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
+    if name:find("cyl") or name:find("tube") then return "Cylinder" end
+    if name:find("ball") or name:find("sphere") then return "Ball" end
 
-    if name:find("wedge") or name:find("triangle") or name:find("tri") or name:find("slope") then
-        return "Wedge"
-    elseif name:find("cyl") or name:find("tube") then
-        return "Cylinder"
-    elseif name:find("ball") or name:find("sphere") then
-        return "Ball"
-    end
-
-    --========================================================--
-    -- 6) UNION WEDGE DETECTION
-    --========================================================--
+    -- 6) Union fallback
     if part:IsA("UnionOperation") then
-        if name:find("wedge") or name:find("triangle") or name:find("slope") then
-            return "Wedge"
-        end
+        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
     end
 
-    --========================================================--
-    -- 7) DEFAULT
-    --========================================================--
     return "Part"
 end
 
@@ -742,6 +697,6 @@ buildBtn.MouseButton1Click:Connect(function()
     statusLabel.Text = "Starting..."
     task.spawn(function()
         buildModelSimple(id)
-        destroyGhost()
+        if previewEnabled then destroyGhost() end
     end)
 end)
