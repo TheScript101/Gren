@@ -483,8 +483,6 @@ cancelBtn.MouseButton1Click:Connect(function()
     destroyGhost()
 end)
 
---e 
-
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
 --========================================================--
