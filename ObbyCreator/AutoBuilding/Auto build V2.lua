@@ -383,27 +383,40 @@ local function loadPreviewModel()
         return
     end
 
-    previewModel = arr[1]
+previewModel = arr[1]
 
-    -- Ensure PrimaryPart exists
-    if not previewModel.PrimaryPart then
-        for _, v in ipairs(previewModel:GetDescendants()) do
-            if v:IsA("BasePart") then
-                previewModel.PrimaryPart = v
-                break
-            end
+-- Convert Folder → Model if needed
+if not previewModel:IsA("Model") then
+    local newModel = Instance.new("Model")
+    newModel.Name = previewModel.Name
+
+    for _, obj in ipairs(previewModel:GetChildren()) do
+        obj.Parent = newModel
+    end
+
+    previewModel:Destroy()
+    previewModel = newModel
+end
+
+-- Ensure PrimaryPart exists
+if not previewModel.PrimaryPart then
+    for _, v in ipairs(previewModel:GetDescendants()) do
+        if v:IsA("BasePart") then
+            previewModel.PrimaryPart = v
+            break
         end
     end
-
-    if not previewModel.PrimaryPart then
-        previewInfo.Text = "Model has no parts"
-        return
-    end
-
-    -- Create ghost
-    createGhost(previewModel)
-    updateGhost()
 end
+
+if not previewModel.PrimaryPart then
+    previewInfo.Text = "Model has no parts"
+    return
+end
+
+-- Create ghost
+createGhost(previewModel)
+updateGhost()
+
 
 -- When toggle changes
 previewToggle.MouseButton1Click:Connect(function()
