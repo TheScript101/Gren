@@ -292,10 +292,13 @@ local function updateGhost()
         ghostConnection = nil
     end
 
-    if not ghostModel or not ghostModel.PrimaryPart then return end
-    local origin = getBuildOriginCFrame()
-    ghostModel:SetPrimaryPartCFrame(origin)
+    -- Do NOT force ghost to follow player anymore.
+    -- Only set initial spawn position.
+    if ghostModel and ghostModel.PrimaryPart then
+        ghostModel:SetPrimaryPartCFrame(getBuildOriginCFrame())
+    end
 end
+
 --========================================================--
 -- PREVIEW TAB CONTENT (CLEAN + WORKING)
 --========================================================--
@@ -672,10 +675,14 @@ cancelBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Build preview parts list ONCE
-local previewParts = {}
-for _, p in ipairs(ghostModel:GetDescendants()) do
-    if p:IsA("BasePart") then
-        table.insert(previewParts, p)
+local previewParts = nil
+
+if ghostModel and ghostModel.PrimaryPart then
+    previewParts = {}
+    for _, p in ipairs(ghostModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            table.insert(previewParts, p)
+        end
     end
 end
 
@@ -827,7 +834,8 @@ local function buildModelSimple(assetId)
 
         -- Use preview transform if available, otherwise original
         local previewPart = previewParts and previewParts[i] or nil
-        local partCF = previewPart and previewPart.CFrame or src.CFrame
+local partCF = previewPart and previewPart.CFrame or src.CFrame
+
 
         local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
 
