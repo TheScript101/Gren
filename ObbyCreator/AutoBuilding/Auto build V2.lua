@@ -687,118 +687,108 @@ local function buildModelSimple(assetId)
     cancelBuild = false
     statusLabel.Text = "Loading asset..."
 
-local ok, arr = pcall(function()
-    return game:GetObjects("rbxassetid://" .. tostring(assetId))
-end)
+    local ok, arr = pcall(function()
+        return game:GetObjects("rbxassetid://" .. tostring(assetId))
+    end)
 
-if not ok or not arr or #arr == 0 then
-    previewInfo.Text = "Invalid ID"
-    return
+    if not ok or not arr or #arr == 0 then
+        previewInfo.Text = "Invalid ID"
+        return
     end
 
     local model = arr[1]
 
--- Convert Folder → Model if needed
-if not model:IsA("Model") then
-    local newModel = Instance.new("Model")
-    newModel.Name = model.Name
+    -- Convert Folder → Model if needed
+    if not model:IsA("Model") then
+        local newModel = Instance.new("Model")
+        newModel.Name = model.Name
 
-    for _, obj in ipairs(model:GetChildren()) do
-        obj.Parent = newModel
+        for _, obj in ipairs(model:GetChildren()) do
+            obj.Parent = newModel
+        end
+
+        model:Destroy()
+        model = newModel
     end
 
-    model:Destroy()
-    model = newModel
-end
-
--- Ensure PrimaryPart exists
-if not model.PrimaryPart then
-    for _, v in ipairs(model:GetDescendants()) do
-        if v:IsA("BasePart") then
-            model.PrimaryPart = v
-            break
+    -- Ensure PrimaryPart exists
+    if not model.PrimaryPart then
+        for _, v in ipairs(model:GetDescendants()) do
+            if v:IsA("BasePart") then
+                model.PrimaryPart = v
+                break
+            end
         end
     end
-end
 
-if not model.PrimaryPart then
-    statusLabel.Text = "Model has no parts."
-    model:Destroy()
-    return
-end
+    if not model.PrimaryPart then
+        statusLabel.Text = "Model has no parts."
+        model:Destroy()
+        return
+    end
 
-local partsFolder = getPartsFolder()
-if not partsFolder then
-    statusLabel.Text = "Parts folder not found."
-    model:Destroy()
-    return
-end
+    local partsFolder = getPartsFolder()
+    if not partsFolder then
+        statusLabel.Text = "Parts folder not found."
+        model:Destroy()
+        return
+    end
 
-    
-local function detectShape(part)
-    -- Ignore ghost parts
-if part:GetAttribute("IsGhost") == true then
-    return nil
-end
+    local function detectShape(part)
+        -- Ignore ghost parts
+        if part:GetAttribute("IsGhost") == true then
+            return nil
+        end
 
-    -- 1) Primary Part.Shape
-    if part:IsA("Part") then
-        local shape = part.Shape
-        if shape == Enum.PartType.Ball then return "Ball" end
-        if shape == Enum.PartType.Cylinder then return "Cylinder" end
-        if shape == Enum.PartType.Wedge then return "Wedge" end
+        if part:IsA("Part") then
+            local shape = part.Shape
+            if shape == Enum.PartType.Ball then return "Ball" end
+            if shape == Enum.PartType.Cylinder then return "Cylinder" end
+            if shape == Enum.PartType.Wedge then return "Wedge" end
+            return "Part"
+        end
+
+        if part:IsA("WedgePart") then return "Wedge" end
+        if part:IsA("CornerWedgePart") then return "CornerWedge" end
+        if part:IsA("TrussPart") then return "Truss" end
+
+        if part:IsA("MeshPart") then
+            local meshType = part.MeshType
+            if meshType == Enum.MeshType.Wedge then return "Wedge" end
+            if meshType == Enum.MeshType.Sphere then return "Ball" end
+            if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
+        end
+
+        if part:IsA("MeshPart") then
+            local id = part.MeshId:lower()
+            if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
+            if id:find("cyl") or id:find("tube") then return "Cylinder" end
+            if id:find("ball") or id:find("sphere") then return "Ball" end
+        end
+
+        local name = part.Name:lower()
+        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
+        if name:find("cyl") or name:find("tube") then return "Cylinder" end
+        if name:find("ball") or name:find("sphere") then return "Ball" end
+
+        if part:IsA("UnionOperation") then
+            if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
+        end
+
         return "Part"
     end
 
-    -- 2) Special parts
-    if part:IsA("WedgePart") then return "Wedge" end
-    if part:IsA("CornerWedgePart") then return "CornerWedge" end
-    if part:IsA("TrussPart") then return "Truss" end
-
-    -- 3) MeshPart shapes
-    if part:IsA("MeshPart") then
-        local meshType = part.MeshType
-        if meshType == Enum.MeshType.Wedge then return "Wedge" end
-        if meshType == Enum.MeshType.Sphere then return "Ball" end
-        if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
+    -- Build where the preview currently is (if it exists), otherwise in front of player
+    local buildOriginCF
+    if ghostModel and ghostModel.PrimaryPart then
+        buildOriginCF = ghostModel.PrimaryPart.CFrame
+    else
+        buildOriginCF = getBuildOriginCFrame()
     end
 
-    -- 4) MeshId fallback
-    if part:IsA("MeshPart") then
-        local id = part.MeshId:lower()
-        if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
-        if id:find("cyl") or id:find("tube") then return "Cylinder" end
-        if id:find("ball") or id:find("sphere") then return "Ball" end
-    end
+    local primaryCF = model.PrimaryPart.CFrame
 
-    -- 5) Name fallback
-    local name = part.Name:lower()
-    if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-    if name:find("cyl") or name:find("tube") then return "Cylinder" end
-    if name:find("ball") or name:find("sphere") then return "Ball" end
-
-    -- 6) Union fallback
-    if part:IsA("UnionOperation") then
-        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-    end
-
-    return "Part"
-end
-
-
-    -- Build where the preview currently is
-local buildOriginCF
-
-if ghostModel and ghostModel.PrimaryPart then
-    buildOriginCF = ghostModel.PrimaryPart.CFrame
-else
-    -- fallback if preview is off
-    buildOriginCF = getBuildOriginCFrame()
-end
-
-local primaryCF = model.PrimaryPart.CFrame
-
-
+    -- Source parts from original model
     local sourceParts = {}
     for _, p in ipairs(model:GetDescendants()) do
         if p:IsA("BasePart") then
@@ -813,115 +803,112 @@ local primaryCF = model.PrimaryPart.CFrame
         return
     end
 
-    statusLabel.Text = "Building.."
-
-    local placedCount = 0
-
-for i, src in ipairs(sourceParts) do
-    if cancelBuild then
-        statusLabel.Text = "Cancelled"
-        break
-    end
-
-    -- Show REAL progress
-    statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
-
-local previewPart = previewParts[i]  -- i = index in the build loop
-local partCF = previewPart and previewPart.CFrame or src.CFrame
-
-local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
-
-
-    -- Count parts before placing
-    local beforeList = partsFolder:GetChildren()
-    local beforeCount = #beforeList
-    local shape = detectShape(src)
-
-    -- Request server to create the part
-    pcall(function()
-    if AddObjectRemote.ClassName == "RemoteEvent" then
-        AddObjectRemote:FireServer(shape, targetCF)
-    else
-        AddObjectRemote:InvokeServer(shape, targetCF)
-    end
-end)
-
-
-    -- Wait for the new part to appear (server rate limit = 1 second)
-    local newPart = nil
-    local timeout = 2 -- 2 seconds is safe for 1/sec rate limit
-    local start = os.clock()
-
-    repeat
-        task.wait(0.05)
-        local current = partsFolder:GetChildren()
-
-        if #current > beforeCount then
-            -- Find the new part
-            local lookup = {}
-            for _, p in ipairs(beforeList) do
-                lookup[p] = true
-            end
-            for _, p in ipairs(current) do
-                if not lookup[p] then
-                    newPart = p
-                    break
-                end
+    -- Build preview parts list ONCE (only if ghost exists)
+    local previewParts = nil
+    if ghostModel and ghostModel.PrimaryPart then
+        previewParts = {}
+        for _, p in ipairs(ghostModel:GetDescendants()) do
+            if p:IsA("BasePart") then
+                table.insert(previewParts, p)
             end
         end
-    until newPart or os.clock() - start > timeout or cancelBuild
-
-    if cancelBuild then
-        statusLabel.Text = "Cancelled"
-        break
     end
 
-    if not newPart then
-        -- Server rejected this placement due to rate limit
-        -- DO NOT increment placedCount
-        continue
-    end
+    statusLabel.Text = "Building.."
+    local placedCount = 0
 
-    -- We actually got a part -> count it
-    placedCount += 1
-    statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
+    for i, src in ipairs(sourceParts) do
+        if cancelBuild then
+            statusLabel.Text = "Cancelled"
+            break
+        end
 
-    -- Move/resize the part
--- Match the preview's scaled size
-local previewPart = previewParts[i]
-local finalSize = previewPart and previewPart.Size or src.Size
+        statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
-local argsMove = {
-    {
-        {
-            newPart,
-            targetCF,
-            finalSize
+        -- Use preview transform if available, otherwise original
+        local previewPart = previewParts and previewParts[i] or nil
+        local partCF = previewPart and previewPart.CFrame or src.CFrame
+
+        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
+
+        local beforeList = partsFolder:GetChildren()
+        local beforeCount = #beforeList
+        local shape = detectShape(src)
+
+        pcall(function()
+            if AddObjectRemote.ClassName == "RemoteEvent" then
+                AddObjectRemote:FireServer(shape, targetCF)
+            else
+                AddObjectRemote:InvokeServer(shape, targetCF)
+            end
+        end)
+
+        local newPart = nil
+        local timeout = 2
+        local start = os.clock()
+
+        repeat
+            task.wait(0.05)
+            local current = partsFolder:GetChildren()
+
+            if #current > beforeCount then
+                local lookup = {}
+                for _, p in ipairs(beforeList) do
+                    lookup[p] = true
+                end
+                for _, p in ipairs(current) do
+                    if not lookup[p] then
+                        newPart = p
+                        break
+                    end
+                end
+            end
+        until newPart or os.clock() - start > timeout or cancelBuild
+
+        if cancelBuild then
+            statusLabel.Text = "Cancelled"
+            break
+        end
+
+        if not newPart then
+            -- rate limit hit, skip counting
+            continue
+        end
+
+        placedCount += 1
+        statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
+
+        -- Match preview's scaled size if available
+        local finalSize = previewPart and previewPart.Size or src.Size
+
+        local argsMove = {
+            {
+                {
+                    newPart,
+                    targetCF,
+                    finalSize
+                }
+            }
         }
-    }
-}
 
-    pcall(function()
-        MoveObjectRemote:InvokeServer(unpack(argsMove))
-    end)
+        pcall(function()
+            MoveObjectRemote:InvokeServer(unpack(argsMove))
+        end)
 
-        -- AUTO COLOR
-pcall(function()
-    Events.PaintObject:InvokeServer(
-        { newPart },      -- array of parts
-        "Color",          -- property
-        src.Color         -- original color
-    )
-end)
+        pcall(function()
+            Events.PaintObject:InvokeServer(
+                { newPart },
+                "Color",
+                src.Color
+            )
+        end)
 
+        task.wait(1.05)
+    end
 
-    -- IMPORTANT: wait for the rate limit
-    task.wait(1.05)
-end
-
-if not cancelBuild then
-    statusLabel.Text = string.format("Finished (%d/%d)", placedCount, total)
-end
+    if not cancelBuild then
+        statusLabel.Text = string.format("Finished (%d/%d)", placedCount, total)
+    end
 
     model:Destroy()
 end
