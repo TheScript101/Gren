@@ -365,15 +365,20 @@ local previewModel = nil
 
 local function loadPreviewModel()
     destroyGhost()
+
     if previewModel then
         previewModel:Destroy()
         previewModel = nil
     end
 
-    if not tonumber(idBox.Text) then return end
-    if not previewEnabled then return end
+    if not tonumber(idBox.Text) then
+        return
+    end
 
-    -- Load model
+    if not previewEnabled then
+        return
+    end
+
     local ok, arr = pcall(function()
         return game:GetObjects("rbxassetid://" .. idBox.Text)
     end)
@@ -383,40 +388,40 @@ local function loadPreviewModel()
         return
     end
 
-previewModel = arr[1]
+    previewModel = arr[1]
 
--- Convert Folder → Model if needed
-if not previewModel:IsA("Model") then
-    local newModel = Instance.new("Model")
-    newModel.Name = previewModel.Name
+    -- Convert Folder → Model
+    if not previewModel:IsA("Model") then
+        local newModel = Instance.new("Model")
+        newModel.Name = previewModel.Name
 
-    for _, obj in ipairs(previewModel:GetChildren()) do
-        obj.Parent = newModel
+        for _, obj in ipairs(previewModel:GetChildren()) do
+            obj.Parent = newModel
+        end
+
+        previewModel:Destroy()
+        previewModel = newModel
     end
 
-    previewModel:Destroy()
-    previewModel = newModel
-end
-
--- Ensure PrimaryPart exists
-if not previewModel.PrimaryPart then
-    for _, v in ipairs(previewModel:GetDescendants()) do
-        if v:IsA("BasePart") then
-            previewModel.PrimaryPart = v
-            break
+    -- Ensure PrimaryPart
+    if not previewModel.PrimaryPart then
+        for _, v in ipairs(previewModel:GetDescendants()) do
+            if v:IsA("BasePart") then
+                previewModel.PrimaryPart = v
+                break
+            end
         end
     end
+
+    if not previewModel.PrimaryPart then
+        previewInfo.Text = "Model has no parts"
+        return
+    end
+
+    createGhost(previewModel)
+    updateGhost()
 end
 
-if not previewModel.PrimaryPart then
-    previewInfo.Text = "Model has no parts"
-    return
-end
-
--- Create ghost
-createGhost(previewModel)
-updateGhost()
-end
 
 -- When toggle changes
 previewToggle.MouseButton1Click:Connect(function()
