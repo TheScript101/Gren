@@ -275,8 +275,7 @@ local function createGhost(model)
     -- Make ghost transparent + anchored
     for _, p in ipairs(ghostModel:GetDescendants()) do
         if p:IsA("BasePart") then
-            p.Transparency = 0.6
-            p.Color = Color3.fromRGB(120, 200, 255)
+            p.Transparency = 0.1
             p.Material = Enum.Material.ForceField
             p.CanCollide = false
             p.Anchored = true
