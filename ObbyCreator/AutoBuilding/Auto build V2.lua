@@ -289,13 +289,12 @@ end
 local function updateGhost()
     if ghostConnection then
         ghostConnection:Disconnect()
+        ghostConnection = nil
     end
 
-    ghostConnection = game:GetService("RunService").RenderStepped:Connect(function()
-        if not ghostModel or not ghostModel.PrimaryPart then return end
-        local origin = getBuildOriginCFrame()
-        ghostModel:SetPrimaryPartCFrame(origin)
-    end)
+    if not ghostModel or not ghostModel.PrimaryPart then return end
+    local origin = getBuildOriginCFrame()
+    ghostModel:SetPrimaryPartCFrame(origin)
 end
 --========================================================--
 -- PREVIEW TAB CONTENT (CLEAN + WORKING)
@@ -333,70 +332,6 @@ previewInfo.TextColor3 = Color3.fromRGB(180,180,180)
 previewInfo.Text = "Enter model ID to enable preview"
 
 --========================================================--
--- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
---========================================================--
-
--- Make preview tab scrollable
-local previewScroll = Instance.new("ScrollingFrame", previewPage)
-previewScroll.Size = UDim2.new(1, -20, 1, -110)
-previewScroll.Position = UDim2.new(0, 10, 0, 100)
-previewScroll.CanvasSize = UDim2.new(0, 0, 0, 600)
-previewScroll.ScrollBarThickness = 4
-previewScroll.BackgroundTransparency = 1
-
-local previewLayout = Instance.new("UIListLayout", previewScroll)
-previewLayout.Padding = UDim.new(0, 8)
-previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-
--- SECTION TITLE
-local rotTitle = Instance.new("TextLabel", previewScroll)
-rotTitle.Size = UDim2.new(1, 0, 0, 20)
-rotTitle.BackgroundTransparency = 1
-rotTitle.Font = Enum.Font.GothamBold
-rotTitle.TextSize = 15
-rotTitle.TextColor3 = Color3.fromRGB(220,220,220)
-rotTitle.Text = "Rotation Controls"
-
-
--- ROTATION INCREMENT
-local rotIncBox = Instance.new("TextBox", previewScroll)
-rotIncBox.Size = UDim2.new(0, 120, 0, 28)
-rotIncBox.PlaceholderText = "Rotation Increment"
-rotIncBox.Font = Enum.Font.Gotham
-rotIncBox.TextSize = 14
-rotIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
-rotIncBox.TextColor3 = Color3.fromRGB(240,240,240)
-Instance.new("UICorner", rotIncBox).CornerRadius = UDim.new(0, 6)
-
-
--- ROTATION BUTTONS
-local function makeButton(text)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0, 90, 0, 32)
-    b.BackgroundColor3 = Color3.fromRGB(45,45,50)
-    b.TextColor3 = Color3.fromRGB(230,230,230)
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 14
-    b.Text = text
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    return b
-end
-
-local rotX = makeButton("Rotate X")
-rotX.Parent = previewScroll
-
-local rotY = makeButton("Rotate Y")
-rotY.Parent = previewScroll
-
-local rotZ = makeButton("Rotate Z")
-rotZ.Parent = previewScroll
-
-
---========================================================--
--- MOVE CONTROLS
---========================================================--
-
 --========================================================--
 -- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
 --========================================================--
@@ -988,7 +923,9 @@ end
 --========================================================--
 
 buildBtn.MouseButton1Click:Connect(function()
-    if cancelBuild then cancelBuild = false end
+    if cancelBuild then
+        cancelBuild = false
+    end
 
     local id = tonumber(idBox.Text)
     if not id then
@@ -999,6 +936,9 @@ buildBtn.MouseButton1Click:Connect(function()
     statusLabel.Text = "Starting..."
     task.spawn(function()
         buildModelSimple(id)
-        if previewEnabled then destroyGhost() end
+        if previewEnabled then
+            destroyGhost()
+        end
     end)
 end)
+
