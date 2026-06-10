@@ -332,6 +332,122 @@ previewInfo.TextSize = 13
 previewInfo.TextColor3 = Color3.fromRGB(180,180,180)
 previewInfo.Text = "Enter model ID to enable preview"
 
+--========================================================--
+-- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
+--========================================================--
+
+-- Make preview tab scrollable
+local previewScroll = Instance.new("ScrollingFrame", previewPage)
+previewScroll.Size = UDim2.new(1, -20, 1, -110)
+previewScroll.Position = UDim2.new(0, 10, 0, 100)
+previewScroll.CanvasSize = UDim2.new(0, 0, 0, 600)
+previewScroll.ScrollBarThickness = 4
+previewScroll.BackgroundTransparency = 1
+
+local previewLayout = Instance.new("UIListLayout", previewScroll)
+previewLayout.Padding = UDim.new(0, 8)
+previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+
+-- SECTION TITLE
+local rotTitle = Instance.new("TextLabel", previewScroll)
+rotTitle.Size = UDim2.new(1, 0, 0, 20)
+rotTitle.BackgroundTransparency = 1
+rotTitle.Font = Enum.Font.GothamBold
+rotTitle.TextSize = 15
+rotTitle.TextColor3 = Color3.fromRGB(220,220,220)
+rotTitle.Text = "Rotation Controls"
+
+
+-- ROTATION INCREMENT
+local rotIncBox = Instance.new("TextBox", previewScroll)
+rotIncBox.Size = UDim2.new(0, 120, 0, 28)
+rotIncBox.PlaceholderText = "Rotation Increment"
+rotIncBox.Font = Enum.Font.Gotham
+rotIncBox.TextSize = 14
+rotIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+rotIncBox.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", rotIncBox).CornerRadius = UDim.new(0, 6)
+
+
+-- ROTATION BUTTONS
+local function makeButton(text)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 90, 0, 32)
+    b.BackgroundColor3 = Color3.fromRGB(45,45,50)
+    b.TextColor3 = Color3.fromRGB(230,230,230)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    b.Text = text
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    return b
+end
+
+local rotX = makeButton("Rotate X")
+rotX.Parent = previewScroll
+
+local rotY = makeButton("Rotate Y")
+rotY.Parent = previewScroll
+
+local rotZ = makeButton("Rotate Z")
+rotZ.Parent = previewScroll
+
+
+--========================================================--
+-- MOVE CONTROLS
+--========================================================--
+
+local moveTitle = Instance.new("TextLabel", previewScroll)
+moveTitle.Size = UDim2.new(1, 0, 0, 20)
+moveTitle.BackgroundTransparency = 1
+moveTitle.Font = Enum.Font.GothamBold
+moveTitle.TextSize = 15
+moveTitle.TextColor3 = Color3.fromRGB(220,220,220)
+moveTitle.Text = "Move Controls"
+
+local moveIncBox = Instance.new("TextBox", previewScroll)
+moveIncBox.Size = UDim2.new(0, 120, 0, 28)
+moveIncBox.PlaceholderText = "Move Increment"
+moveIncBox.Font = Enum.Font.Gotham
+moveIncBox.TextSize = 14
+moveIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+moveIncBox.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", moveIncBox).CornerRadius = UDim.new(0, 6)
+
+local moveX = makeButton("Move X")
+moveX.Parent = previewScroll
+
+local moveY = makeButton("Move Y")
+moveY.Parent = previewScroll
+
+local moveZ = makeButton("Move Z")
+moveZ.Parent = previewScroll
+
+
+--========================================================--
+-- SIZE CONTROLS
+--========================================================--
+
+local sizeTitle = Instance.new("TextLabel", previewScroll)
+sizeTitle.Size = UDim2.new(1, 0, 0, 20)
+sizeTitle.BackgroundTransparency = 1
+sizeTitle.Font = Enum.Font.GothamBold
+sizeTitle.TextSize = 15
+sizeTitle.TextColor3 = Color3.fromRGB(220,220,220)
+sizeTitle.Text = "Size Controls"
+
+local sizeIncBox = Instance.new("TextBox", previewScroll)
+sizeIncBox.Size = UDim2.new(0, 120, 0, 28)
+sizeIncBox.PlaceholderText = "Scale Increment"
+sizeIncBox.Font = Enum.Font.Gotham
+sizeIncBox.TextSize = 14
+sizeIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+sizeIncBox.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", sizeIncBox).CornerRadius = UDim.new(0, 6)
+
+local sizeBtn = makeButton("Scale Model")
+sizeBtn.Parent = previewScroll
+
 -- UPDATE UI
 local function refreshPreviewUI()
     if not tonumber(idBox.Text) then
