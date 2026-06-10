@@ -486,27 +486,42 @@ if not ok or not arr or #arr == 0 then
 
     local model = arr[1]
 
+-- Convert Folder → Model if needed
+if not model:IsA("Model") then
+    local newModel = Instance.new("Model")
+    newModel.Name = model.Name
 
-    if not model.PrimaryPart then
-        for _, v in ipairs(model:GetDescendants()) do
-            if v:IsA("BasePart") then
-                model.PrimaryPart = v
-                break
-            end
-        end
-        if not model.PrimaryPart then
-            statusLabel.Text = "Model has no parts."
-            model:Destroy()
-            return
-        end
+    for _, obj in ipairs(model:GetChildren()) do
+        obj.Parent = newModel
     end
 
-    local partsFolder = getPartsFolder()
-    if not partsFolder then
-        statusLabel.Text = "Parts folder not found."
-        model:Destroy()
-        return
+    model:Destroy()
+    model = newModel
+end
+
+-- Ensure PrimaryPart exists
+if not model.PrimaryPart then
+    for _, v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then
+            model.PrimaryPart = v
+            break
+        end
     end
+end
+
+if not model.PrimaryPart then
+    statusLabel.Text = "Model has no parts."
+    model:Destroy()
+    return
+end
+
+local partsFolder = getPartsFolder()
+if not partsFolder then
+    statusLabel.Text = "Parts folder not found."
+    model:Destroy()
+    return
+end
+
     
 local function detectShape(part)
     -- Ignore ghost parts
