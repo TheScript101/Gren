@@ -671,6 +671,14 @@ cancelBtn.MouseButton1Click:Connect(function()
     destroyGhost()
 end)
 
+-- Build preview parts list ONCE
+local previewParts = {}
+for _, p in ipairs(ghostModel:GetDescendants()) do
+    if p:IsA("BasePart") then
+        table.insert(previewParts, p)
+    end
+end
+
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
 --========================================================--
@@ -817,14 +825,6 @@ for i, src in ipairs(sourceParts) do
 
     -- Show REAL progress
     statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
-
--- Match preview part by index instead of name
-local previewParts = {}
-for _, p in ipairs(ghostModel:GetDescendants()) do
-    if p:IsA("BasePart") then
-        table.insert(previewParts, p)
-    end
-end
 
 local previewPart = previewParts[i]  -- i = index in the build loop
 local partCF = previewPart and previewPart.CFrame or src.CFrame
