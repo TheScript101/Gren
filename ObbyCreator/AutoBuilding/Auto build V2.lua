@@ -809,7 +809,7 @@ local primaryCF = model.PrimaryPart.CFrame
 
     local placedCount = 0
 
-for _, src in ipairs(sourceParts) do
+for i, src in ipairs(sourceParts) do
     if cancelBuild then
         statusLabel.Text = "Cancelled"
         break
@@ -818,7 +818,15 @@ for _, src in ipairs(sourceParts) do
     -- Show REAL progress
     statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
-    local previewPart = ghostModel:FindFirstChild(src.Name, true)
+-- Match preview part by index instead of name
+local previewParts = {}
+for _, p in ipairs(ghostModel:GetDescendants()) do
+    if p:IsA("BasePart") then
+        table.insert(previewParts, p)
+    end
+end
+
+local previewPart = previewParts[i]  -- i = index in the build loop
 local partCF = previewPart and previewPart.CFrame or src.CFrame
 
 local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
@@ -880,7 +888,7 @@ end)
 
     -- Move/resize the part
 -- Match the preview's scaled size
-local previewPart = ghostModel:FindFirstChild(src.Name, true)
+local previewPart = previewParts[i]
 local finalSize = previewPart and previewPart.Size or src.Size
 
 local argsMove = {
