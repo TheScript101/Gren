@@ -354,6 +354,8 @@ local function refreshPreviewUI()
     end
 end
 
+refreshPreviewUI()
+
 -- TOGGLE CLICK
 --========================================================--
 -- LIVE PREVIEW MODEL LOADER
