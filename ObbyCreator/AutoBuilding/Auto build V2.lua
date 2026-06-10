@@ -274,13 +274,14 @@ local function createGhost(model)
 
     -- Make ghost transparent + anchored
     for _, p in ipairs(ghostModel:GetDescendants()) do
-        if p:IsA("BasePart") then
-            p.Transparency = 0.01
-            p.Material = Enum.Material.ForceField
-            p.CanCollide = false
-            p.Anchored = true
-        end
+    if p:IsA("BasePart") then
+        p.Transparency = 0.4
+        p.Material = Enum.Material.Plastic  -- now allowed
+        p.CanCollide = false
+        p.Anchored = true
+        p:SetAttribute("IsGhost", true)     -- IMPORTANT
     end
+end
 
     return ghostModel
 end
@@ -509,9 +510,9 @@ if not ok or not arr or #arr == 0 then
     
 local function detectShape(part)
     -- Ignore ghost parts
-    if part.Material == Enum.Material.ForceField then
-        return nil
-    end
+if part:GetAttribute("IsGhost") == true then
+    return nil
+end
 
     -- 1) Primary Part.Shape
     if part:IsA("Part") then
