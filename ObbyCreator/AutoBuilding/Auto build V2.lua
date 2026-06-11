@@ -137,7 +137,7 @@ end
 
 local buildTabBtn = createTabButton("Build")
 local previewTabBtn = createTabButton("Preview")
-local settingsTabBtn = createTabButton("Settings")
+local loadingTabBtn = createTabButton("Loading")
 
 tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     tabScroll.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 10, 0, 0)
@@ -158,18 +158,18 @@ end
 
 local buildPage = createTabPage()
 local previewPage = createTabPage()
-local settingsPage = createTabPage()
+local loadingPage = createTabPage()
 
 local function showTab(tab)
     buildPage.Visible = false
     previewPage.Visible = false
-    settingsPage.Visible = false
+    loadingPage.Visible = false
     tab.Visible = true
 end
 
 buildTabBtn.MouseButton1Click:Connect(function() showTab(buildPage) end)
 previewTabBtn.MouseButton1Click:Connect(function() showTab(previewPage) end)
-settingsTabBtn.MouseButton1Click:Connect(function() showTab(settingsPage) end)
+loadingTabBtn.MouseButton1Click:Connect(function() showTab(loadingPage) end)
 
 showTab(buildPage)
 
@@ -594,6 +594,87 @@ idBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 --========================================================--
+-- LOADING TAB CONTENT
+--========================================================--
+
+local loadingLabel = Instance.new("TextLabel", loadingPage)
+loadingLabel.Size = UDim2.new(1, -20, 0, 20)
+loadingLabel.Position = UDim2.new(0, 10, 0, 0)
+loadingLabel.BackgroundTransparency = 1
+loadingLabel.Font = Enum.Font.GothamBold
+loadingLabel.TextSize = 15
+loadingLabel.TextColor3 = Color3.fromRGB(220,220,220)
+loadingLabel.Text = "Load Another Player's Build"
+
+-- DROPDOWN BUTTON
+local dropdown = Instance.new("TextButton", loadingPage)
+dropdown.Size = UDim2.new(1, -20, 0, 32)
+dropdown.Position = UDim2.new(0, 10, 0, 30)
+dropdown.BackgroundColor3 = Color3.fromRGB(45,45,50)
+dropdown.TextColor3 = Color3.fromRGB(230,230,230)
+dropdown.Font = Enum.Font.GothamBold
+dropdown.TextSize = 14
+dropdown.Text = "Select Obby"
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
+
+-- DROPDOWN LIST
+local dropdownList = Instance.new("Frame", loadingPage)
+dropdownList.Size = UDim2.new(1, -20, 0, 150)
+dropdownList.Position = UDim2.new(0, 10, 0, 70)
+dropdownList.BackgroundColor3 = Color3.fromRGB(35,35,40)
+dropdownList.Visible = false
+Instance.new("UICorner", dropdownList).CornerRadius = UDim.new(0, 6)
+
+local listLayout = Instance.new("UIListLayout", dropdownList)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 4)
+
+-- LOAD BUTTON
+local loadBtn = Instance.new("TextButton", loadingPage)
+loadBtn.Size = UDim2.new(1, -20, 0, 36)
+loadBtn.Position = UDim2.new(0, 10, 0, 230)
+loadBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
+loadBtn.TextColor3 = Color3.fromRGB(255,255,255)
+loadBtn.Font = Enum.Font.GothamBold
+loadBtn.TextSize = 15
+loadBtn.Text = "Load Build"
+Instance.new("UICorner", loadBtn).CornerRadius = UDim.new(0, 6)
+
+local selectedObby = nil
+
+local function refreshObbyList()
+    dropdownList:ClearAllChildren()
+
+    local obbies = workspace:FindFirstChild("Obbies")
+    if not obbies then return end
+
+    for _, obby in ipairs(obbies:GetChildren()) do
+        if obby:IsA("Folder") or obby:IsA("Model") then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 28)
+            btn.BackgroundColor3 = Color3.fromRGB(50,50,55)
+            btn.TextColor3 = Color3.fromRGB(230,230,230)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            btn.Text = obby.Name
+            btn.Parent = dropdownList
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+            btn.MouseButton1Click:Connect(function()
+                selectedObby = obby.Name
+                dropdown.Text = "Selected: " .. obby.Name
+                dropdownList.Visible = false
+            end)
+        end
+    end
+end
+
+dropdown.MouseButton1Click:Connect(function()
+    dropdownList.Visible = not dropdownList.Visible
+    refreshObbyList()
+end)
+
+--========================================================--
 -- SETTINGS TAB CONTENT
 --========================================================--
 
@@ -626,6 +707,25 @@ cancelBtn.MouseButton1Click:Connect(function()
     previewEnabled = false
     refreshPreviewUI()
 end)
+
+local function detectSpecialShape(part)
+    local special = {
+        ["3 Point Pyramid"] = "3 Point Pyramid",
+        ["Cone"] = "Cone",
+        ["Half Ball"] = "Half Ball",
+        ["Half Cylinder"] = "Half Cylinder",
+        ["Half Hollow Cylinder"] = "Half Hollow Cylinder",
+        ["Head"] = "Head",
+        ["Hole"] = "Hole",
+        ["Hollow Cylinder"] = "Hollow Cylinder",
+        ["Pyramid"] = "Pyramid",
+        ["Ramp"] = "Ramp",
+        ["Star"] = "Star",
+        ["Torus"] = "Torus"
+    }
+
+    return special[part.Name]
+end
 
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
@@ -859,6 +959,83 @@ local function buildModelSimple(assetId)
 
     model:Destroy()
 end
+
+loadBtn.MouseButton1Click:Connect(function()
+    if not selectedObby then
+        statusLabel.Text = "Select an obby first"
+        return
+    end
+
+    local obby = workspace.Obbies:FindFirstChild(selectedObby)
+    if not obby then
+        statusLabel.Text = "Obby not found"
+        return
+    end
+
+    local srcPartsFolder = obby:FindFirstChild("Items") and obby.Items:FindFirstChild("Parts")
+    if not srcPartsFolder then
+        statusLabel.Text = "No parts found in obby"
+        return
+    end
+
+    local myPartsFolder = getPartsFolder()
+    if not myPartsFolder then
+        statusLabel.Text = "Your plot not found"
+        return
+    end
+
+    statusLabel.Text = "Loading build..."
+
+    -- REBASE OFFSET
+    local myOrigin = myPartsFolder.Parent.Parent.PrimaryPart and myPartsFolder.Parent.Parent.PrimaryPart.CFrame or CFrame.new()
+    local srcOrigin = srcPartsFolder:GetChildren()[1] and srcPartsFolder:GetChildren()[1].CFrame or CFrame.new()
+    local offset = myOrigin * srcOrigin:Inverse()
+
+    task.spawn(function()
+        for _, src in ipairs(srcPartsFolder:GetChildren()) do
+            if src:IsA("BasePart") then
+
+                local shape = detectSpecialShape(src)
+                if not shape then
+                    shape = "Part"
+                end
+
+                local targetCF = offset * src.CFrame
+                local size = src.Size
+
+                -- Create part
+                pcall(function()
+                    AddObjectRemote:FireServer(shape, targetCF)
+                end)
+
+                task.wait(1)
+
+                -- Find new part
+                local newPart = myPartsFolder:GetChildren()[#myPartsFolder:GetChildren()]
+
+                -- Move + resize
+                pcall(function()
+                    MoveObjectRemote:InvokeServer({{newPart, targetCF, size}})
+                end)
+
+                -- Apply color
+                pcall(function()
+                    Events.PaintObject:InvokeServer({newPart}, "Color", src.Color)
+                end)
+
+                -- Apply material
+                pcall(function()
+                    Events.PaintObject:InvokeServer({newPart}, "Material", tostring(src.Material))
+                end)
+
+                task.wait(1)
+            end
+        end
+
+        statusLabel.Text = "Build Loaded!"
+    end)
+end)
+
 
 --========================================================--
 -- BUTTON BIND
