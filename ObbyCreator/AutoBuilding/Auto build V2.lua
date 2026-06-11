@@ -751,6 +751,30 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
+    -- Get ALL folders inside Items (Parts, Conveyors, Timed Parts, Quiz Parts, etc.)
+    local function getAllPlayerParts()
+        local items = partsFolder.Parent
+        local all = {}
+        for _, folder in ipairs(items:GetChildren()) do
+            for _, obj in ipairs(folder:GetChildren()) do
+                all[obj] = true
+            end
+        end
+        return all
+    end
+
+    local function findNewPart(before)
+        local items = partsFolder.Parent
+        for _, folder in ipairs(items:GetChildren()) do
+            for _, obj in ipairs(folder:GetChildren()) do
+                if not before[obj] then
+                    return obj
+                end
+            end
+        end
+        return nil
+    end
+
     task.spawn(function()
         for index, data in ipairs(savedBuild) do
             if cancelLoad then
@@ -765,45 +789,38 @@ loadBtn.MouseButton1Click:Connect(function()
             local materialName = data.Material
             local behaviors = data.Behaviors or {}
 
-            -- BEFORE list
-            local before = {}
-            for _, p in ipairs(partsFolder:GetChildren()) do
-                before[p] = true
-            end
+            -- BEFORE list (ALL folders)
+            local before = getAllPlayerParts()
 
-            -- Spawn new part (1-second rate limit)
-            local okAdd, errAdd = pcall(function()
+            -- Spawn new part
+            local okAdd = pcall(function()
                 AddObjectRemote:InvokeServer(shape, cf)
             end)
 
             if not okAdd then
-                warn("AddObject failed:", errAdd)
+                warn("AddObject failed for index", index)
                 continue
             end
 
-            -- Wait for new part (FAST)
+            -- Wait for new part (universal detection)
             local newPart = nil
-            local timeout = os.clock() + 1
+            local timeout = os.clock() + 1.2
 
             repeat
-                task.wait(0.02)
-                for _, p in ipairs(partsFolder:GetChildren()) do
-                    if not before[p] then
-                        newPart = p
-                        break
-                    end
-                end
+                task.wait(0.03)
+                newPart = findNewPart(before)
             until newPart or os.clock() > timeout or cancelLoad
 
             if cancelLoad then break end
+
             if not newPart then
-                warn("No new part spawned for index", index)
+                warn("Skipping part index", index, "— server did not spawn it in time")
                 continue
             end
 
-            -- Move + resize
+            -- Move + resize (correct format)
             pcall(function()
-                MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+                MoveObjectRemote:InvokeServer(newPart, cf, size)
             end)
 
             -- Color
@@ -811,33 +828,24 @@ loadBtn.MouseButton1Click:Connect(function()
                 Events.PaintObject:InvokeServer({newPart}, "Color", color)
             end)
 
-            -- Material (safe conversion from string)
-            local materialEnum
-            local okMat, result = pcall(function()
-                return Enum.Material[materialName]
-            end)
-            if okMat and result then
-                materialEnum = result
-            else
-                materialEnum = Enum.Material.Plastic
-            end
-
+            -- Material (convert string → Enum)
+            local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
             pcall(function()
                 Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
             end)
 
-            -- Apply behaviors (make sure we pass instances, not tables)
+            -- Behaviors
             for key, value in pairs(behaviors) do
                 pcall(function()
                     Events.BehaviourObject:InvokeServer({newPart}, key, value)
                 end)
             end
 
-            -- Update progress label like "3/45"
+            -- Progress
             loadedCount += 1
             loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
 
-            -- Respect ~1 second server limit
+            -- Respect server rate limit
             task.wait(1.0)
         end
 
