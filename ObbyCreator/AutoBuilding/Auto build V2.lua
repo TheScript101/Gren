@@ -653,7 +653,7 @@ end)
 
             -- Wait for new part to appear
             local newPart = nil
-            local timeout = os.clock() + 3
+            local timeout = os.clock() + 1
 
             repeat
                 task.wait(0.05)
