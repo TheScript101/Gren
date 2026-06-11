@@ -570,6 +570,50 @@ end
 
 refreshPreviewUI()
 
+-- FUNCTION TO DETECT SHAPE
+    local function detectShape(part)
+        if part:GetAttribute("IsGhost") == true then
+            return nil
+        end
+
+        if part:IsA("Part") then
+            local shape = part.Shape
+            if shape == Enum.PartType.Ball then return "Ball" end
+            if shape == Enum.PartType.Cylinder then return "Cylinder" end
+            if shape == Enum.PartType.Wedge then return "Wedge" end
+            return "Part"
+        end
+
+        if part:IsA("WedgePart") then return "Wedge" end
+        if part:IsA("CornerWedgePart") then return "CornerWedge" end
+        if part:IsA("TrussPart") then return "Truss" end
+
+        if part:IsA("MeshPart") then
+            local meshType = part.MeshType
+            if meshType == Enum.MeshType.Wedge then return "Wedge" end
+            if meshType == Enum.MeshType.Sphere then return "Ball" end
+            if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
+        end
+
+        if part:IsA("MeshPart") then
+            local id = part.MeshId:lower()
+            if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
+            if id:find("cyl") or id:find("tube") then return "Cylinder" end
+            if id:find("ball") or id:find("sphere") then return "Ball" end
+        end
+
+        local name = part.Name:lower()
+        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
+        if name:find("cyl") or name:find("tube") then return "Cylinder" end
+        if name:find("ball") or name:find("sphere") then return "Ball" end
+
+        if part:IsA("UnionOperation") then
+            if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
+        end
+
+        return "Part"
+    end
+
 --========================================================--
 -- ROTATION / MOVE / SCALE LOGIC (OFFSET-BASED)
 --========================================================--
@@ -945,49 +989,6 @@ local function buildModelSimple(assetId)
         statusLabel.Text = "Parts folder not found."
         model:Destroy()
         return
-    end
-
-    local function detectShape(part)
-        if part:GetAttribute("IsGhost") == true then
-            return nil
-        end
-
-        if part:IsA("Part") then
-            local shape = part.Shape
-            if shape == Enum.PartType.Ball then return "Ball" end
-            if shape == Enum.PartType.Cylinder then return "Cylinder" end
-            if shape == Enum.PartType.Wedge then return "Wedge" end
-            return "Part"
-        end
-
-        if part:IsA("WedgePart") then return "Wedge" end
-        if part:IsA("CornerWedgePart") then return "CornerWedge" end
-        if part:IsA("TrussPart") then return "Truss" end
-
-        if part:IsA("MeshPart") then
-            local meshType = part.MeshType
-            if meshType == Enum.MeshType.Wedge then return "Wedge" end
-            if meshType == Enum.MeshType.Sphere then return "Ball" end
-            if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
-        end
-
-        if part:IsA("MeshPart") then
-            local id = part.MeshId:lower()
-            if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
-            if id:find("cyl") or id:find("tube") then return "Cylinder" end
-            if id:find("ball") or id:find("sphere") then return "Ball" end
-        end
-
-        local name = part.Name:lower()
-        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-        if name:find("cyl") or name:find("tube") then return "Cylinder" end
-        if name:find("ball") or name:find("sphere") then return "Ball" end
-
-        if part:IsA("UnionOperation") then
-            if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-        end
-
-        return "Part"
     end
 
     -- Build origin: if preview exists, use ghost position; else default
