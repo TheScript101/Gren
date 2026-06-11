@@ -701,7 +701,7 @@ saveBtn.MouseButton1Click:Connect(function()
     Size = p.Size,
     CFrame = p.CFrame,
     Color = p.Color,
-    Material = tostring(p.Material),
+    Material = p.Material.Name,
     Behaviors = extractBehaviors(p)
 })
         end
@@ -776,13 +776,13 @@ loadBtn.MouseButton1Click:Connect(function()
             if not newPart then continue end
 
             -- Move + resize
-            MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+            MoveObjectRemote:InvokeServer(newPart, cf, size)
 
             -- Color
             Events.PaintObject:InvokeServer({newPart}, "Color", color)
 
             -- Material
-            Events.PaintObject:InvokeServer({newPart}, "Material", material)
+            Events.PaintObject:InvokeServer({newPart}, "Material", Enum.Material[material])
 
             -- Behaviors
             for key, value in pairs(data.Behaviors) do
