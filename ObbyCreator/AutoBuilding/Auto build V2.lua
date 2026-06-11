@@ -751,41 +751,21 @@ saveBtn.MouseButton1Click:Connect(function()
         return
     end
 
-    local parts = partsFolder:GetChildren()
-    if #parts == 0 then
-        statusLabel.Text = "No parts to save"
-        return
-    end
-
+    local items = partsFolder.Parent
     savedBuild = {}
 
-    for _, p in ipairs(parts) do
-    if p:IsA("BasePart") then
-        -- normal part
-        table.insert(savedBuild, {
-            Type = detectPartType(p),
-            Size = p.Size,
-            CFrame = p.CFrame,
-            Color = p.Color,
-            Material = p.Material.Name,
-            Behaviors = extractBehaviors(p)
-        })
-    elseif p:IsA("Model") then
-        -- special part (Conveyor, Timed Part, Quiz Part, etc.)
-        local realPart = p:FindFirstChildWhichIsA("BasePart")
-        if realPart then
+    for _, obj in ipairs(items:GetDescendants()) do
+        if obj:IsA("BasePart") then
             table.insert(savedBuild, {
-                Type = detectPartType(p),
-                Size = realPart.Size,
-                CFrame = realPart.CFrame,
-                Color = realPart.Color,
-                Material = realPart.Material.Name,
-                Behaviors = extractBehaviors(p)
+                Type = detectPartType(obj),
+                Size = obj.Size,
+                CFrame = obj.CFrame,
+                Color = obj.Color,
+                Material = obj.Material.Name,
+                Behaviors = extractBehaviors(obj)
             })
         end
     end
-end
-
 
     statusLabel.Text = "Build Saved!"
 end)
