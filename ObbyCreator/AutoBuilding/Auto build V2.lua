@@ -695,17 +695,32 @@ saveBtn.MouseButton1Click:Connect(function()
     savedBuild = {}
 
     for _, p in ipairs(parts) do
-        if p:IsA("BasePart") then
+    if p:IsA("BasePart") then
+        -- normal part
+        table.insert(savedBuild, {
+            Type = detectPartType(p),
+            Size = p.Size,
+            CFrame = p.CFrame,
+            Color = p.Color,
+            Material = p.Material.Name,
+            Behaviors = extractBehaviors(p)
+        })
+    elseif p:IsA("Model") then
+        -- special part (Conveyor, Timed Part, Quiz Part, etc.)
+        local realPart = p:FindFirstChildWhichIsA("BasePart")
+        if realPart then
             table.insert(savedBuild, {
-    Type = detectPartType(p),
-    Size = p.Size,
-    CFrame = p.CFrame,
-    Color = p.Color,
-    Material = p.Material.Name,
-    Behaviors = extractBehaviors(p)
-})
+                Type = detectPartType(p),
+                Size = realPart.Size,
+                CFrame = realPart.CFrame,
+                Color = realPart.Color,
+                Material = realPart.Material.Name,
+                Behaviors = extractBehaviors(p)
+            })
         end
     end
+end
+
 
     statusLabel.Text = "Build Saved!"
 end)
@@ -737,17 +752,18 @@ loadBtn.MouseButton1Click:Connect(function()
     loadStatus.Text = "0/" .. totalParts
 
     task.spawn(function()
-        for _, data in ipairs(savedBuild) do
+        for index, data in ipairs(savedBuild) do
             if cancelLoad then
                 statusLabel.Text = "Load Cancelled"
                 break
             end
 
-            local shape = data.Type
+            local shape = data.Type or "Part"
             local cf = data.CFrame
             local size = data.Size
             local color = data.Color
-            local material = data.Material
+            local materialName = data.Material
+            local behaviors = data.Behaviors or {}
 
             -- BEFORE list
             local before = {}
@@ -756,14 +772,21 @@ loadBtn.MouseButton1Click:Connect(function()
             end
 
             -- Spawn new part (1-second rate limit)
-            AddObjectRemote:InvokeServer(shape, cf)
+            local okAdd, errAdd = pcall(function()
+                AddObjectRemote:InvokeServer(shape, cf)
+            end)
+
+            if not okAdd then
+                warn("AddObject failed:", errAdd)
+                continue
+            end
 
             -- Wait for new part (FAST)
             local newPart = nil
-            local timeout = os.clock() + 0.5
+            local timeout = os.clock() + 1
 
             repeat
-                task.wait(0.01)
+                task.wait(0.02)
                 for _, p in ipairs(partsFolder:GetChildren()) do
                     if not before[p] then
                         newPart = p
@@ -773,27 +796,49 @@ loadBtn.MouseButton1Click:Connect(function()
             until newPart or os.clock() > timeout or cancelLoad
 
             if cancelLoad then break end
-            if not newPart then continue end
-
-            -- Move + resize
-            MoveObjectRemote:InvokeServer(newPart, cf, size)
-
-            -- Color
-            Events.PaintObject:InvokeServer({newPart}, "Color", color)
-
-            -- Material
-            Events.PaintObject:InvokeServer({newPart}, "Material", Enum.Material[material])
-
-            -- Behaviors
-            for key, value in pairs(data.Behaviors) do
-                Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
+            if not newPart then
+                warn("No new part spawned for index", index)
+                continue
             end
 
-            -- Progress
+            -- Move + resize
+            pcall(function()
+                MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+            end)
+
+            -- Color
+            pcall(function()
+                Events.PaintObject:InvokeServer({newPart}, "Color", color)
+            end)
+
+            -- Material (safe conversion from string)
+            local materialEnum
+            local okMat, result = pcall(function()
+                return Enum.Material[materialName]
+            end)
+            if okMat and result then
+                materialEnum = result
+            else
+                materialEnum = Enum.Material.Plastic
+            end
+
+            pcall(function()
+                Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
+            end)
+
+            -- Apply behaviors (make sure we pass instances, not tables)
+            for key, value in pairs(behaviors) do
+                pcall(function()
+                    Events.BehaviourObject:InvokeServer({newPart}, key, value)
+                end)
+            end
+
+            -- Update progress label like "3/45"
             loadedCount += 1
             loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
 
-            task.wait(1.05)
+            -- Respect ~1 second server limit
+            task.wait(1.0)
         end
 
         if not cancelLoad then
