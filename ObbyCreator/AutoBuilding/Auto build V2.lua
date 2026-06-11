@@ -16,6 +16,7 @@ local MoveObjectRemote = Events:WaitForChild("MoveObject")
 
 local cancelBuild = false
 local savedBuild = nil
+local cancelLoad = false
 
 --========================================================--
 -- GHOST PREVIEW SYSTEM
@@ -472,6 +473,16 @@ loadBtn.TextSize = 15
 loadBtn.Text = "Load Saved Build"
 Instance.new("UICorner", loadBtn).CornerRadius = UDim.new(0, 6)
 
+local cancelLoadBtn = Instance.new("TextButton", loadingPage)
+cancelLoadBtn.Size = UDim2.new(1, -20, 0, 36)
+cancelLoadBtn.Position = UDim2.new(0, 10, 0, 140)
+cancelLoadBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+cancelLoadBtn.TextColor3 = Color3.fromRGB(255,255,255)
+cancelLoadBtn.Font = Enum.Font.GothamBold
+cancelLoadBtn.TextSize = 15
+cancelLoadBtn.Text = "Cancel Loading"
+Instance.new("UICorner", cancelLoadBtn).CornerRadius = UDim.new(0, 6)
+
 --========================================================--
 -- PREVIEW UI UPDATE
 --========================================================--
@@ -594,6 +605,12 @@ saveBtn.MouseButton1Click:Connect(function()
     statusLabel.Text = "Build Saved!"
 end)
 
+-- CANCEL BUTTON
+cancelLoadBtn.MouseButton1Click:Connect(function()
+    cancelLoad = true
+    statusLabel.Text = "Cancelling load..."
+end)
+
 -- LOAD BUTTON
 loadBtn.MouseButton1Click:Connect(function()
     if not savedBuild then
@@ -607,45 +624,71 @@ loadBtn.MouseButton1Click:Connect(function()
         return
     end
 
+    cancelLoad = false
     statusLabel.Text = "Loading saved build..."
 
     task.spawn(function()
         for _, data in ipairs(savedBuild) do
+            if cancelLoad then
+                statusLabel.Text = "Load Cancelled"
+                break
+            end
+
             local shape = data.Shape
             local cf = data.CFrame
             local size = data.Size
             local color = data.Color
             local material = data.Material
 
-            -- Create part
+            -- BEFORE list
+            local before = {}
+            for _, p in ipairs(partsFolder:GetChildren()) do
+                before[p] = true
+            end
+
+            -- Spawn new part
             pcall(function()
                 AddObjectRemote:FireServer(shape, cf)
             end)
 
-            task.wait(1)
+            -- Wait for new part to appear
+            local newPart = nil
+            local timeout = os.clock() + 3
 
-            -- Find new part
-            local newPart = partsFolder:GetChildren()[#partsFolder:GetChildren()]
+            repeat
+                task.wait(0.05)
+                for _, p in ipairs(partsFolder:GetChildren()) do
+                    if not before[p] then
+                        newPart = p
+                        break
+                    end
+                end
+            until newPart or os.clock() > timeout or cancelLoad
+
+            if cancelLoad then break end
+            if not newPart then continue end
 
             -- Move + resize
             pcall(function()
                 MoveObjectRemote:InvokeServer({{newPart, cf, size}})
             end)
 
-            -- Apply color
+            -- Color
             pcall(function()
                 Events.PaintObject:InvokeServer({newPart}, "Color", color)
             end)
 
-            -- Apply material
+            -- Material
             pcall(function()
                 Events.PaintObject:InvokeServer({newPart}, "Material", material)
             end)
 
-            task.wait(1)
+            task.wait(0.1)
         end
 
-        statusLabel.Text = "Build Loaded!"
+        if not cancelLoad then
+            statusLabel.Text = "Build Loaded!"
+        end
     end)
 end)
 
