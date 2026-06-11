@@ -822,27 +822,29 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
-    -- Get ALL player parts across ALL item folders
+    -- UNIVERSAL: capture ALL BaseParts/Models under Items
     local function getAllPlayerParts()
         local items = partsFolder.Parent
         local all = {}
-        for _, folder in ipairs(items:GetChildren()) do
-            for _, obj in ipairs(folder:GetChildren()) do
+
+        for _, obj in ipairs(items:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Model") then
                 all[obj] = true
             end
         end
+
         return all
     end
 
     local function findNewPart(before)
         local items = partsFolder.Parent
-        for _, folder in ipairs(items:GetChildren()) do
-            for _, obj in ipairs(folder:GetChildren()) do
-                if not before[obj] then
-                    return obj
-                end
+
+        for _, obj in ipairs(items:GetDescendants()) do
+            if (obj:IsA("BasePart") or obj:IsA("Model")) and not before[obj] then
+                return obj
             end
         end
+
         return nil
     end
 
@@ -858,10 +860,10 @@ loadBtn.MouseButton1Click:Connect(function()
         local materialName = data.Material
         local behaviors = data.Behaviors or {}
 
-        -- BEFORE list (ALL folders)
+        -- BEFORE snapshot
         local before = getAllPlayerParts()
 
-        -- Spawn new part
+        -- Spawn
         local okAdd = pcall(function()
             AddObjectRemote:InvokeServer(shape, cf)
         end)
@@ -871,7 +873,7 @@ loadBtn.MouseButton1Click:Connect(function()
             return false
         end
 
-        -- Wait for new part (universal detection)
+        -- Detect new part
         local newPart = nil
         local timeout = os.clock() + 1.2
 
@@ -889,7 +891,7 @@ loadBtn.MouseButton1Click:Connect(function()
             return false
         end
 
-        -- Move + resize (correct server format)
+        -- Move + resize
         pcall(function()
             MoveObjectRemote:InvokeServer({{newPart, cf, size}})
         end)
@@ -899,7 +901,7 @@ loadBtn.MouseButton1Click:Connect(function()
             Events.PaintObject:InvokeServer({newPart}, "Color", color)
         end)
 
-        -- Material (string → Enum)
+        -- Material
         local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
         pcall(function()
             Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
@@ -916,14 +918,12 @@ loadBtn.MouseButton1Click:Connect(function()
         loadedCount += 1
         loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
 
-        -- Respect server rate limit
         task.wait(1.0)
-
         return true
     end
 
     task.spawn(function()
-        -- FIRST PASS: everything NOT in buildLast
+        -- PASS 1: everything except build-last
         for index, data in ipairs(savedBuild) do
             if cancelLoad then
                 statusLabel.Text = "Load Cancelled"
@@ -936,7 +936,7 @@ loadBtn.MouseButton1Click:Connect(function()
         end
 
         if not cancelLoad then
-            -- SECOND PASS: build-last parts (Pressure Plate, Button, Button Deactivator)
+            -- PASS 2: build-last (Pressure Plate, Button, Button Deactivator)
             for index, data in ipairs(savedBuild) do
                 if cancelLoad then
                     statusLabel.Text = "Load Cancelled"
