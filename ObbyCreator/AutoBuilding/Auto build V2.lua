@@ -736,87 +736,70 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
-    task.spawn(function()
-        for _, data in ipairs(savedBuild) do
-            if cancelLoad then
-                statusLabel.Text = "Load Cancelled"
-                break
-            end
+task.spawn(function()
+    for _, data in ipairs(savedBuild) do
+        if cancelLoad then
+            statusLabel.Text = "Load Cancelled"
+            break
+        end
 
-            local shape = data.Type
-            local cf = data.CFrame
-            local size = data.Size
-            local color = data.Color
-            local material = data.Material
+        local shape = data.Type
+        local cf = data.CFrame
+        local size = data.Size
+        local color = data.Color
+        local material = data.Material
 
-            -- BEFORE list
-            local before = {}
+        -- BEFORE list
+        local before = {}
+        for _, p in ipairs(partsFolder:GetChildren()) do
+            before[p] = true
+        end
+
+        -- Spawn new part (1-second rate limit)
+        AddObjectRemote:InvokeServer(shape, cf)
+
+        -- Wait for new part (FAST)
+        local newPart = nil
+        local timeout = os.clock() + 0.5
+
+        repeat
+            task.wait(0.01)
             for _, p in ipairs(partsFolder:GetChildren()) do
-                before[p] = true
+                if not before[p] then
+                    newPart = p
+                    break
+                end
             end
+        until newPart or os.clock() > timeout or cancelLoad
 
-            -- Spawn new part (RemoteFunction)
-            pcall(function()
-                AddObjectRemote:InvokeServer(shape, cf)
-            end)
+        if cancelLoad then break end
+        if not newPart then continue end
 
-            -- Wait for new part
-            local newPart = nil
-            local timeout = os.clock() + 1
+        -- Move + resize (single call)
+        MoveObjectRemote:InvokeServer({{newPart, cf, size}})
 
-            repeat
-                task.wait(0.02)
-                for _, p in ipairs(partsFolder:GetChildren()) do
-                    if not before[p] then
-                        newPart = p
-                        break
-                    end
-                end
-            until newPart or os.clock() > timeout or cancelLoad
+        -- Color
+        Events.PaintObject:InvokeServer({newPart}, "Color", color)
 
-            if cancelLoad then break end
-            if not newPart then continue end
+        -- Material
+        Events.PaintObject:InvokeServer({newPart}, "Material", material)
 
-            -- Move + resize (retry-safe)
-            pcall(function()
-                for i = 1, 3 do
-                    MoveObjectRemote:InvokeServer({{newPart, cf, size}})
-                    task.wait(0.05)
-                end
-            end)
-
-            -- Color (retry-safe)
-            pcall(function()
-                for i = 1, 2 do
-                    Events.PaintObject:InvokeServer({newPart}, "Color", color)
-                    task.wait(0.03)
-                end
-            end)
-
-            -- Material (retry-safe)
-            pcall(function()
-                for i = 1, 2 do
-                    Events.PaintObject:InvokeServer({newPart}, "Material", material)
-                    task.wait(0.03)
-                end
-            end)
-
-                    -- Apply behaviors
-for key, value in pairs(data.Behaviors) do
-    pcall(function()
-        Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
-    end)
-end
-
-            -- Update progress
-            loadedCount += 1
-            loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
+        -- Apply behaviors (FAST)
+        for key, value in pairs(data.Behaviors) do
+            Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
         end
 
-        if not cancelLoad then
-            statusLabel.Text = "Build Loaded!"
-        end
-    end)
+        -- Update progress
+        loadedCount += 1
+        loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
+
+        -- Respect 1-second server limit
+        task.wait(1.05)
+    end
+
+    if not cancelLoad then
+        statusLabel.Text = "Build Loaded!"
+    end
 end)
 
 --========================================================--
