@@ -646,10 +646,10 @@ loadBtn.MouseButton1Click:Connect(function()
                 before[p] = true
             end
 
-            -- Spawn new part
-            pcall(function()
-                AddObjectRemote:FireServer(shape, cf)
-            end)
+-- Spawn new part (RemoteFunction)
+pcall(function()
+    AddObjectRemote:InvokeServer(shape, cf)
+end)
 
             -- Wait for new part to appear
             local newPart = nil
