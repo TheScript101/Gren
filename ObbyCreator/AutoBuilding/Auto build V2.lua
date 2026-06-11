@@ -26,6 +26,26 @@ local ghostConnection = nil
 local previewEnabled = false -- controlled by the toggle
 local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player HRP
 
+-- DETECT SPECIAL SHAPE
+local function detectSpecialShape(part)
+    local special = {
+        ["3 Point Pyramid"] = "3 Point Pyramid",
+        ["Cone"] = "Cone",
+        ["Half Ball"] = "Half Ball",
+        ["Half Cylinder"] = "Half Cylinder",
+        ["Half Hollow Cylinder"] = "Half Hollow Cylinder",
+        ["Head"] = "Head",
+        ["Hole"] = "Hole",
+        ["Hollow Cylinder"] = "Hollow Cylinder",
+        ["Pyramid"] = "Pyramid",
+        ["Ramp"] = "Ramp",
+        ["Star"] = "Star",
+        ["Torus"] = "Torus"
+    }
+
+    return special[part.Name]
+end
+
 --========================================================--
 -- PLAYER PARTS FOLDER
 --========================================================--
@@ -747,25 +767,6 @@ cancelBtn.MouseButton1Click:Connect(function()
     previewEnabled = false
     refreshPreviewUI()
 end)
-
-local function detectSpecialShape(part)
-    local special = {
-        ["3 Point Pyramid"] = "3 Point Pyramid",
-        ["Cone"] = "Cone",
-        ["Half Ball"] = "Half Ball",
-        ["Half Cylinder"] = "Half Cylinder",
-        ["Half Hollow Cylinder"] = "Half Hollow Cylinder",
-        ["Head"] = "Head",
-        ["Hole"] = "Hole",
-        ["Hollow Cylinder"] = "Hollow Cylinder",
-        ["Pyramid"] = "Pyramid",
-        ["Ramp"] = "Ramp",
-        ["Star"] = "Star",
-        ["Torus"] = "Torus"
-    }
-
-    return special[part.Name]
-end
 
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
