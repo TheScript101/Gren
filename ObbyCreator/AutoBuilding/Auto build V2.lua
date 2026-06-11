@@ -822,13 +822,15 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
-    -- UNIVERSAL: capture ALL BaseParts/Models under Items
-    local function getAllPlayerParts()
+    --------------------------------------------------------------------
+    -- UNIVERSAL BASEPART‑ONLY SNAPSHOT (executor‑safe)
+    --------------------------------------------------------------------
+    local function getAllParts()
         local items = partsFolder.Parent
         local all = {}
 
         for _, obj in ipairs(items:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("Model") then
+            if obj:IsA("BasePart") then
                 all[obj] = true
             end
         end
@@ -840,7 +842,7 @@ loadBtn.MouseButton1Click:Connect(function()
         local items = partsFolder.Parent
 
         for _, obj in ipairs(items:GetDescendants()) do
-            if (obj:IsA("BasePart") or obj:IsA("Model")) and not before[obj] then
+            if obj:IsA("BasePart") and not before[obj] then
                 return obj
             end
         end
@@ -848,10 +850,11 @@ loadBtn.MouseButton1Click:Connect(function()
         return nil
     end
 
+    --------------------------------------------------------------------
+    -- BUILD ONE PART
+    --------------------------------------------------------------------
     local function buildOnePart(index, data)
-        if cancelLoad then
-            return false
-        end
+        if cancelLoad then return false end
 
         local shape = data.Type or "Part"
         local cf = data.CFrame
@@ -860,8 +863,8 @@ loadBtn.MouseButton1Click:Connect(function()
         local materialName = data.Material
         local behaviors = data.Behaviors or {}
 
-        -- BEFORE snapshot
-        local before = getAllPlayerParts()
+        -- Snapshot BEFORE spawn
+        local before = getAllParts()
 
         -- Spawn
         local okAdd = pcall(function()
@@ -873,18 +876,16 @@ loadBtn.MouseButton1Click:Connect(function()
             return false
         end
 
-        -- Detect new part
+        -- Wait for new BasePart
         local newPart = nil
-        local timeout = os.clock() + 1.2
+        local timeout = os.clock() + 2.0 -- extended timeout for executor stability
 
         repeat
-            task.wait(0.03)
+            task.wait(0.02)
             newPart = findNewPart(before)
         until newPart or os.clock() > timeout or cancelLoad
 
-        if cancelLoad then
-            return false
-        end
+        if cancelLoad then return false end
 
         if not newPart then
             warn("Skipping part index", index, "— server did not spawn it in time")
@@ -918,12 +919,15 @@ loadBtn.MouseButton1Click:Connect(function()
         loadedCount += 1
         loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
 
-        task.wait(1.0)
+        task.wait(0.5) -- executor‑safe rate limit
         return true
     end
 
+    --------------------------------------------------------------------
+    -- TWO‑PASS LOADING
+    --------------------------------------------------------------------
     task.spawn(function()
-        -- PASS 1: everything except build-last
+        -- PASS 1: everything except build‑last
         for index, data in ipairs(savedBuild) do
             if cancelLoad then
                 statusLabel.Text = "Load Cancelled"
@@ -935,8 +939,8 @@ loadBtn.MouseButton1Click:Connect(function()
             end
         end
 
+        -- PASS 2: build‑last parts
         if not cancelLoad then
-            -- PASS 2: build-last (Pressure Plate, Button, Button Deactivator)
             for index, data in ipairs(savedBuild) do
                 if cancelLoad then
                     statusLabel.Text = "Load Cancelled"
