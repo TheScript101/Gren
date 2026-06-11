@@ -453,6 +453,15 @@ loadingLabel.TextSize = 15
 loadingLabel.TextColor3 = Color3.fromRGB(220,220,220)
 loadingLabel.Text = "Save / Load Your Build"
 
+local loadStatus = Instance.new("TextLabel", loadingPage)
+loadStatus.Size = UDim2.new(1, -20, 0, 20)
+loadStatus.Position = UDim2.new(0, 10, 0, 20)
+loadStatus.BackgroundTransparency = 1
+loadStatus.Font = Enum.Font.Gotham
+loadStatus.TextSize = 13
+loadStatus.TextColor3 = Color3.fromRGB(180,180,180)
+loadStatus.Text = ""
+
 local saveBtn = Instance.new("TextButton", loadingPage)
 saveBtn.Size = UDim2.new(1, -20, 0, 36)
 saveBtn.Position = UDim2.new(0, 10, 0, 40)
@@ -627,6 +636,10 @@ loadBtn.MouseButton1Click:Connect(function()
     cancelLoad = false
     statusLabel.Text = "Loading saved build..."
 
+    local totalParts = #savedBuild
+    local loadedCount = 0
+    loadStatus.Text = "0/" .. totalParts
+
     task.spawn(function()
         for _, data in ipairs(savedBuild) do
             if cancelLoad then
@@ -646,17 +659,17 @@ loadBtn.MouseButton1Click:Connect(function()
                 before[p] = true
             end
 
--- Spawn new part (RemoteFunction)
-pcall(function()
-    AddObjectRemote:InvokeServer(shape, cf)
-end)
+            -- Spawn new part (RemoteFunction)
+            pcall(function()
+                AddObjectRemote:InvokeServer(shape, cf)
+            end)
 
-            -- Wait for new part to appear
+            -- Wait for new part
             local newPart = nil
             local timeout = os.clock() + 1
 
             repeat
-                task.wait(0.05)
+                task.wait(0.02)
                 for _, p in ipairs(partsFolder:GetChildren()) do
                     if not before[p] then
                         newPart = p
@@ -668,22 +681,33 @@ end)
             if cancelLoad then break end
             if not newPart then continue end
 
-            -- Move + resize
+            -- Move + resize (retry-safe)
             pcall(function()
-                MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+                for i = 1, 3 do
+                    MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+                    task.wait(0.05)
+                end
             end)
 
-            -- Color
+            -- Color (retry-safe)
             pcall(function()
-                Events.PaintObject:InvokeServer({newPart}, "Color", color)
+                for i = 1, 2 do
+                    Events.PaintObject:InvokeServer({newPart}, "Color", color)
+                    task.wait(0.03)
+                end
             end)
 
-            -- Material
+            -- Material (retry-safe)
             pcall(function()
-                Events.PaintObject:InvokeServer({newPart}, "Material", material)
+                for i = 1, 2 do
+                    Events.PaintObject:InvokeServer({newPart}, "Material", material)
+                    task.wait(0.03)
+                end
             end)
 
-            task.wait(0.1)
+            -- Update progress
+            loadedCount += 1
+            loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
         end
 
         if not cancelLoad then
