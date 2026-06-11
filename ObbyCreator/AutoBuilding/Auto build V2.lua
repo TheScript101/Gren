@@ -736,70 +736,70 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
-task.spawn(function()
-    for _, data in ipairs(savedBuild) do
-        if cancelLoad then
-            statusLabel.Text = "Load Cancelled"
-            break
-        end
-
-        local shape = data.Type
-        local cf = data.CFrame
-        local size = data.Size
-        local color = data.Color
-        local material = data.Material
-
-        -- BEFORE list
-        local before = {}
-        for _, p in ipairs(partsFolder:GetChildren()) do
-            before[p] = true
-        end
-
-        -- Spawn new part (1-second rate limit)
-        AddObjectRemote:InvokeServer(shape, cf)
-
-        -- Wait for new part (FAST)
-        local newPart = nil
-        local timeout = os.clock() + 0.5
-
-        repeat
-            task.wait(0.01)
-            for _, p in ipairs(partsFolder:GetChildren()) do
-                if not before[p] then
-                    newPart = p
-                    break
-                end
+    task.spawn(function()
+        for _, data in ipairs(savedBuild) do
+            if cancelLoad then
+                statusLabel.Text = "Load Cancelled"
+                break
             end
-        until newPart or os.clock() > timeout or cancelLoad
 
-        if cancelLoad then break end
-        if not newPart then continue end
+            local shape = data.Type
+            local cf = data.CFrame
+            local size = data.Size
+            local color = data.Color
+            local material = data.Material
 
-        -- Move + resize (single call)
-        MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+            -- BEFORE list
+            local before = {}
+            for _, p in ipairs(partsFolder:GetChildren()) do
+                before[p] = true
+            end
 
-        -- Color
-        Events.PaintObject:InvokeServer({newPart}, "Color", color)
+            -- Spawn new part (1-second rate limit)
+            AddObjectRemote:InvokeServer(shape, cf)
 
-        -- Material
-        Events.PaintObject:InvokeServer({newPart}, "Material", material)
+            -- Wait for new part (FAST)
+            local newPart = nil
+            local timeout = os.clock() + 0.5
 
-        -- Apply behaviors (FAST)
-        for key, value in pairs(data.Behaviors) do
-            Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
+            repeat
+                task.wait(0.01)
+                for _, p in ipairs(partsFolder:GetChildren()) do
+                    if not before[p] then
+                        newPart = p
+                        break
+                    end
+                end
+            until newPart or os.clock() > timeout or cancelLoad
+
+            if cancelLoad then break end
+            if not newPart then continue end
+
+            -- Move + resize
+            MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+
+            -- Color
+            Events.PaintObject:InvokeServer({newPart}, "Color", color)
+
+            -- Material
+            Events.PaintObject:InvokeServer({newPart}, "Material", material)
+
+            -- Behaviors
+            for key, value in pairs(data.Behaviors) do
+                Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
+            end
+
+            -- Progress
+            loadedCount += 1
+            loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
+
+            task.wait(1.05)
         end
 
-        -- Update progress
-        loadedCount += 1
-        loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
-
-        -- Respect 1-second server limit
-        task.wait(1.05)
-    end
-
-    if not cancelLoad then
-        statusLabel.Text = "Build Loaded!"
-    end
+        if not cancelLoad then
+            statusLabel.Text = "Build Loaded!"
+        end
+    end)
 end)
 
 --========================================================--
