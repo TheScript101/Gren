@@ -743,7 +743,7 @@ loadBtn.MouseButton1Click:Connect(function()
                 break
             end
 
-            local shape = data.Shape
+            local shape = data.Type
             local cf = data.CFrame
             local size = data.Size
             local color = data.Color
