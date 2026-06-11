@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -22,6 +23,7 @@ local cancelBuild = false
 local ghostModel = nil
 local ghostConnection = nil
 local previewEnabled = false -- controlled by the toggle
+local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player HRP
 
 --========================================================--
 -- PLAYER PARTS FOLDER
@@ -45,14 +47,6 @@ end
 -- GUI
 --========================================================--
 
---========================================================--
--- GUI (PROFESSIONAL TAB UI)
---========================================================--
-
---========================================================--
--- GUI (MODERN, CENTERED, DRAGGABLE, SCROLLABLE TABS)
---========================================================--
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoBuilderUI"
 screenGui.ResetOnSpawn = false
@@ -62,16 +56,14 @@ screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 380, 0, 280)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- PERFECT CENTER
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
 -- DRAGGABLE WINDOW
 local dragging, dragStart, startPos
-
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
@@ -147,7 +139,6 @@ local buildTabBtn = createTabButton("Build")
 local previewTabBtn = createTabButton("Preview")
 local settingsTabBtn = createTabButton("Settings")
 
--- Auto‑resize scroll area
 tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     tabScroll.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 10, 0, 0)
 end)
@@ -180,8 +171,7 @@ buildTabBtn.MouseButton1Click:Connect(function() showTab(buildPage) end)
 previewTabBtn.MouseButton1Click:Connect(function() showTab(previewPage) end)
 settingsTabBtn.MouseButton1Click:Connect(function() showTab(settingsPage) end)
 
-showTab(buildPage) -- default
-
+showTab(buildPage)
 
 --========================================================--
 -- BUILD TAB CONTENT
@@ -236,7 +226,6 @@ statusLabel.TextColor3 = Color3.fromRGB(200,200,200)
 statusLabel.Text = "Waiting..."
 
 --========================================================--
---========================================================--
 -- HELPERS
 --========================================================--
 
@@ -266,41 +255,43 @@ local function destroyGhost()
     end
 end
 
+local function startGhostFollow()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+        ghostConnection = nil
+    end
+
+    ghostConnection = RunService.RenderStepped:Connect(function()
+        local hrp = Character:FindFirstChild("HumanoidRootPart")
+        if hrp and ghostModel and ghostModel.PrimaryPart then
+            ghostModel:SetPrimaryPartCFrame(hrp.CFrame * ghostOffsetCF)
+        end
+    end)
+end
+
 local function createGhost(model)
     destroyGhost()
 
     ghostModel = model:Clone()
     ghostModel.Parent = workspace
 
-    -- Make ghost transparent + anchored
     for _, p in ipairs(ghostModel:GetDescendants()) do
-    if p:IsA("BasePart") then
-        p.Transparency = 0.4
-        p.Material = Enum.Material.Plastic  -- now allowed
-        p.CanCollide = false
-        p.Anchored = true
-        p:SetAttribute("IsGhost", true)     -- IMPORTANT
+        if p:IsA("BasePart") then
+            p.Transparency = 0.4
+            p.Material = Enum.Material.Plastic
+            p.CanCollide = false
+            p.Anchored = true
+            p:SetAttribute("IsGhost", true)
+        end
     end
-end
 
+    ghostOffsetCF = CFrame.new(0, 0, -5) -- reset offset when new ghost is created
+    startGhostFollow()
     return ghostModel
 end
 
-local function updateGhost()
-    if ghostConnection then
-        ghostConnection:Disconnect()
-        ghostConnection = nil
-    end
-
-    -- Do NOT force ghost to follow player anymore.
-    -- Only set initial spawn position.
-    if ghostModel and ghostModel.PrimaryPart then
-        ghostModel:SetPrimaryPartCFrame(getBuildOriginCFrame())
-    end
-end
-
 --========================================================--
--- PREVIEW TAB CONTENT (CLEAN + WORKING)
+-- PREVIEW TAB CONTENT
 --========================================================--
 
 local previewLabel = Instance.new("TextLabel", previewPage)
@@ -312,7 +303,6 @@ previewLabel.TextSize = 15
 previewLabel.TextColor3 = Color3.fromRGB(220,220,220)
 previewLabel.Text = "Ghost Preview"
 
--- SIMPLE TOGGLE BUTTON
 local previewToggle = Instance.new("TextButton", previewPage)
 previewToggle.Size = UDim2.new(0, 140, 0, 32)
 previewToggle.Position = UDim2.new(0, 10, 0, 30)
@@ -324,7 +314,6 @@ previewToggle.Text = "Preview: OFF"
 previewToggle.AutoButtonColor = false
 Instance.new("UICorner", previewToggle).CornerRadius = UDim.new(0, 8)
 
--- INFO LABEL
 local previewInfo = Instance.new("TextLabel", previewPage)
 previewInfo.Size = UDim2.new(1, -20, 0, 20)
 previewInfo.Position = UDim2.new(0, 10, 0, 70)
@@ -335,15 +324,13 @@ previewInfo.TextColor3 = Color3.fromRGB(180,180,180)
 previewInfo.Text = "Enter model ID to enable preview"
 
 --========================================================--
---========================================================--
 -- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
 --========================================================--
 
--- Make preview tab scrollable (bigger area)
 local previewScroll = Instance.new("ScrollingFrame", previewPage)
 previewScroll.Size = UDim2.new(1, -20, 1, -110)
 previewScroll.Position = UDim2.new(0, 10, 0, 100)
-previewScroll.CanvasSize = UDim2.new(0, 0, 0, 900) -- MUCH bigger
+previewScroll.CanvasSize = UDim2.new(0, 0, 0, 900)
 previewScroll.ScrollBarThickness = 6
 previewScroll.BackgroundTransparency = 1
 
@@ -351,8 +338,6 @@ local previewLayout = Instance.new("UIListLayout", previewScroll)
 previewLayout.Padding = UDim.new(0, 10)
 previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-
--- Helper button creator
 local function makeButton(text)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 120, 0, 32)
@@ -365,38 +350,7 @@ local function makeButton(text)
     return b
 end
 
-
---========================================================--
--- ROTATION CONTROLS
---========================================================--
-
-local rotTitle = Instance.new("TextLabel", previewScroll)
-rotTitle.Size = UDim2.new(1, 0, 0, 20)
-rotTitle.BackgroundTransparency = 1
-rotTitle.Font = Enum.Font.GothamBold
-rotTitle.TextSize = 15
-rotTitle.TextColor3 = Color3.fromRGB(220,220,220)
-rotTitle.Text = "Rotation Controls"
-
-local rotIncBox = Instance.new("TextBox", previewScroll)
-rotIncBox.Size = UDim2.new(0, 120, 0, 28)
-rotIncBox.PlaceholderText = "Rotation Increment"
-rotIncBox.Text = "5" -- DEFAULT
-rotIncBox.Font = Enum.Font.Gotham
-rotIncBox.TextSize = 14
-rotIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
-rotIncBox.TextColor3 = Color3.fromRGB(240,240,240)
-Instance.new("UICorner", rotIncBox).CornerRadius = UDim.new(0, 6)
-
-local rotX = makeButton("Rotate X"); rotX.Parent = previewScroll
-local rotY = makeButton("Rotate Y"); rotY.Parent = previewScroll
-local rotZ = makeButton("Rotate Z"); rotZ.Parent = previewScroll
-
-
---========================================================--
 -- MOVE CONTROLS
---========================================================--
-
 local moveTitle = Instance.new("TextLabel", previewScroll)
 moveTitle.Size = UDim2.new(1, 0, 0, 20)
 moveTitle.BackgroundTransparency = 1
@@ -408,7 +362,7 @@ moveTitle.Text = "Move Controls"
 local moveIncBox = Instance.new("TextBox", previewScroll)
 moveIncBox.Size = UDim2.new(0, 120, 0, 28)
 moveIncBox.PlaceholderText = "Move Increment"
-moveIncBox.Text = "5" -- DEFAULT
+moveIncBox.Text = "5"
 moveIncBox.Font = Enum.Font.Gotham
 moveIncBox.TextSize = 14
 moveIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
@@ -419,11 +373,30 @@ local moveX = makeButton("Move X"); moveX.Parent = previewScroll
 local moveY = makeButton("Move Y"); moveY.Parent = previewScroll
 local moveZ = makeButton("Move Z"); moveZ.Parent = previewScroll
 
+-- ROTATION CONTROLS
+local rotTitle = Instance.new("TextLabel", previewScroll)
+rotTitle.Size = UDim2.new(1, 0, 0, 20)
+rotTitle.BackgroundTransparency = 1
+rotTitle.Font = Enum.Font.GothamBold
+rotTitle.TextSize = 15
+rotTitle.TextColor3 = Color3.fromRGB(220,220,220)
+rotTitle.Text = "Rotation Controls"
 
---========================================================--
+local rotIncBox = Instance.new("TextBox", previewScroll)
+rotIncBox.Size = UDim2.new(0, 120, 0, 28)
+rotIncBox.PlaceholderText = "Rotation Increment"
+rotIncBox.Text = "5"
+rotIncBox.Font = Enum.Font.Gotham
+rotIncBox.TextSize = 14
+rotIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+rotIncBox.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", rotIncBox).CornerRadius = UDim.new(0, 6)
+
+local rotX = makeButton("Rotate X"); rotX.Parent = previewScroll
+local rotY = makeButton("Rotate Y"); rotY.Parent = previewScroll
+local rotZ = makeButton("Rotate Z"); rotZ.Parent = previewScroll
+
 -- SIZE CONTROLS
---========================================================--
-
 local sizeTitle = Instance.new("TextLabel", previewScroll)
 sizeTitle.Size = UDim2.new(1, 0, 0, 20)
 sizeTitle.BackgroundTransparency = 1
@@ -435,7 +408,7 @@ sizeTitle.Text = "Size Controls (Buggy)"
 local sizeIncBox = Instance.new("TextBox", previewScroll)
 sizeIncBox.Size = UDim2.new(0, 120, 0, 28)
 sizeIncBox.PlaceholderText = "Scale Increment"
-sizeIncBox.Text = "1" -- DEFAULT
+sizeIncBox.Text = "1"
 sizeIncBox.Font = Enum.Font.Gotham
 sizeIncBox.TextSize = 14
 sizeIncBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
@@ -445,8 +418,10 @@ Instance.new("UICorner", sizeIncBox).CornerRadius = UDim.new(0, 6)
 local sizeBtn = makeButton("Scale Model")
 sizeBtn.Parent = previewScroll
 
+--========================================================--
+-- PREVIEW UI UPDATE
+--========================================================--
 
--- UPDATE UI
 local function refreshPreviewUI()
     if not tonumber(idBox.Text) then
         previewToggle.BackgroundColor3 = Color3.fromRGB(45,45,50)
@@ -471,7 +446,7 @@ end
 refreshPreviewUI()
 
 --========================================================--
--- ROTATION / MOVE / SCALE LOGIC
+-- ROTATION / MOVE / SCALE LOGIC (OFFSET-BASED)
 --========================================================--
 
 local function getRotInc()
@@ -486,54 +461,40 @@ local function getScaleInc()
     return tonumber(sizeIncBox.Text) or 1
 end
 
-
--- ROTATION
 local function rotateGhost(axis)
     if not ghostModel or not ghostModel.PrimaryPart then return end
     local inc = math.rad(getRotInc())
 
-    local cf = ghostModel.PrimaryPart.CFrame
-
     if axis == "X" then
-        cf = cf * CFrame.Angles(inc, 0, 0)
+        ghostOffsetCF = ghostOffsetCF * CFrame.Angles(inc, 0, 0)
     elseif axis == "Y" then
-        cf = cf * CFrame.Angles(0, inc, 0)
+        ghostOffsetCF = ghostOffsetCF * CFrame.Angles(0, inc, 0)
     elseif axis == "Z" then
-        cf = cf * CFrame.Angles(0, 0, inc)
+        ghostOffsetCF = ghostOffsetCF * CFrame.Angles(0, 0, inc)
     end
-
-    ghostModel:SetPrimaryPartCFrame(cf)
 end
 
 rotX.MouseButton1Click:Connect(function() rotateGhost("X") end)
 rotY.MouseButton1Click:Connect(function() rotateGhost("Y") end)
 rotZ.MouseButton1Click:Connect(function() rotateGhost("Z") end)
 
-
--- MOVE
 local function moveGhost(axis)
     if not ghostModel or not ghostModel.PrimaryPart then return end
     local inc = getMoveInc()
 
-    local cf = ghostModel.PrimaryPart.CFrame
-
     if axis == "X" then
-        cf = cf + Vector3.new(inc, 0, 0)
+        ghostOffsetCF = ghostOffsetCF * CFrame.new(inc, 0, 0)
     elseif axis == "Y" then
-        cf = cf + Vector3.new(0, inc, 0)
+        ghostOffsetCF = ghostOffsetCF * CFrame.new(0, inc, 0)
     elseif axis == "Z" then
-        cf = cf + Vector3.new(0, 0, inc)
+        ghostOffsetCF = ghostOffsetCF * CFrame.new(0, 0, inc)
     end
-
-    ghostModel:SetPrimaryPartCFrame(cf)
 end
 
 moveX.MouseButton1Click:Connect(function() moveGhost("X") end)
 moveY.MouseButton1Click:Connect(function() moveGhost("Y") end)
 moveZ.MouseButton1Click:Connect(function() moveGhost("Z") end)
 
-
--- SCALE
 local function scaleGhost()
     if not ghostModel then return end
     local inc = getScaleInc()
@@ -547,7 +508,6 @@ end
 
 sizeBtn.MouseButton1Click:Connect(scaleGhost)
 
--- TOGGLE CLICK
 --========================================================--
 -- LIVE PREVIEW MODEL LOADER
 --========================================================--
@@ -581,7 +541,6 @@ local function loadPreviewModel()
 
     previewModel = arr[1]
 
-    -- Convert Folder → Model
     if not previewModel:IsA("Model") then
         local newModel = Instance.new("Model")
         newModel.Name = previewModel.Name
@@ -594,7 +553,6 @@ local function loadPreviewModel()
         previewModel = newModel
     end
 
-    -- Ensure PrimaryPart
     if not previewModel.PrimaryPart then
         for _, v in ipairs(previewModel:GetDescendants()) do
             if v:IsA("BasePart") then
@@ -610,11 +568,8 @@ local function loadPreviewModel()
     end
 
     createGhost(previewModel)
-    updateGhost()
 end
 
-
--- When toggle changes
 previewToggle.MouseButton1Click:Connect(function()
     if not tonumber(idBox.Text) then
         previewInfo.Text = "Enter model ID to enable preview"
@@ -631,15 +586,12 @@ previewToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- When ID changes
 idBox:GetPropertyChangedSignal("Text"):Connect(function()
     refreshPreviewUI()
     if previewEnabled then
         loadPreviewModel()
     end
 end)
-
-
 
 --========================================================--
 -- SETTINGS TAB CONTENT
@@ -653,7 +605,6 @@ settingsLabel.Font = Enum.Font.Gotham
 settingsLabel.TextSize = 14
 settingsLabel.TextColor3 = Color3.fromRGB(200,200,200)
 settingsLabel.Text = "Settings coming soon..."
-
 
 local toggleGuiBtn = Instance.new("TextButton", screenGui)
 toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
@@ -672,19 +623,9 @@ cancelBtn.MouseButton1Click:Connect(function()
     cancelBuild = true
     statusLabel.Text = "Cancelling..."
     destroyGhost()
+    previewEnabled = false
+    refreshPreviewUI()
 end)
-
--- Build preview parts list ONCE
-local previewParts = nil
-
-if ghostModel and ghostModel.PrimaryPart then
-    previewParts = {}
-    for _, p in ipairs(ghostModel:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(previewParts, p)
-        end
-    end
-end
 
 --========================================================--
 -- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
@@ -705,7 +646,6 @@ local function buildModelSimple(assetId)
 
     local model = arr[1]
 
-    -- Convert Folder → Model if needed
     if not model:IsA("Model") then
         local newModel = Instance.new("Model")
         newModel.Name = model.Name
@@ -718,7 +658,6 @@ local function buildModelSimple(assetId)
         model = newModel
     end
 
-    -- Ensure PrimaryPart exists
     if not model.PrimaryPart then
         for _, v in ipairs(model:GetDescendants()) do
             if v:IsA("BasePart") then
@@ -742,7 +681,6 @@ local function buildModelSimple(assetId)
     end
 
     local function detectShape(part)
-        -- Ignore ghost parts
         if part:GetAttribute("IsGhost") == true then
             return nil
         end
@@ -785,7 +723,7 @@ local function buildModelSimple(assetId)
         return "Part"
     end
 
-    -- Build where the preview currently is (if it exists), otherwise in front of player
+    -- Build origin: if preview exists, use ghost position; else default
     local buildOriginCF
     if ghostModel and ghostModel.PrimaryPart then
         buildOriginCF = ghostModel.PrimaryPart.CFrame
@@ -795,7 +733,6 @@ local function buildModelSimple(assetId)
 
     local primaryCF = model.PrimaryPart.CFrame
 
-    -- Source parts from original model
     local sourceParts = {}
     for _, p in ipairs(model:GetDescendants()) do
         if p:IsA("BasePart") then
@@ -810,7 +747,7 @@ local function buildModelSimple(assetId)
         return
     end
 
-    -- Build preview parts list ONCE (only if ghost exists)
+    -- Build preview parts list ONCE (if ghost exists)
     local previewParts = nil
     if ghostModel and ghostModel.PrimaryPart then
         previewParts = {}
@@ -832,12 +769,16 @@ local function buildModelSimple(assetId)
 
         statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
-        -- Use preview transform if available, otherwise original
         local previewPart = previewParts and previewParts[i] or nil
-local partCF = previewPart and previewPart.CFrame or src.CFrame
 
-
-        local targetCF = computeTargetCFrame(primaryCF, buildOriginCF, partCF)
+        -- If preview exists, build exactly where the preview part is.
+        -- Otherwise, use original relative placement.
+        local targetCF
+        if previewPart then
+            targetCF = previewPart.CFrame
+        else
+            targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
+        end
 
         local beforeList = partsFolder:GetChildren()
         local beforeCount = #beforeList
@@ -879,14 +820,12 @@ local partCF = previewPart and previewPart.CFrame or src.CFrame
         end
 
         if not newPart then
-            -- rate limit hit, skip counting
             continue
         end
 
         placedCount += 1
         statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
 
-        -- Match preview's scaled size if available
         local finalSize = previewPart and previewPart.Size or src.Size
 
         local argsMove = {
@@ -941,7 +880,8 @@ buildBtn.MouseButton1Click:Connect(function()
         buildModelSimple(id)
         if previewEnabled then
             destroyGhost()
+            previewEnabled = false
+            refreshPreviewUI()
         end
     end)
 end)
-
