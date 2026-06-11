@@ -28,23 +28,74 @@ local previewEnabled = false -- controlled by the toggle
 local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player HRP
 
 -- DETECT SPECIAL SHAPE
-local function detectSpecialShape(part)
-    local special = {
-        ["3 Point Pyramid"] = "3 Point Pyramid",
-        ["Cone"] = "Cone",
-        ["Half Ball"] = "Half Ball",
-        ["Half Cylinder"] = "Half Cylinder",
-        ["Half Hollow Cylinder"] = "Half Hollow Cylinder",
-        ["Head"] = "Head",
-        ["Hole"] = "Hole",
-        ["Hollow Cylinder"] = "Hollow Cylinder",
-        ["Pyramid"] = "Pyramid",
-        ["Ramp"] = "Ramp",
-        ["Star"] = "Star",
-        ["Torus"] = "Torus"
+local function detectPartType(part)
+    local name = part.Name
+
+    -- Special shapes (your original list)
+    local specialShapes = {
+        ["3 Point Pyramid"] = true,
+        ["Cone"] = true,
+        ["Half Ball"] = true,
+        ["Half Cylinder"] = true,
+        ["Half Hollow Cylinder"] = true,
+        ["Head"] = true,
+        ["Hole"] = true,
+        ["Hollow Cylinder"] = true,
+        ["Pyramid"] = true,
+        ["Ramp"] = true,
+        ["Star"] = true,
+        ["Torus"] = true
     }
 
-    return special[part.Name]
+    if specialShapes[name] then
+        return name
+    end
+
+    -- Special functional parts
+    local functional = {
+        ["Lava"] = true,
+        ["Checkpoint"] = true,
+        ["Conveyor"] = true,
+        ["Fading Part"] = true,
+        ["Trip Part"] = true,
+        ["Timed Part"] = true,
+        ["Timed Lava"] = true,
+        ["Speed Pad"] = true,
+        ["Seat"] = true,
+        ["Respawn Part"] = true,
+        ["Reset Part"] = true,
+        ["Quiz Part"] = true,
+        ["Teleport Pad"] = true,
+        ["Jump Pad"] = true,
+        ["Heal Part"] = true,
+        ["Global Properties Part"] = true
+    }
+
+    if functional[name] then
+        return name
+    end
+
+    -- Normal Roblox shapes
+    if part:IsA("Part") then
+        if part.Shape == Enum.PartType.Ball then return "Ball" end
+        if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
+        if part.Shape == Enum.PartType.Wedge then return "Wedge" end
+        return "Part"
+    end
+
+    return "Part"
+end
+
+local function extractBehaviors(part)
+    local behaviors = {}
+
+    for _, child in ipairs(part:GetChildren()) do
+        if child:IsA("BoolValue") or child:IsA("NumberValue") or child:IsA("StringValue") or child:IsA("Vector3Value") then
+            behaviors[child.Name] = child.Value
+        end
+    end
+
+    return behaviors
 end
 
 --========================================================--
@@ -602,12 +653,13 @@ saveBtn.MouseButton1Click:Connect(function()
     for _, p in ipairs(parts) do
         if p:IsA("BasePart") then
             table.insert(savedBuild, {
-                Shape = detectSpecialShape(p) or "Part",
-                Size = p.Size,
-                CFrame = p.CFrame,
-                Color = p.Color,
-                Material = tostring(p.Material)
-            })
+    Type = detectPartType(p),
+    Size = p.Size,
+    CFrame = p.CFrame,
+    Color = p.Color,
+    Material = tostring(p.Material),
+    Behaviors = extractBehaviors(p)
+})
         end
     end
 
@@ -704,6 +756,13 @@ loadBtn.MouseButton1Click:Connect(function()
                     task.wait(0.03)
                 end
             end)
+
+                    -- Apply behaviors
+for key, value in pairs(data.Behaviors) do
+    pcall(function()
+        Events.BehaviourObject:InvokeServer({{newPart}}, key, value)
+    end)
+end
 
             -- Update progress
             loadedCount += 1
