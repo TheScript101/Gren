@@ -25,13 +25,91 @@ local cancelLoad = false
 local ghostModel = nil
 local ghostConnection = nil
 local previewEnabled = false -- controlled by the toggle
-local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player HRP
+local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player 
+
+local specialFunctional = {
+    -- Original special parts
+    ["Lava"] = true,
+    ["Checkpoint"] = true,
+    ["Conveyor"] = true,
+    ["Fading Part"] = true,
+    ["Trip Part"] = true,
+    ["Timed Part"] = true,
+    ["Timed Lava"] = true,
+    ["Speed Pad"] = true,
+    ["Seat"] = true,
+    ["Respawn Part"] = true,
+    ["Reset Part"] = true,
+    ["Quiz Part"] = true,
+    ["Teleport Pad"] = true,
+    ["Jump Pad"] = true,
+    ["Heal Part"] = true,
+    ["Global Properties Part"] = true,
+
+    -- NEW SPECIAL BLOCKS
+    ["Gear Part"] = true,
+    ["Gear Remover"] = true,
+    ["Pressure Plate"] = true,
+    ["Button"] = true,
+    ["Button Deactivator"] = true,
+
+    -- NEW MOVING PARTS
+    ["Push Block"] = true,        -- workspace name
+    ["Lava Push Block"] = true,
+
+    -- NEW MOVING SPECIAL PARTS
+    ["Moving Conveyor"] = true,
+    ["Moving Fading Part"] = true,
+    ["Moving Lava"] = true,
+    ["Moving Timed Part"] = true,
+    ["Moving Trip Part"] = true,
+    ["Moving Part"] = true,
+
+    -- NEW CHARACTER PARTS
+    ["Mannequin"] = true,
+    ["Character Model"] = true,
+
+    -- SPIN PARTS
+    ["Spin Conveyor"] = true,
+    ["Spin Fading Part"] = true,
+    ["Spin Lava"] = true,
+    ["Spin Part"] = true,
+    ["Spin Timed Part"] = true,
+    ["Spin Trip Part"] = true
+}
+
+local function detectRealPushShape(part)
+    local size = part.Size
+
+    -- Ball (all sides equal)
+    if math.abs(size.X - size.Y) < 0.01 and math.abs(size.Y - size.Z) < 0.01 then
+        return "Push Ball"
+    end
+
+    -- Cylinder (X == Z, Y different)
+    if math.abs(size.X - size.Z) < 0.01 and math.abs(size.Y - size.X) > 0.01 then
+        return "Push Cylinder"
+    end
+
+    -- Wedge
+    if part:IsA("WedgePart") then
+        return "Push Wedge"
+    end
+
+    -- Corner Wedge
+    if part:IsA("CornerWedgePart") then
+        return "Push Corner Wedge"
+    end
+
+    -- Default
+    return "Push Block"
+end
 
 -- DETECT SPECIAL SHAPE
 local function detectPartType(part)
     local name = part.Name
 
-    -- Special shapes (your original list)
+    -- Special shapes
     local specialShapes = {
         ["3 Point Pyramid"] = true,
         ["Cone"] = true,
@@ -51,27 +129,13 @@ local function detectPartType(part)
         return name
     end
 
-    -- Special functional parts
-    local functional = {
-        ["Lava"] = true,
-        ["Checkpoint"] = true,
-        ["Conveyor"] = true,
-        ["Fading Part"] = true,
-        ["Trip Part"] = true,
-        ["Timed Part"] = true,
-        ["Timed Lava"] = true,
-        ["Speed Pad"] = true,
-        ["Seat"] = true,
-        ["Respawn Part"] = true,
-        ["Reset Part"] = true,
-        ["Quiz Part"] = true,
-        ["Teleport Pad"] = true,
-        ["Jump Pad"] = true,
-        ["Heal Part"] = true,
-        ["Global Properties Part"] = true
-    }
+    -- Push Block (workspace name) → detect REAL shape
+    if name == "Push Block" then
+        return detectRealPushShape(part)
+    end
 
-    if functional[name] then
+    -- Special functional parts
+    if specialFunctional[name] then
         return name
     end
 
@@ -86,6 +150,7 @@ local function detectPartType(part)
     return "Part"
 end
 
+-- OTHER
 local function extractBehaviors(part)
     local behaviors = {}
 
@@ -732,6 +797,12 @@ cancelLoadBtn.MouseButton1Click:Connect(function()
 end)
 
 -- LOAD BUTTON
+local buildLast = {
+    ["Pressure Plate"] = true,
+    ["Button"] = true,
+    ["Button Deactivator"] = true
+}
+
 loadBtn.MouseButton1Click:Connect(function()
     if not savedBuild then
         statusLabel.Text = "No saved build"
@@ -751,7 +822,7 @@ loadBtn.MouseButton1Click:Connect(function()
     local loadedCount = 0
     loadStatus.Text = "0/" .. totalParts
 
-    -- Get ALL folders inside Items (Parts, Conveyors, Timed Parts, Quiz Parts, etc.)
+    -- Get ALL player parts across ALL item folders
     local function getAllPlayerParts()
         local items = partsFolder.Parent
         local all = {}
@@ -775,79 +846,107 @@ loadBtn.MouseButton1Click:Connect(function()
         return nil
     end
 
+    local function buildOnePart(index, data)
+        if cancelLoad then
+            return false
+        end
+
+        local shape = data.Type or "Part"
+        local cf = data.CFrame
+        local size = data.Size
+        local color = data.Color
+        local materialName = data.Material
+        local behaviors = data.Behaviors or {}
+
+        -- BEFORE list (ALL folders)
+        local before = getAllPlayerParts()
+
+        -- Spawn new part
+        local okAdd = pcall(function()
+            AddObjectRemote:InvokeServer(shape, cf)
+        end)
+
+        if not okAdd then
+            warn("AddObject failed for index", index, "shape:", shape)
+            return false
+        end
+
+        -- Wait for new part (universal detection)
+        local newPart = nil
+        local timeout = os.clock() + 1.2
+
+        repeat
+            task.wait(0.03)
+            newPart = findNewPart(before)
+        until newPart or os.clock() > timeout or cancelLoad
+
+        if cancelLoad then
+            return false
+        end
+
+        if not newPart then
+            warn("Skipping part index", index, "— server did not spawn it in time")
+            return false
+        end
+
+        -- Move + resize (correct server format)
+        pcall(function()
+            MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+        end)
+
+        -- Color
+        pcall(function()
+            Events.PaintObject:InvokeServer({newPart}, "Color", color)
+        end)
+
+        -- Material (string → Enum)
+        local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
+        pcall(function()
+            Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
+        end)
+
+        -- Behaviors
+        for key, value in pairs(behaviors) do
+            pcall(function()
+                Events.BehaviourObject:InvokeServer({newPart}, key, value)
+            end)
+        end
+
+        -- Progress
+        loadedCount += 1
+        loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
+
+        -- Respect server rate limit
+        task.wait(1.0)
+
+        return true
+    end
+
     task.spawn(function()
+        -- FIRST PASS: everything NOT in buildLast
         for index, data in ipairs(savedBuild) do
             if cancelLoad then
                 statusLabel.Text = "Load Cancelled"
                 break
             end
 
-            local shape = data.Type or "Part"
-            local cf = data.CFrame
-            local size = data.Size
-            local color = data.Color
-            local materialName = data.Material
-            local behaviors = data.Behaviors or {}
-
-            -- BEFORE list (ALL folders)
-            local before = getAllPlayerParts()
-
-            -- Spawn new part
-            local okAdd = pcall(function()
-                AddObjectRemote:InvokeServer(shape, cf)
-            end)
-
-            if not okAdd then
-                warn("AddObject failed for index", index)
-                continue
+            if not buildLast[data.Type] then
+                buildOnePart(index, data)
             end
+        end
 
-            -- Wait for new part (universal detection)
-            local newPart = nil
-            local timeout = os.clock() + 1.2
+        if not cancelLoad then
+            -- SECOND PASS: build-last parts (Pressure Plate, Button, Button Deactivator)
+            for index, data in ipairs(savedBuild) do
+                if cancelLoad then
+                    statusLabel.Text = "Load Cancelled"
+                    break
+                end
 
-            repeat
-                task.wait(0.03)
-                newPart = findNewPart(before)
-            until newPart or os.clock() > timeout or cancelLoad
-
-            if cancelLoad then break end
-
-            if not newPart then
-                warn("Skipping part index", index, "— server did not spawn it in time")
-                continue
+                if buildLast[data.Type] then
+                    buildOnePart(index, data)
+                end
             end
-
--- Move + resize (correct server format)
-pcall(function()
-    MoveObjectRemote:InvokeServer({{newPart, cf, size}})
-end)
-
-
-            -- Color
-            pcall(function()
-                Events.PaintObject:InvokeServer({newPart}, "Color", color)
-            end)
-
-            -- Material (convert string → Enum)
-            local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
-            pcall(function()
-                Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
-            end)
-
-            -- Behaviors
-            for key, value in pairs(behaviors) do
-                pcall(function()
-                    Events.BehaviourObject:InvokeServer({newPart}, key, value)
-                end)
-            end
-
-            -- Progress
-            loadedCount += 1
-            loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
-
-            -- Respect server rate limit
-            task.wait(1.0)
         end
 
         if not cancelLoad then
