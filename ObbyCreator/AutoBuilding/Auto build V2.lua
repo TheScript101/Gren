@@ -818,10 +818,11 @@ loadBtn.MouseButton1Click:Connect(function()
                 continue
             end
 
-            -- Move + resize (correct format)
-            pcall(function()
-                MoveObjectRemote:InvokeServer(newPart, cf, size)
-            end)
+-- Move + resize (correct server format)
+pcall(function()
+    MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+end)
+
 
             -- Color
             pcall(function()
