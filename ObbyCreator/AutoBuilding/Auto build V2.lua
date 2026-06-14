@@ -191,19 +191,32 @@ local function isExcludedPart(part)
     return false
 end
 
-local function isValidItemPart(part)
-    if not part:IsA("BasePart") then return false end
-    if isExcludedPart(part) then return false end
+local function isValidItemPart(obj)
+    -- Exclusions
+    if isExcludedPart(obj) then return false end
 
-    local items = getItemsFolder()
-    if not items then return false end
+    -- Accept BaseParts
+    if obj:IsA("BasePart") then
+        -- Must be inside Items
+        local items = getItemsFolder()
+        if not items then return false end
 
-    local parent = part.Parent
-    while parent do
-        if parent == items then
-            return true
+        local parent = obj.Parent
+        while parent do
+            if parent == items then
+                return true
+            end
+            parent = parent.Parent
         end
-        parent = parent.Parent
+        return false
+    end
+
+    -- Accept Models that contain a BasePart
+    if obj:IsA("Model") then
+        local realPart = obj:FindFirstChildWhichIsA("BasePart", true)
+        if realPart then
+            return isValidItemPart(realPart)
+        end
     end
 
     return false
@@ -853,12 +866,19 @@ local function selectPartsInScreenBox(p1, p2)
     if not items then return end
 
     for _, obj in ipairs(items:GetDescendants()) do
-        if obj:IsA("BasePart") and isValidItemPart(obj) then
+        if (obj:IsA("BasePart") or obj:IsA("Model")) and isValidItemPart(obj) then
             local screenPos, onScreen = Camera:WorldToViewportPoint(obj.Position)
             if onScreen then
                 if screenPos.X >= minX and screenPos.X <= maxX and screenPos.Y >= minY and screenPos.Y <= maxY then
-                    selectedParts[obj] = true
-                    addHighlight(obj)
+                    local realPart = obj
+if obj:IsA("Model") then
+    realPart = obj:FindFirstChildWhichIsA("BasePart", true)
+end
+
+if realPart then
+    selectedParts[realPart] = true
+    addHighlight(realPart)
+end
                 end
             end
         end
