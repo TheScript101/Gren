@@ -1,34 +1,42 @@
 --========================================================--
--- SIMPLE AUTO BUILDER (AddObject + MoveObject only)
--- Builds the model 5 studs in front of your character
+-- AUTO BUILDER PRO - FULL REWRITE
 --========================================================--
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Camera = workspace.CurrentCamera
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local AddObjectRemote = Events:WaitForChild("AddObject")
 local MoveObjectRemote = Events:WaitForChild("MoveObject")
 
 local cancelBuild = false
-local savedBuild = nil
 local cancelLoad = false
+local savedBuild = nil
+
+-- selection state
+local selectedParts = {}      -- [BasePart] = true
+local highlights = {}         -- [BasePart] = Highlight
+local multiSelectEnabled = false
+local selectionBoxMode = false
+
+-- long press
+local multiSelectPressStart = nil
+local LONG_PRESS_TIME = 5
+
+-- retry load
+local failedIndices = {}
 
 --========================================================--
--- GHOST PREVIEW SYSTEM
+-- SPECIAL PARTS / TYPE DETECTION
 --========================================================--
-
-local ghostModel = nil
-local ghostConnection = nil
-local previewEnabled = false -- controlled by the toggle
-local ghostOffsetCF = CFrame.new(0, 0, -5) -- offset relative to player 
 
 local specialFunctional = {
-    -- Original special parts
     ["Lava"] = true,
     ["Checkpoint"] = true,
     ["Conveyor"] = true,
@@ -46,18 +54,15 @@ local specialFunctional = {
     ["Heal Part"] = true,
     ["Global Properties Part"] = true,
 
-    -- NEW SPECIAL BLOCKS
     ["Gear Part"] = true,
     ["Gear Remover"] = true,
     ["Pressure Plate"] = true,
     ["Button"] = true,
     ["Button Deactivator"] = true,
 
-    -- NEW MOVING PARTS
-    ["Push Block"] = true,        -- workspace name
+    ["Push Block"] = true,
     ["Lava Push Block"] = true,
 
-    -- NEW MOVING SPECIAL PARTS
     ["Moving Conveyor"] = true,
     ["Moving Fading Part"] = true,
     ["Moving Lava"] = true,
@@ -65,11 +70,9 @@ local specialFunctional = {
     ["Moving Trip Part"] = true,
     ["Moving Part"] = true,
 
-    -- NEW CHARACTER PARTS
     ["Mannequin"] = true,
     ["Character Model"] = true,
 
-    -- SPIN PARTS
     ["Spin Conveyor"] = true,
     ["Spin Fading Part"] = true,
     ["Spin Lava"] = true,
@@ -81,35 +84,28 @@ local specialFunctional = {
 local function detectRealPushShape(part)
     local size = part.Size
 
-    -- Ball (all sides equal)
     if math.abs(size.X - size.Y) < 0.01 and math.abs(size.Y - size.Z) < 0.01 then
         return "Push Ball"
     end
 
-    -- Cylinder (X == Z, Y different)
     if math.abs(size.X - size.Z) < 0.01 and math.abs(size.Y - size.X) > 0.01 then
         return "Push Cylinder"
     end
 
-    -- Wedge
     if part:IsA("WedgePart") then
         return "Push Wedge"
     end
 
-    -- Corner Wedge
     if part:IsA("CornerWedgePart") then
         return "Push Corner Wedge"
     end
 
-    -- Default
     return "Push Block"
 end
 
--- DETECT SPECIAL SHAPE
 local function detectPartType(part)
     local name = part.Name
 
-    -- Special shapes
     local specialShapes = {
         ["3 Point Pyramid"] = true,
         ["Cone"] = true,
@@ -129,17 +125,14 @@ local function detectPartType(part)
         return name
     end
 
-    -- Push Block (workspace name) → detect REAL shape
     if name == "Push Block" then
         return detectRealPushShape(part)
     end
 
-    -- Special functional parts
     if specialFunctional[name] then
         return name
     end
 
-    -- Normal Roblox shapes
     if part:IsA("Part") then
         if part.Shape == Enum.PartType.Ball then return "Ball" end
         if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
@@ -150,39 +143,129 @@ local function detectPartType(part)
     return "Part"
 end
 
--- OTHER
 local function extractBehaviors(part)
     local behaviors = {}
-
     for _, child in ipairs(part:GetChildren()) do
         if child:IsA("BoolValue") or child:IsA("NumberValue") or child:IsA("StringValue") or child:IsA("Vector3Value") then
             behaviors[child.Name] = child.Value
         end
     end
-
     return behaviors
 end
 
 --========================================================--
--- PLAYER PARTS FOLDER
+-- PLAYER ITEMS / EXCLUSIONS
 --========================================================--
 
-local function getPartsFolder()
+local function getItemsFolder()
     local obbies = workspace:FindFirstChild("Obbies")
     if not obbies then return nil end
 
     local playerFolder = obbies:FindFirstChild(LocalPlayer.Name)
     if not playerFolder then return nil end
 
-    local items = playerFolder:FindFirstChild("Items")
-    if not items then return nil end
+    return playerFolder:FindFirstChild("Items")
+end
 
-    local parts = items:FindFirstChild("Parts")
-    return parts
+local function isInMusicZones(part)
+    local parent = part.Parent
+    while parent do
+        if parent.Name == "Music Zones" then
+            return true
+        end
+        parent = parent.Parent
+    end
+    return false
+end
+
+local function isExcludedPart(part)
+    if isInMusicZones(part) then
+        return true
+    end
+
+    local n = part.Name
+    if n == "Music Zone" or n == "Advanced Tools Part" or n == "Music Part" then
+        return true
+    end
+
+    return false
+end
+
+local function isValidItemPart(part)
+    if not part:IsA("BasePart") then return false end
+    if isExcludedPart(part) then return false end
+
+    local items = getItemsFolder()
+    if not items then return false end
+
+    local parent = part.Parent
+    while parent do
+        if parent == items then
+            return true
+        end
+        parent = parent.Parent
+    end
+
+    return false
 end
 
 --========================================================--
--- GUI
+-- GHOST PREVIEW
+--========================================================--
+
+local ghostModel = nil
+local ghostConnection = nil
+local previewEnabled = false
+local ghostOffsetCF = CFrame.new(0, 0, -5)
+
+local function destroyGhost()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+        ghostConnection = nil
+    end
+    if ghostModel then
+        ghostModel:Destroy()
+        ghostModel = nil
+    end
+end
+
+local function startGhostFollow()
+    if ghostConnection then
+        ghostConnection:Disconnect()
+        ghostConnection = nil
+    end
+
+    ghostConnection = RunService.RenderStepped:Connect(function()
+        local hrp = Character:FindFirstChild("HumanoidRootPart")
+        if hrp and ghostModel and ghostModel.PrimaryPart then
+            ghostModel:SetPrimaryPartCFrame(hrp.CFrame * ghostOffsetCF)
+        end
+    end)
+end
+
+local function createGhost(model)
+    destroyGhost()
+
+    ghostModel = model:Clone()
+    ghostModel.Parent = workspace
+
+    for _, p in ipairs(ghostModel:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.Transparency = 0.4
+            p.Material = Enum.Material.Plastic
+            p.CanCollide = false
+            p.Anchored = true
+            p:SetAttribute("IsGhost", true)
+        end
+    end
+
+    ghostOffsetCF = CFrame.new(0, 0, -5)
+    startGhostFollow()
+    return ghostModel
+end
+
+--========================================================--
+-- GUI SETUP
 --========================================================--
 
 local screenGui = Instance.new("ScreenGui")
@@ -190,7 +273,6 @@ screenGui.Name = "AutoBuilderUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- MAIN WINDOW
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 380, 0, 280)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -200,10 +282,9 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- DRAGGABLE WINDOW
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = mainFrame.Position
@@ -211,7 +292,7 @@ mainFrame.InputBegan:Connect(function(input)
 end)
 
 mainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
         local delta = input.Position - dragStart
         mainFrame.Position = UDim2.new(
             startPos.X.Scale,
@@ -222,13 +303,12 @@ mainFrame.InputChanged:Connect(function(input)
     end
 end)
 
-game:GetService("UserInputService").InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
 
--- TOP BAR
 local topBar = Instance.new("Frame", mainFrame)
 topBar.Size = UDim2.new(1, 0, 0, 40)
 topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -243,10 +323,6 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 17
 title.TextColor3 = Color3.fromRGB(240,240,240)
 title.Text = "Auto Builder Pro"
-
---========================================================--
--- SCROLLABLE TAB BAR
---========================================================--
 
 local tabScroll = Instance.new("ScrollingFrame", mainFrame)
 tabScroll.Size = UDim2.new(1, -20, 0, 36)
@@ -281,10 +357,6 @@ tabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     tabScroll.CanvasSize = UDim2.new(0, tabLayout.AbsoluteContentSize.X + 10, 0, 0)
 end)
 
---========================================================--
--- TAB PAGES
---========================================================--
-
 local function createTabPage()
     local page = Instance.new("Frame", mainFrame)
     page.Size = UDim2.new(1, -20, 1, -100)
@@ -312,7 +384,7 @@ loadingTabBtn.MouseButton1Click:Connect(function() showTab(loadingPage) end)
 showTab(buildPage)
 
 --========================================================--
--- BUILD TAB CONTENT
+-- BUILD TAB
 --========================================================--
 
 local idLabel = Instance.new("TextLabel", buildPage)
@@ -364,72 +436,7 @@ statusLabel.TextColor3 = Color3.fromRGB(200,200,200)
 statusLabel.Text = "Waiting..."
 
 --========================================================--
--- HELPERS
---========================================================--
-
-local function getBuildOriginCFrame()
-    local hrp = Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return CFrame.new() end
-    return hrp.CFrame * CFrame.new(0, 0, -5)
-end
-
-local function computeTargetCFrame(primaryCF, buildOriginCF, partCF)
-    local rel = primaryCF:ToObjectSpace(partCF)
-    return buildOriginCF * rel
-end
-
---========================================================--
--- GHOST PREVIEW FUNCTIONS
---========================================================--
-
-local function destroyGhost()
-    if ghostConnection then
-        ghostConnection:Disconnect()
-        ghostConnection = nil
-    end
-    if ghostModel then
-        ghostModel:Destroy()
-        ghostModel = nil
-    end
-end
-
-local function startGhostFollow()
-    if ghostConnection then
-        ghostConnection:Disconnect()
-        ghostConnection = nil
-    end
-
-    ghostConnection = RunService.RenderStepped:Connect(function()
-        local hrp = Character:FindFirstChild("HumanoidRootPart")
-        if hrp and ghostModel and ghostModel.PrimaryPart then
-            ghostModel:SetPrimaryPartCFrame(hrp.CFrame * ghostOffsetCF)
-        end
-    end)
-end
-
-local function createGhost(model)
-    destroyGhost()
-
-    ghostModel = model:Clone()
-    ghostModel.Parent = workspace
-
-    for _, p in ipairs(ghostModel:GetDescendants()) do
-        if p:IsA("BasePart") then
-            p.Transparency = 0.4
-            p.Material = Enum.Material.Plastic
-            p.CanCollide = false
-            p.Anchored = true
-            p:SetAttribute("IsGhost", true)
-        end
-    end
-
-    ghostOffsetCF = CFrame.new(0, 0, -5) -- reset offset when new ghost is created
-    startGhostFollow()
-    return ghostModel
-end
-
---========================================================--
--- PREVIEW TAB CONTENT
+-- PREVIEW TAB
 --========================================================--
 
 local previewLabel = Instance.new("TextLabel", previewPage)
@@ -461,10 +468,6 @@ previewInfo.TextSize = 13
 previewInfo.TextColor3 = Color3.fromRGB(180,180,180)
 previewInfo.Text = "Enter model ID to enable preview"
 
---========================================================--
--- PREVIEW CONTROLS (ROTATE / MOVE / SIZE)
---========================================================--
-
 local previewScroll = Instance.new("ScrollingFrame", previewPage)
 previewScroll.Size = UDim2.new(1, -20, 1, -110)
 previewScroll.Position = UDim2.new(0, 10, 0, 100)
@@ -488,7 +491,6 @@ local function makeButton(text)
     return b
 end
 
--- MOVE CONTROLS
 local moveTitle = Instance.new("TextLabel", previewScroll)
 moveTitle.Size = UDim2.new(1, 0, 0, 20)
 moveTitle.BackgroundTransparency = 1
@@ -511,7 +513,6 @@ local moveX = makeButton("Move X"); moveX.Parent = previewScroll
 local moveY = makeButton("Move Y"); moveY.Parent = previewScroll
 local moveZ = makeButton("Move Z"); moveZ.Parent = previewScroll
 
--- ROTATION CONTROLS
 local rotTitle = Instance.new("TextLabel", previewScroll)
 rotTitle.Size = UDim2.new(1, 0, 0, 20)
 rotTitle.BackgroundTransparency = 1
@@ -534,7 +535,6 @@ local rotX = makeButton("Rotate X"); rotX.Parent = previewScroll
 local rotY = makeButton("Rotate Y"); rotY.Parent = previewScroll
 local rotZ = makeButton("Rotate Z"); rotZ.Parent = previewScroll
 
--- SIZE CONTROLS
 local sizeTitle = Instance.new("TextLabel", previewScroll)
 sizeTitle.Size = UDim2.new(1, 0, 0, 20)
 sizeTitle.BackgroundTransparency = 1
@@ -555,133 +555,6 @@ Instance.new("UICorner", sizeIncBox).CornerRadius = UDim.new(0, 6)
 
 local sizeBtn = makeButton("Scale Model")
 sizeBtn.Parent = previewScroll
-
---========================================================--
--- LOADING TAB CONTENT
---========================================================--
-
-local loadingLabel = Instance.new("TextLabel", loadingPage)
-loadingLabel.Size = UDim2.new(1, -20, 0, 20)
-loadingLabel.Position = UDim2.new(0, 10, 0, 0)
-loadingLabel.BackgroundTransparency = 1
-loadingLabel.Font = Enum.Font.GothamBold
-loadingLabel.TextSize = 15
-loadingLabel.TextColor3 = Color3.fromRGB(220,220,220)
-loadingLabel.Text = "Save / Load Your Build"
-
-local loadStatus = Instance.new("TextLabel", loadingPage)
-loadStatus.Size = UDim2.new(1, -20, 0, 20)
-loadStatus.Position = UDim2.new(0, 10, 0, 20)
-loadStatus.BackgroundTransparency = 1
-loadStatus.Font = Enum.Font.Gotham
-loadStatus.TextSize = 13
-loadStatus.TextColor3 = Color3.fromRGB(180,180,180)
-loadStatus.Text = ""
-
-local saveBtn = Instance.new("TextButton", loadingPage)
-saveBtn.Size = UDim2.new(1, -20, 0, 36)
-saveBtn.Position = UDim2.new(0, 10, 0, 40)
-saveBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
-saveBtn.TextColor3 = Color3.fromRGB(255,255,255)
-saveBtn.Font = Enum.Font.GothamBold
-saveBtn.TextSize = 15
-saveBtn.Text = "Save Current Build"
-Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 6)
-
-local loadBtn = Instance.new("TextButton", loadingPage)
-loadBtn.Size = UDim2.new(1, -20, 0, 36)
-loadBtn.Position = UDim2.new(0, 10, 0, 90)
-loadBtn.BackgroundColor3 = Color3.fromRGB(45,45,50)
-loadBtn.TextColor3 = Color3.fromRGB(255,255,255)
-loadBtn.Font = Enum.Font.GothamBold
-loadBtn.TextSize = 15
-loadBtn.Text = "Load Saved Build"
-Instance.new("UICorner", loadBtn).CornerRadius = UDim.new(0, 6)
-
-local cancelLoadBtn = Instance.new("TextButton", loadingPage)
-cancelLoadBtn.Size = UDim2.new(1, -20, 0, 36)
-cancelLoadBtn.Position = UDim2.new(0, 10, 0, 140)
-cancelLoadBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
-cancelLoadBtn.TextColor3 = Color3.fromRGB(255,255,255)
-cancelLoadBtn.Font = Enum.Font.GothamBold
-cancelLoadBtn.TextSize = 15
-cancelLoadBtn.Text = "Cancel Loading"
-Instance.new("UICorner", cancelLoadBtn).CornerRadius = UDim.new(0, 6)
-
---========================================================--
--- PREVIEW UI UPDATE
---========================================================--
-
-local function refreshPreviewUI()
-    if not tonumber(idBox.Text) then
-        previewToggle.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        previewToggle.Text = "Preview: OFF"
-        previewInfo.Text = "Enter model ID to enable preview"
-        previewEnabled = false
-        destroyGhost()
-        return
-    end
-
-    previewInfo.Text = ""
-
-    if previewEnabled then
-        previewToggle.BackgroundColor3 = Color3.fromRGB(60,160,70)
-        previewToggle.Text = "Preview: ON"
-    else
-        previewToggle.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        previewToggle.Text = "Preview: OFF"
-    end
-end
-
-refreshPreviewUI()
-
--- FUNCTION TO DETECT SHAPE
-    local function detectShape(part)
-        if part:GetAttribute("IsGhost") == true then
-            return nil
-        end
-
-        if part:IsA("Part") then
-            local shape = part.Shape
-            if shape == Enum.PartType.Ball then return "Ball" end
-            if shape == Enum.PartType.Cylinder then return "Cylinder" end
-            if shape == Enum.PartType.Wedge then return "Wedge" end
-            return "Part"
-        end
-
-        if part:IsA("WedgePart") then return "Wedge" end
-        if part:IsA("CornerWedgePart") then return "CornerWedge" end
-        if part:IsA("TrussPart") then return "Truss" end
-
-        if part:IsA("MeshPart") then
-            local meshType = part.MeshType
-            if meshType == Enum.MeshType.Wedge then return "Wedge" end
-            if meshType == Enum.MeshType.Sphere then return "Ball" end
-            if meshType == Enum.MeshType.Cylinder then return "Cylinder" end
-        end
-
-        if part:IsA("MeshPart") then
-            local id = part.MeshId:lower()
-            if id:find("wedge") or id:find("tri") or id:find("slope") then return "Wedge" end
-            if id:find("cyl") or id:find("tube") then return "Cylinder" end
-            if id:find("ball") or id:find("sphere") then return "Ball" end
-        end
-
-        local name = part.Name:lower()
-        if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-        if name:find("cyl") or name:find("tube") then return "Cylinder" end
-        if name:find("ball") or name:find("sphere") then return "Ball" end
-
-        if part:IsA("UnionOperation") then
-            if name:find("wedge") or name:find("tri") or name:find("slope") then return "Wedge" end
-        end
-
-        return "Part"
-    end
-
---========================================================--
--- ROTATION / MOVE / SCALE LOGIC (OFFSET-BASED)
---========================================================--
 
 local function getRotInc()
     return tonumber(rotIncBox.Text) or 5
@@ -742,535 +615,571 @@ end
 
 sizeBtn.MouseButton1Click:Connect(scaleGhost)
 
+local function refreshPreviewUI()
+    if not tonumber(idBox.Text) then
+        previewToggle.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        previewToggle.Text = "Preview: OFF"
+        previewInfo.Text = "Enter model ID to enable preview"
+        previewEnabled = false
+        destroyGhost()
+        return
+    end
 
--- SAVE BUTTON
+    previewInfo.Text = ""
+
+    if previewEnabled then
+        previewToggle.BackgroundColor3 = Color3.fromRGB(60,160,70)
+        previewToggle.Text = "Preview: ON"
+    else
+        previewToggle.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        previewToggle.Text = "Preview: OFF"
+    end
+end
+
+refreshPreviewUI()
+
+previewToggle.MouseButton1Click:Connect(function()
+    if not tonumber(idBox.Text) then
+        previewEnabled = false
+        refreshPreviewUI()
+        return
+    end
+
+    previewEnabled = not previewEnabled
+    if not previewEnabled then
+        destroyGhost()
+    end
+    refreshPreviewUI()
+end)
+
+--========================================================--
+-- LOADING TAB + MULTI-SELECT UI
+--========================================================--
+
+local loadingLabel = Instance.new("TextLabel", loadingPage)
+loadingLabel.Size = UDim2.new(1, -20, 0, 20)
+loadingLabel.Position = UDim2.new(0, 10, 0, 0)
+loadingLabel.BackgroundTransparency = 1
+loadingLabel.Font = Enum.Font.GothamBold
+loadingLabel.TextSize = 15
+loadingLabel.TextColor3 = Color3.fromRGB(220,220,220)
+loadingLabel.Text = "Save / Load Your Build"
+
+local loadStatus = Instance.new("TextLabel", loadingPage)
+loadStatus.Size = UDim2.new(1, -20, 0, 20)
+loadStatus.Position = UDim2.new(0, 10, 0, 20)
+loadStatus.BackgroundTransparency = 1
+loadStatus.Font = Enum.Font.Gotham
+loadStatus.TextSize = 13
+loadStatus.TextColor3 = Color3.fromRGB(180,180,180)
+loadStatus.Text = ""
+
+local saveBtn = Instance.new("TextButton", loadingPage)
+saveBtn.Size = UDim2.new(1, -20, 0, 32)
+saveBtn.Position = UDim2.new(0, 10, 0, 40)
+saveBtn.BackgroundColor3 = Color3.fromRGB(60,160,70)
+saveBtn.TextColor3 = Color3.fromRGB(255,255,255)
+saveBtn.Font = Enum.Font.GothamBold
+saveBtn.TextSize = 15
+saveBtn.Text = "Save (Selection / All)"
+Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 6)
+
+local loadBtn = Instance.new("TextButton", loadingPage)
+loadBtn.Size = UDim2.new(1, -20, 0, 32)
+loadBtn.Position = UDim2.new(0, 10, 0, 80)
+loadBtn.BackgroundColor3 = Color3.fromRGB(45,45,50)
+loadBtn.TextColor3 = Color3.fromRGB(255,255,255)
+loadBtn.Font = Enum.Font.GothamBold
+loadBtn.TextSize = 15
+loadBtn.Text = "Load Saved Build"
+Instance.new("UICorner", loadBtn).CornerRadius = UDim.new(0, 6)
+
+local cancelLoadBtn = Instance.new("TextButton", loadingPage)
+cancelLoadBtn.Size = UDim2.new(1, -20, 0, 32)
+cancelLoadBtn.Position = UDim2.new(0, 10, 0, 120)
+cancelLoadBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+cancelLoadBtn.TextColor3 = Color3.fromRGB(255,255,255)
+cancelLoadBtn.Font = Enum.Font.GothamBold
+cancelLoadBtn.TextSize = 15
+cancelLoadBtn.Text = "Cancel Loading"
+Instance.new("UICorner", cancelLoadBtn).CornerRadius = UDim.new(0, 6)
+
+local multiSelectToggle = Instance.new("TextButton", loadingPage)
+multiSelectToggle.Size = UDim2.new(0.48, -10, 0, 32)
+multiSelectToggle.Position = UDim2.new(0, 10, 0, 160)
+multiSelectToggle.BackgroundColor3 = Color3.fromRGB(220, 180, 40) -- yellow
+multiSelectToggle.TextColor3 = Color3.fromRGB(30,30,30)
+multiSelectToggle.Font = Enum.Font.GothamBold
+multiSelectToggle.TextSize = 14
+multiSelectToggle.Text = "Multi-Select"
+multiSelectToggle.AutoButtonColor = false
+Instance.new("UICorner", multiSelectToggle).CornerRadius = UDim.new(0, 6)
+
+local selectAllBtn = Instance.new("TextButton", loadingPage)
+selectAllBtn.Size = UDim2.new(0.48, -10, 0, 32)
+selectAllBtn.Position = UDim2.new(0.52, 0, 0, 160)
+selectAllBtn.BackgroundColor3 = Color3.fromRGB(45,45,50)
+selectAllBtn.TextColor3 = Color3.fromRGB(255,255,255)
+selectAllBtn.Font = Enum.Font.GothamBold
+selectAllBtn.TextSize = 14
+selectAllBtn.Text = "Select All"
+Instance.new("UICorner", selectAllBtn).CornerRadius = UDim.new(0, 6)
+
+--========================================================--
+-- HIGHLIGHT / SELECTION HELPERS
+--========================================================--
+
+local function clearHighlights()
+    for part, hl in pairs(highlights) do
+        if hl and hl.Parent then
+            hl:Destroy()
+        end
+    end
+    highlights = {}
+end
+
+local function clearSelection()
+    selectedParts = {}
+    clearHighlights()
+end
+
+local function addHighlight(part)
+    if highlights[part] then return end
+    local hl = Instance.new("Highlight")
+    hl.Adornee = part
+    hl.FillColor = Color3.fromRGB(80, 150, 255)
+    hl.FillTransparency = 0.6
+    hl.OutlineColor = Color3.fromRGB(80, 150, 255)
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = screenGui
+    highlights[part] = hl
+end
+
+local function removeHighlight(part)
+    local hl = highlights[part]
+    if hl then
+        hl:Destroy()
+        highlights[part] = nil
+    end
+end
+
+local function togglePartSelection(part)
+    if not isValidItemPart(part) then return end
+
+    if selectedParts[part] then
+        selectedParts[part] = nil
+        removeHighlight(part)
+    else
+        selectedParts[part] = true
+        addHighlight(part)
+    end
+end
+
+--========================================================--
+-- MULTI-SELECT INPUT (CLICK + BOX)
+--========================================================--
+
+local selectionBoxFrame = Instance.new("Frame")
+selectionBoxFrame.BackgroundColor3 = Color3.fromRGB(120,120,120)
+selectionBoxFrame.BackgroundTransparency = 0.7
+selectionBoxFrame.BorderSizePixel = 1
+selectionBoxFrame.BorderColor3 = Color3.fromRGB(180,180,180)
+selectionBoxFrame.Visible = false
+selectionBoxFrame.ZIndex = 10
+selectionBoxFrame.Parent = screenGui
+
+local boxStartPos = nil
+
+local function setMultiSelectVisual()
+    if selectionBoxMode then
+        multiSelectToggle.BackgroundColor3 = Color3.fromRGB(255, 140, 0) -- orange
+        multiSelectToggle.TextColor3 = Color3.fromRGB(30,30,30)
+        multiSelectToggle.Text = "Selection-Box"
+    elseif multiSelectEnabled then
+        multiSelectToggle.BackgroundColor3 = Color3.fromRGB(220, 180, 40) -- yellow
+        multiSelectToggle.TextColor3 = Color3.fromRGB(30,30,30)
+        multiSelectToggle.Text = "Multi-Select"
+    else
+        multiSelectToggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        multiSelectToggle.TextColor3 = Color3.fromRGB(230,230,230)
+        multiSelectToggle.Text = "Multi-Select"
+    end
+end
+
+setMultiSelectVisual()
+
+multiSelectToggle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        multiSelectPressStart = tick()
+    end
+end)
+
+multiSelectToggle.InputEnded:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+        return
+    end
+
+    if not multiSelectPressStart then return end
+    local held = tick() - multiSelectPressStart
+    multiSelectPressStart = nil
+
+    if held >= LONG_PRESS_TIME then
+        selectionBoxMode = not selectionBoxMode
+        multiSelectEnabled = selectionBoxMode or multiSelectEnabled
+    else
+        if selectionBoxMode then
+            selectionBoxMode = false
+        else
+            multiSelectEnabled = not multiSelectEnabled
+        end
+    end
+
+    setMultiSelectVisual()
+end)
+
+local function screenToWorldRay(x, y)
+    local unitRay = Camera:ScreenPointToRay(x, y)
+    return Ray.new(unitRay.Origin, unitRay.Direction * 1000)
+end
+
+local function selectPartsInScreenBox(p1, p2)
+    local minX = math.min(p1.X, p2.X)
+    local maxX = math.max(p1.X, p2.X)
+    local minY = math.min(p1.Y, p2.Y)
+    local maxY = math.max(p1.Y, p2.Y)
+
+    local items = getItemsFolder()
+    if not items then return end
+
+    for _, obj in ipairs(items:GetDescendants()) do
+        if obj:IsA("BasePart") and isValidItemPart(obj) then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(obj.Position)
+            if onScreen then
+                if screenPos.X >= minX and screenPos.X <= maxX and screenPos.Y >= minY and screenPos.Y <= maxY then
+                    selectedParts[obj] = true
+                    addHighlight(obj)
+                end
+            end
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if not multiSelectEnabled then return end
+
+    if selectionBoxMode then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            boxStartPos = UserInputService:GetMouseLocation()
+            selectionBoxFrame.Visible = true
+            selectionBoxFrame.Position = UDim2.fromOffset(boxStartPos.X, boxStartPos.Y)
+            selectionBoxFrame.Size = UDim2.new(0, 0, 0, 0)
+        end
+    else
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            local ray = screenToWorldRay(pos.X, pos.Y)
+            local hitPart = workspace:FindPartOnRay(ray, LocalPlayer.Character, false, true)
+            if hitPart then
+                togglePartSelection(hitPart)
+            end
+        end
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gp)
+    if gp then return end
+    if not selectionBoxMode or not boxStartPos then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        local currentPos = UserInputService:GetMouseLocation()
+        local x = math.min(boxStartPos.X, currentPos.X)
+        local y = math.min(boxStartPos.Y, currentPos.Y)
+        local w = math.abs(boxStartPos.X - currentPos.X)
+        local h = math.abs(boxStartPos.Y - currentPos.Y)
+        selectionBoxFrame.Position = UDim2.fromOffset(x, y)
+        selectionBoxFrame.Size = UDim2.fromOffset(w, h)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gp)
+    if gp then return end
+    if not selectionBoxMode or not boxStartPos then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local endPos = UserInputService:GetMouseLocation()
+        selectionBoxFrame.Visible = false
+        selectionBoxFrame.Size = UDim2.fromOffset(0, 0)
+
+        selectPartsInScreenBox(boxStartPos, endPos)
+
+        boxStartPos = nil
+        selectionBoxMode = false
+        setMultiSelectVisual()
+    end
+end)
+
+selectAllBtn.MouseButton1Click:Connect(function()
+    clearSelection()
+    local items = getItemsFolder()
+    if not items then return end
+
+    for _, obj in ipairs(items:GetDescendants()) do
+        if obj:IsA("BasePart") and isValidItemPart(obj) then
+            selectedParts[obj] = true
+            addHighlight(obj)
+        end
+    end
+end)
+
+--========================================================--
+-- SAVE LOGIC (SELECTION / ALL)
+--========================================================--
+
 saveBtn.MouseButton1Click:Connect(function()
-    local partsFolder = getPartsFolder()
-    if not partsFolder then
+    local items = getItemsFolder()
+    if not items then
         statusLabel.Text = "Your plot not found"
         return
     end
 
-    local items = partsFolder.Parent
     savedBuild = {}
 
-    for _, obj in ipairs(items:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            table.insert(savedBuild, {
-                Type = detectPartType(obj),
-                Size = obj.Size,
-                CFrame = obj.CFrame,
-                Color = obj.Color,
-                Material = obj.Material.Name,
-                Behaviors = extractBehaviors(obj)
-            })
+    local function addPart(part)
+        table.insert(savedBuild, {
+            Type = detectPartType(part),
+            Size = part.Size,
+            CFrame = part.CFrame,
+            Color = part.Color,
+            Material = part.Material.Name,
+            Behaviors = extractBehaviors(part)
+        })
+    end
+
+    local anySelected = false
+    for p in pairs(selectedParts) do
+        if p:IsA("BasePart") and isValidItemPart(p) then
+            anySelected = true
+            addPart(p)
         end
     end
 
-    statusLabel.Text = "Build Saved!"
+    if not anySelected then
+        for _, obj in ipairs(items:GetDescendants()) do
+            if obj:IsA("BasePart") and isValidItemPart(obj) then
+                addPart(obj)
+            end
+        end
+    end
+
+    statusLabel.Text = "Build Saved! (" .. tostring(#savedBuild) .. " parts)"
 end)
 
--- CANCEL BUTTON
+--========================================================--
+-- LOAD LOGIC + RETRY LOOP
+--========================================================--
+
 cancelLoadBtn.MouseButton1Click:Connect(function()
     cancelLoad = true
     statusLabel.Text = "Cancelling load..."
 end)
 
--- LOAD BUTTON
 local buildLast = {
     ["Pressure Plate"] = true,
     ["Button"] = true,
     ["Button Deactivator"] = true
 }
 
+local function getAllPartsSnapshot()
+    local items = getItemsFolder()
+    local all = {}
+    if not items then return all end
+
+    for _, obj in ipairs(items:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            all[obj] = true
+        end
+    end
+    return all
+end
+
+local function findNewPart(before)
+    local items = getItemsFolder()
+    if not items then return nil end
+
+    for _, obj in ipairs(items:GetDescendants()) do
+        if obj:IsA("BasePart") and not before[obj] then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function buildOnePart(index, data, totalParts, loadedCountRef)
+    if cancelLoad then return false end
+
+    local shape = data.Type or "Part"
+    local cf = data.CFrame
+    local size = data.Size
+    local color = data.Color
+    local materialName = data.Material
+    local behaviors = data.Behaviors or {}
+
+    local before = getAllPartsSnapshot()
+
+    local okAdd = pcall(function()
+        AddObjectRemote:InvokeServer(shape, cf)
+    end)
+
+    if not okAdd then
+        warn("AddObject failed for index", index, "shape:", shape)
+        return false
+    end
+
+    local newPart = nil
+    local timeout = os.clock() + 2.0
+
+    repeat
+        task.wait(0.02)
+        newPart = findNewPart(before)
+    until newPart or os.clock() > timeout or cancelLoad
+
+    if cancelLoad then return false end
+
+    if not newPart then
+        warn("Skipping part index", index, "— server did not spawn it in time")
+        return false
+    end
+
+    pcall(function()
+        MoveObjectRemote:InvokeServer({{newPart, cf, size}})
+    end)
+
+    pcall(function()
+        Events.PaintObject:InvokeServer({newPart}, "Color", color)
+    end)
+
+    local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
+    pcall(function()
+        Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
+    end)
+
+    for key, value in pairs(behaviors) do
+        pcall(function()
+            Events.BehaviourObject:InvokeServer({newPart}, key, value)
+        end)
+    end
+
+    loadedCountRef.value += 1
+    loadStatus.Text = string.format("Built %d/%d", loadedCountRef.value, totalParts)
+
+    task.wait(1.05)
+    return true
+end
+
 loadBtn.MouseButton1Click:Connect(function()
-    if not savedBuild then
+    if not savedBuild or #savedBuild == 0 then
         statusLabel.Text = "No saved build"
         return
     end
 
-    local partsFolder = getPartsFolder()
-    if not partsFolder then
+    local items = getItemsFolder()
+    if not items then
         statusLabel.Text = "Your plot not found"
         return
     end
 
     cancelLoad = false
+    failedIndices = {}
     statusLabel.Text = "Loading saved build..."
 
     local totalParts = #savedBuild
-    local loadedCount = 0
-    loadStatus.Text = "0/" .. totalParts
+    local loadedCountRef = { value = 0 }
+    loadStatus.Text = "Built 0/" .. totalParts
 
-    --------------------------------------------------------------------
-    -- UNIVERSAL BASEPART‑ONLY SNAPSHOT (executor‑safe)
-    --------------------------------------------------------------------
-    local function getAllParts()
-        local items = partsFolder.Parent
-        local all = {}
-
-        for _, obj in ipairs(items:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                all[obj] = true
-            end
-        end
-
-        return all
-    end
-
-    local function findNewPart(before)
-        local items = partsFolder.Parent
-
-        for _, obj in ipairs(items:GetDescendants()) do
-            if obj:IsA("BasePart") and not before[obj] then
-                return obj
-            end
-        end
-
-        return nil
-    end
-
-    --------------------------------------------------------------------
-    -- BUILD ONE PART
-    --------------------------------------------------------------------
-    local function buildOnePart(index, data)
-        if cancelLoad then return false end
-
-        local shape = data.Type or "Part"
-        local cf = data.CFrame
-        local size = data.Size
-        local color = data.Color
-        local materialName = data.Material
-        local behaviors = data.Behaviors or {}
-
-        -- Snapshot BEFORE spawn
-        local before = getAllParts()
-
-        -- Spawn
-        local okAdd = pcall(function()
-            AddObjectRemote:InvokeServer(shape, cf)
-        end)
-
-        if not okAdd then
-            warn("AddObject failed for index", index, "shape:", shape)
-            return false
-        end
-
-        -- Wait for new BasePart
-        local newPart = nil
-        local timeout = os.clock() + 2.0 -- extended timeout for executor stability
-
-        repeat
-            task.wait(0.02)
-            newPart = findNewPart(before)
-        until newPart or os.clock() > timeout or cancelLoad
-
-        if cancelLoad then return false end
-
-        if not newPart then
-            warn("Skipping part index", index, "— server did not spawn it in time")
-            return false
-        end
-
-        -- Move + resize
-        pcall(function()
-            MoveObjectRemote:InvokeServer({{newPart, cf, size}})
-        end)
-
-        -- Color
-        pcall(function()
-            Events.PaintObject:InvokeServer({newPart}, "Color", color)
-        end)
-
-        -- Material
-        local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
-        pcall(function()
-            Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
-        end)
-
-        -- Behaviors
-        for key, value in pairs(behaviors) do
-            pcall(function()
-                Events.BehaviourObject:InvokeServer({newPart}, key, value)
-            end)
-        end
-
-        -- Progress
-        loadedCount += 1
-        loadStatus.Text = string.format("%d/%d", loadedCount, totalParts)
-
-        task.wait(0.5) -- executor‑safe rate limit
-        return true
-    end
-
-    --------------------------------------------------------------------
-    -- TWO‑PASS LOADING
-    --------------------------------------------------------------------
     task.spawn(function()
-        -- PASS 1: everything except build‑last
         for index, data in ipairs(savedBuild) do
             if cancelLoad then
                 statusLabel.Text = "Load Cancelled"
-                break
+                return
             end
 
             if not buildLast[data.Type] then
-                buildOnePart(index, data)
+                local ok = buildOnePart(index, data, totalParts, loadedCountRef)
+                if not ok then
+                    table.insert(failedIndices, index)
+                end
             end
         end
 
-        -- PASS 2: build‑last parts
-        if not cancelLoad then
-            for index, data in ipairs(savedBuild) do
-                if cancelLoad then
-                    statusLabel.Text = "Load Cancelled"
+        if cancelLoad then
+            statusLabel.Text = "Load Cancelled"
+            return
+        end
+
+        for index, data in ipairs(savedBuild) do
+            if cancelLoad then
+                statusLabel.Text = "Load Cancelled"
+                return
+            end
+
+            if buildLast[data.Type] then
+                local ok = buildOnePart(index, data, totalParts, loadedCountRef)
+                if not ok then
+                    table.insert(failedIndices, index)
+                end
+            end
+        end
+
+        if cancelLoad then
+            statusLabel.Text = "Load Cancelled"
+            return
+        end
+
+        if #failedIndices > 0 then
+            statusLabel.Text = "Retrying missing parts..."
+            while #failedIndices > 0 and not cancelLoad do
+                local remaining = {}
+                for _, idx in ipairs(failedIndices) do
+                    if cancelLoad then break end
+                    local data = savedBuild[idx]
+                    loadStatus.Text = string.format("Retry loop: %d missing, built %d/%d", #failedIndices, loadedCountRef.value, totalParts)
+                    local ok = buildOnePart(idx, data, totalParts, loadedCountRef)
+                    if not ok then
+                        table.insert(remaining, idx)
+                    end
+                end
+                failedIndices = remaining
+                if #failedIndices == 0 or cancelLoad then
                     break
                 end
-
-                if buildLast[data.Type] then
-                    buildOnePart(index, data)
-                end
             end
         end
 
-        if not cancelLoad then
-            statusLabel.Text = "Build Loaded!"
+        if cancelLoad then
+            statusLabel.Text = "Load Cancelled"
+        else
+            statusLabel.Text = "Build Loaded! (" .. tostring(loadedCountRef.value) .. "/" .. tostring(totalParts) .. ")"
         end
     end)
 end)
 
 --========================================================--
--- LIVE PREVIEW MODEL LOADER
+-- BUILD BUTTON (STUB - YOU CAN HOOK YOUR MODEL SYSTEM)
 --========================================================--
 
-local previewModel = nil
-
-local function loadPreviewModel()
-    destroyGhost()
-
-    if previewModel then
-        previewModel:Destroy()
-        previewModel = nil
-    end
-
-    if not tonumber(idBox.Text) then
-        return
-    end
-
-    if not previewEnabled then
-        return
-    end
-
-    local ok, arr = pcall(function()
-        return game:GetObjects("rbxassetid://" .. idBox.Text)
-    end)
-
-    if not ok or not arr or #arr == 0 then
-        previewInfo.Text = "Invalid ID"
-        return
-    end
-
-    previewModel = arr[1]
-
-    if not previewModel:IsA("Model") then
-        local newModel = Instance.new("Model")
-        newModel.Name = previewModel.Name
-
-        for _, obj in ipairs(previewModel:GetChildren()) do
-            obj.Parent = newModel
-        end
-
-        previewModel:Destroy()
-        previewModel = newModel
-    end
-
-    if not previewModel.PrimaryPart then
-        for _, v in ipairs(previewModel:GetDescendants()) do
-            if v:IsA("BasePart") then
-                previewModel.PrimaryPart = v
-                break
-            end
-        end
-    end
-
-    if not previewModel.PrimaryPart then
-        previewInfo.Text = "Model has no parts"
-        return
-    end
-
-    createGhost(previewModel)
+local function getBuildOriginCFrame()
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return CFrame.new() end
+    return hrp.CFrame * CFrame.new(0, 0, -5)
 end
 
-previewToggle.MouseButton1Click:Connect(function()
-    if not tonumber(idBox.Text) then
-        previewInfo.Text = "Enter model ID to enable preview"
-        return
-    end
-
-    previewEnabled = not previewEnabled
-    refreshPreviewUI()
-
-    if previewEnabled then
-        loadPreviewModel()
-    else
-        destroyGhost()
-    end
-end)
-
-idBox:GetPropertyChangedSignal("Text"):Connect(function()
-    refreshPreviewUI()
-    if previewEnabled then
-        loadPreviewModel()
-    end
-end)
-
---========================================================--
--- SETTINGS TAB CONTENT
---========================================================--
-
-local settingsLabel = Instance.new("TextLabel", settingsPage)
-settingsLabel.Size = UDim2.new(1, -20, 0, 20)
-settingsLabel.Position = UDim2.new(0, 10, 0, 0)
-settingsLabel.BackgroundTransparency = 1
-settingsLabel.Font = Enum.Font.Gotham
-settingsLabel.TextSize = 14
-settingsLabel.TextColor3 = Color3.fromRGB(200,200,200)
-settingsLabel.Text = "Settings coming soon..."
-
-local toggleGuiBtn = Instance.new("TextButton", screenGui)
-toggleGuiBtn.Size = UDim2.new(0, 38, 0, 38)
-toggleGuiBtn.Position = UDim2.new(1, -60, 0.35, 0)
-toggleGuiBtn.Text = "⚙️"
-toggleGuiBtn.Font = Enum.Font.Gotham
-toggleGuiBtn.TextSize = 20
-toggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
-toggleGuiBtn.TextColor3 = Color3.fromRGB(255,255,255)
-
-toggleGuiBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
+buildBtn.MouseButton1Click:Connect(function()
+    statusLabel.Text = "Build logic not wired to model ID yet."
 end)
 
 cancelBtn.MouseButton1Click:Connect(function()
     cancelBuild = true
-    statusLabel.Text = "Cancelling..."
-    destroyGhost()
-    previewEnabled = false
-    refreshPreviewUI()
-end)
-
---========================================================--
--- BUILD LOGIC (ONE PASS, IMMEDIATE MOVE)
---========================================================--
-
-local function buildModelSimple(assetId)
-    cancelBuild = false
-    statusLabel.Text = "Loading asset..."
-
-    local ok, arr = pcall(function()
-        return game:GetObjects("rbxassetid://" .. tostring(assetId))
-    end)
-
-    if not ok or not arr or #arr == 0 then
-        previewInfo.Text = "Invalid ID"
-        return
-    end
-
-    local model = arr[1]
-
-    if not model:IsA("Model") then
-        local newModel = Instance.new("Model")
-        newModel.Name = model.Name
-
-        for _, obj in ipairs(model:GetChildren()) do
-            obj.Parent = newModel
-        end
-
-        model:Destroy()
-        model = newModel
-    end
-
-    if not model.PrimaryPart then
-        for _, v in ipairs(model:GetDescendants()) do
-            if v:IsA("BasePart") then
-                model.PrimaryPart = v
-                break
-            end
-        end
-    end
-
-    if not model.PrimaryPart then
-        statusLabel.Text = "Model has no parts."
-        model:Destroy()
-        return
-    end
-
-    local partsFolder = getPartsFolder()
-    if not partsFolder then
-        statusLabel.Text = "Parts folder not found."
-        model:Destroy()
-        return
-    end
-
-    -- Build origin: if preview exists, use ghost position; else default
-    local buildOriginCF
-    if ghostModel and ghostModel.PrimaryPart then
-        buildOriginCF = ghostModel.PrimaryPart.CFrame
-    else
-        buildOriginCF = getBuildOriginCFrame()
-    end
-
-    local primaryCF = model.PrimaryPart.CFrame
-
-    local sourceParts = {}
-    for _, p in ipairs(model:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(sourceParts, p)
-        end
-    end
-
-    local total = #sourceParts
-    if total == 0 then
-        statusLabel.Text = "No parts to build."
-        model:Destroy()
-        return
-    end
-
-    -- Build preview parts list ONCE (if ghost exists)
-    local previewParts = nil
-    if ghostModel and ghostModel.PrimaryPart then
-        previewParts = {}
-        for _, p in ipairs(ghostModel:GetDescendants()) do
-            if p:IsA("BasePart") then
-                table.insert(previewParts, p)
-            end
-        end
-    end
-
-    statusLabel.Text = "Building.."
-    local placedCount = 0
-
-    for i, src in ipairs(sourceParts) do
-        if cancelBuild then
-            statusLabel.Text = "Cancelled"
-            break
-        end
-
-        statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
-
-        local previewPart = previewParts and previewParts[i] or nil
-
-        -- If preview exists, build exactly where the preview part is.
-        -- Otherwise, use original relative placement.
-        local targetCF
-        if previewPart then
-            targetCF = previewPart.CFrame
-        else
-            targetCF = computeTargetCFrame(primaryCF, buildOriginCF, src.CFrame)
-        end
-
-        local beforeList = partsFolder:GetChildren()
-        local beforeCount = #beforeList
-        local shape = detectShape(src)
-
-        pcall(function()
-            if AddObjectRemote.ClassName == "RemoteEvent" then
-                AddObjectRemote:FireServer(shape, targetCF)
-            else
-                AddObjectRemote:InvokeServer(shape, targetCF)
-            end
-        end)
-
-        local newPart = nil
-        local timeout = 2
-        local start = os.clock()
-
-        repeat
-            task.wait(0.05)
-            local current = partsFolder:GetChildren()
-
-            if #current > beforeCount then
-                local lookup = {}
-                for _, p in ipairs(beforeList) do
-                    lookup[p] = true
-                end
-                for _, p in ipairs(current) do
-                    if not lookup[p] then
-                        newPart = p
-                        break
-                    end
-                end
-            end
-        until newPart or os.clock() - start > timeout or cancelBuild
-
-        if cancelBuild then
-            statusLabel.Text = "Cancelled"
-            break
-        end
-
-        if not newPart then
-            continue
-        end
-
-        placedCount += 1
-        statusLabel.Text = string.format("Building.. %d/%d", placedCount, total)
-
-        local finalSize = previewPart and previewPart.Size or src.Size
-
-        local argsMove = {
-            {
-                {
-                    newPart,
-                    targetCF,
-                    finalSize
-                }
-            }
-        }
-
-        pcall(function()
-            MoveObjectRemote:InvokeServer(unpack(argsMove))
-        end)
-
-        pcall(function()
-            Events.PaintObject:InvokeServer(
-                { newPart },
-                "Color",
-                src.Color
-            )
-        end)
-
-        task.wait(1.05)
-    end
-
-    if not cancelBuild then
-        statusLabel.Text = string.format("Finished (%d/%d)", placedCount, total)
-    end
-
-    model:Destroy()
-end
-
-
---========================================================--
--- BUTTON BIND
---========================================================--
-
-buildBtn.MouseButton1Click:Connect(function()
-    if cancelBuild then
-        cancelBuild = false
-    end
-
-    local id = tonumber(idBox.Text)
-    if not id then
-        statusLabel.Text = "ID must be numbers only"
-        return
-    end
-
-    statusLabel.Text = "Starting..."
-    task.spawn(function()
-        buildModelSimple(id)
-        if previewEnabled then
-            destroyGhost()
-            previewEnabled = false
-            refreshPreviewUI()
-        end
-    end)
+    statusLabel.Text = "Build cancelled."
 end)
