@@ -33,6 +33,8 @@ local CombatSection5 = CombatTab:Section({})
 local CombatSection6 = CombatTab:Section({})
 local PlayerSection = PlayerTab:Section({})
 local MiscSection = MiscTab:Section({})
+local MiscSection2 = MiscTab:Section({})
+local MiscSection3 = MiscTab:Section({})
 local VisualSection = VisualTab:Section({})
 local FunSection = FunTab:Section({})
 local FunSection2 = FunTab:Section({})
@@ -895,6 +897,166 @@ MiscSection:Toggle({
 		end
 	end
 })
+
+-- // AUTO SCAFFOLD
+local scaffoldEnabled = false
+local blockSize = Vector3.new(4,4,4)
+local VIM = game:GetService("VirtualInputManager")
+
+MiscSection2:Toggle({
+    Name = "Auto Scaffold",
+    Default = false,
+    Callback = function(v)
+        scaffoldEnabled = v
+    end
+})
+
+task.spawn(function()
+    while true do
+        if scaffoldEnabled then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                local tool = char:FindFirstChild("Block")
+
+                if root and hum and tool then
+                    if hum.MoveDirection.Magnitude > 0 then
+                        local placePos = root.Position - Vector3.new(0, blockSize.Y/2 + 1, 0)
+
+                        -- simulate click
+                        VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                        task.wait(0.01)
+                        VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- // BLOCK COUNTER
+local blockCounterEnabled = false
+local blockGui = nil
+
+local function getBlockText()
+    local char = player.Character
+    local bp = player.Backpack
+
+    local w = workspace:FindFirstChild(player.Name)
+    if w and w:FindFirstChild("Block") then
+        local gui = w.Block:FindFirstChild("Handle") and w.Block.Handle:FindFirstChild("LeftGui")
+        if gui and gui:FindFirstChild("Num") then
+            return gui.Num.Text
+        end
+    end
+
+    local tool = bp:FindFirstChild("Block")
+    if tool and tool:FindFirstChild("Handle") then
+        local gui = tool.Handle:FindFirstChild("LeftGui")
+        if gui and gui:FindFirstChild("Num") then
+            return gui.Num.Text
+        end
+    end
+
+    return "0"
+end
+
+MiscSection2:Toggle({
+    Name = "Block Counter",
+    Default = false,
+    Callback = function(v)
+        blockCounterEnabled = v
+
+        if v then
+            blockGui = Instance.new("ScreenGui")
+            blockGui.Name = "BlockCounterGui"
+            blockGui.Parent = game:GetService("CoreGui")
+
+            local label = Instance.new("TextLabel")
+            label.Name = "Counter"
+            label.Size = UDim2.new(0, 200, 0, 40)
+            label.Position = UDim2.new(0.5, -100, 0, 60)
+            label.BackgroundTransparency = 1
+            label.TextColor3 = Color3.fromRGB(255,255,255)
+            label.TextScaled = true
+            label.Font = Enum.Font.GothamBold
+            label.Parent = blockGui
+
+            task.spawn(function()
+                while blockCounterEnabled and blockGui do
+                    label.Text = "Blocks: " .. getBlockText()
+                    task.wait(0.1)
+                end
+            end)
+
+        else
+            if blockGui then blockGui:Destroy() end
+            blockGui = nil
+        end
+    end
+})
+
+-- // BOW AIMBOT
+local bowAimbotEnabled = false
+local VIM = game:GetService("VirtualInputManager")
+
+local function getClosestToMouse()
+    local mouse = player:GetMouse()
+    local closest, dist = nil, math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local mag = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        closest = hrp
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+MiscSection3:Toggle({
+    Name = "Bow Aimbot",
+    Default = false,
+    Callback = function(v)
+        bowAimbotEnabled = v
+    end
+})
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if not bowAimbotEnabled then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local char = player.Character
+        if not char then return end
+
+        local bow = char:FindFirstChild("Bow")
+        if not bow then return end
+
+        local target = getClosestToMouse()
+        if not target then return end
+
+        camera.CFrame = CFrame.new(camera.CFrame.Position, target.Position)
+
+        task.wait(0.05)
+        VIM:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        task.wait(0.02)
+        VIM:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    end
+end)
+
 
 ------------------------ PLAYER CHAMS ------------------------
 local Players = game:GetService("Players")
