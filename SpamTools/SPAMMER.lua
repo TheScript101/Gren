@@ -79,7 +79,7 @@ spamBtn.MouseButton1Click:Connect(function()
 
     if spamming then
         spamBtn.Text = "STOP SPAM"
-        spamBtn.BackgroundColor3 = Color3.fromRGB(120, 180, 120)
+        spamBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 120)
         startSpamming()
     else
         spamBtn.Text = "SPAM ALL TOOLS"
