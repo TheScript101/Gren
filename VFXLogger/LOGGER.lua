@@ -55,17 +55,7 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VFX_Logger"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = false
-screenGui.DisplayOrder = 99999 -- overlap others
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-
--- Toggle button
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 100, 0, 30)
-toggleButton.Position = UDim2.new(0, 10, 0, 10)
-toggleButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-toggleButton.Text = "Toggle GUI"
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.Parent = screenGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
@@ -74,10 +64,6 @@ mainFrame.Position = UDim2.new(0.5, -300, 0.5, -175)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-
-toggleButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-end)
 
 local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
@@ -95,7 +81,7 @@ titleLabel.Name = "Title"
 titleLabel.Size = UDim2.new(0, 200, 1, 0)
 titleLabel.Position = UDim2.new(0, 8, 0, 0)
 titleLabel.BackgroundTransparency = 1
-itleLabel.Text = "VFX Logger"
+titleLabel.Text = "VFX Logger"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
@@ -287,6 +273,19 @@ logNPCButton.Parent = settingsFrame
 local logNPCCorner = Instance.new("UICorner")
 logNPCCorner.CornerRadius = UDim.new(0, 6)
 logNPCCorner.Parent = logNPCButton
+
+-- Toggle button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+toggleButton.Text = "Toggle GUI"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Parent = screenGui
+
+toggleButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+end)
 
 --////////////////////////////////////////////////////
 -- State
