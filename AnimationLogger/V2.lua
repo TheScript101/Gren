@@ -377,6 +377,22 @@ local function playNormally(animId)
     return track
 end
 
+local function playSegment(animId)
+    if not animId or not player.Character then return end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local data = animationData[animId]
+    if not data then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    local track = humanoid:LoadAnimation(anim)
+    track:Play()
+
+    local segStart = data.startPos or 0
+    local segEnd = data.endPos or data.length or segStart
+
     local setOnce
     setOnce = RunService.Heartbeat:Connect(function()
         if track.IsPlaying then
@@ -385,14 +401,12 @@ end
         end
     end)
 
-    -- monitor and stop when reaching segEnd
     local conn
     conn = RunService.Heartbeat:Connect(function()
         if not track.IsPlaying then
             if conn then conn:Disconnect() end
             return
         end
-        -- If looped, we still want to stop after reaching segEnd once
         if track.TimePosition >= segEnd - 1e-4 then
             track:Stop()
             if conn then conn:Disconnect() end
