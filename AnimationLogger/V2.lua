@@ -112,7 +112,7 @@ Instance.new("UICorner", PlayNormalButton).CornerRadius = UDim.new(0, 8)
 local CopyButton = Instance.new("TextButton")
 CopyButton.Parent = PickFrame
 CopyButton.Size = UDim2.new(1, -10, 0, 30)
-CopyButton.Position = UDim2.new(0, 5, 0, 145)
+CopyButton.Position = UDim2.new(0,5,0,110)
 CopyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 CopyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CopyButton.Text = "Copy ID"
@@ -316,21 +316,6 @@ local function playNormally(animId)
     return track
 end
 
-    local segStart = data.startPos or 0
-    local segEnd = data.endPos or data.length or segStart
-
-    -- clamp
-    segStart = math.clamp(segStart, 0, data.length or math.huge)
-    segEnd = math.clamp(segEnd, 0, data.length or math.huge)
-
-    -- apply properties
-    track.Looped = data.loop or false
-    track.Speed = data.speed or 1
-
-    -- set time and play
-    -- Some animations may not accept TimePosition until played once; play then set TimePosition immediately
-    track:Play()
-    -- small delay to ensure TimePosition can be set (use Heartbeat for immediate)
     local setOnce
     setOnce = RunService.Heartbeat:Connect(function()
         if track.IsPlaying then
