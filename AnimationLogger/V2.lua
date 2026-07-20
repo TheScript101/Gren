@@ -245,6 +245,11 @@ local function makeAnimButton(animId)
     return btn
 end
 
+-- Helper: round speed nicely
+local function roundNum(n)
+    return tonumber(string.format("%.2f", n))
+end
+
 local function refreshAnimButton(animId)
     local btn = animationButtons[animId]
     if not btn then return end
@@ -268,10 +273,11 @@ local function ensureButtonFor(animId)
                 local startStr = data.startPos and formatNum(data.startPos) or "?"
                 local endStr = data.endPos and formatNum(data.endPos) or (data.length and formatNum(data.length) or "?")
                 local lengthStr = data.length and formatNum(data.length) or "?"
+                local speedStr = data.speed and tostring(roundNum(data.speed)) or "?"
                 PickText.Text =
                     "ID: " .. animId ..
                     "\nStart: " .. startStr .. "s | End: " .. endStr .. "s" ..
-                    "\nSpeed: " .. tostring(data.speed) .. " | Loop: " .. tostring(data.loop) ..
+                    "\nSpeed: " .. speedStr .. " | Loop: " .. tostring(data.loop) ..
                     "\nLength: " .. lengthStr .. "s"
             else
                 PickText.Text = "ID: " .. animId .. "\nNo advanced data yet."
