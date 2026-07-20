@@ -74,7 +74,7 @@ UIListLayout.Padding = UDim.new(0, 5)
 -- Pick Frame (side panel with actions)
 local PickFrame = Instance.new("Frame")
 PickFrame.Parent = ScreenGui
-PickFrame.Size = UDim2.new(0, 260, 0, 140)
+PickFrame.Size = UDim2.new(0, 260, 0, 180)
 PickFrame.Position = UDim2.new(0.5, 170, 0.5, -200)
 PickFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 PickFrame.Visible = false
@@ -168,6 +168,61 @@ LogAllButton.Text = "Log All Animations: OFF"
 LogAllButton.Font = Enum.Font.Gotham
 LogAllButton.TextSize = 14
 Instance.new("UICorner", LogAllButton).CornerRadius = UDim.new(0, 8)
+
+-- Play As Logged Button
+local PlayLoggedButton = Instance.new("TextButton")
+PlayLoggedButton.Parent = PickFrame
+PlayLoggedButton.Size = UDim2.new(1, -10, 0, 30)
+PlayLoggedButton.Position = UDim2.new(0, 5, 0, 135)
+PlayLoggedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PlayLoggedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayLoggedButton.Text = "Play As Logged"
+PlayLoggedButton.Font = Enum.Font.Gotham
+PlayLoggedButton.TextSize = 14
+PlayLoggedButton.Name = "PlayLoggedButton"
+Instance.new("UICorner", PlayLoggedButton).CornerRadius = UDim.new(0, 8)
+
+-- Helper: round speed nicely
+local function roundNum(n)
+    return tonumber(string.format("%.2f", n))
+end
+
+-- Play As Logged handler
+PlayLoggedButton.MouseButton1Click:Connect(function()
+    if not selectedAnimId or not player.Character then return end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local data = animationData[selectedAnimId]
+    if not data then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = selectedAnimId
+    local track = humanoid:LoadAnimation(anim)
+
+    -- Apply logged settings
+    track.Looped = false
+    track.Speed = roundNum(data.speed or 1)
+    track:Play()
+
+    -- Jump to start position if logged
+    if data.startPos then
+        track.TimePosition = data.startPos
+    end
+
+    -- Stop at end position or length
+    local segEnd = data.endPos or data.length
+    if segEnd then
+        local conn
+        conn = RunService.Heartbeat:Connect(function()
+            if track.IsPlaying and track.TimePosition >= segEnd - 1e-4 then
+                track:Stop()
+                if conn then conn:Disconnect() end
+            end
+        end)
+    end
+end)
+
 
 -- Helpers ------------------------------------------------------------
 
