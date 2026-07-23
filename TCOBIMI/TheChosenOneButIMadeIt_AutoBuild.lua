@@ -148,9 +148,8 @@ local function buildModel(model, counterLabel)
             -- CastShadow OFF
             fireSync("SyncShadow", { { Part = newPart, CastShadow = false } })
 
-            -- Anchor preserved
-            fireSync("SyncAnchor", { { Part = newPart, Anchored = part.Anchored } })
-
+            -- Anchor preserved already
+            
             -- Collision preserved (NO SyncCollision)
             newPart.CanCollide = part.CanCollide
         end
