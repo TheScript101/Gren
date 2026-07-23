@@ -1,6 +1,7 @@
 --// SERVICES
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 --// CONFIGURATION
@@ -113,9 +114,6 @@ local function buildModel(model, counterLabel)
     local total = #parts
     local built = 0
 
-    local shape = detectShape(part)
-    local newPart = createPart(shape, part.CFrame, workspace)
-
         for _, part in ipairs(parts) do
         if stopBuild then break end
 
@@ -145,15 +143,6 @@ local function buildModel(model, counterLabel)
 
     model:Destroy()
 end
-    
-        built += 1
-        counterLabel.Text = built .. "/" .. total
-
-        task.wait(BUILD_DELAY)
-    end
-
-    model:Destroy()
-end
 
 --// GUI FIXED
 local gui = Instance.new("ScreenGui")
@@ -168,7 +157,7 @@ end)
 
 if not gui.Parent then
     pcall(function()
-        gui.Parent = StarterGui
+        gui.Parent = playerGui
     end)
 end
 
