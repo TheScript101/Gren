@@ -113,46 +113,39 @@ local function buildModel(model, counterLabel)
     local total = #parts
     local built = 0
 
-    for _, part in ipairs(parts) do
+    local shape = detectShape(part)
+    local newPart = createPart(shape, part.CFrame, workspace)
+
+        for _, part in ipairs(parts) do
         if stopBuild then break end
 
         local shape = detectShape(part)
         local newPart = createPart(shape, part.CFrame, workspace)
 
         if newPart then
-            -- Resize
             fireSync("SyncResize", { { Part = newPart, CFrame = part.CFrame, Size = part.Size } })
-
-            -- Move
-            fireSync("SyncMove",   { { Part = newPart, CFrame = part.CFrame } })
-
-            -- Rotate
+            fireSync("SyncMove", { { Part = newPart, CFrame = part.CFrame } })
             fireSync("SyncRotate", { { Part = newPart, CFrame = part.CFrame } })
-
-            -- Material
-            fireSync("SyncMaterial",{ { Part = newPart, Material = part.Material } })
-
-            -- Color only
-            fireSync("SyncColor",  { { Part = newPart, Color = part.Color } })
-
-            -- Transparency separately
+            fireSync("SyncMaterial", { { Part = newPart, Material = part.Material } })
+            fireSync("SyncColor", { { Part = newPart, Color = part.Color } })
             fireSync("SyncMaterial", { { Part = newPart, Transparency = part.Transparency } })
-
-            -- Surfaces
-            fireSync("SyncSurface",{ { Part = newPart, Surfaces = {
+            fireSync("SyncSurface", { { Part = newPart, Surfaces = {
                 Top = part.TopSurface, Bottom = part.BottomSurface,
                 Front = part.FrontSurface, Back = part.BackSurface,
                 Left = part.LeftSurface, Right = part.RightSurface
             }}})
-
-            -- CastShadow OFF
             fireSync("SyncShadow", { { Part = newPart, CastShadow = false } })
-
-            -- Anchor preserved already
-            
-            -- Collision preserved (NO SyncCollision)
             fireSync("SyncCollision", { { Part = newPart, CanCollide = part.CanCollide } })
+        end
 
+        built += 1
+        counterLabel.Text = built .. "/" .. total
+        task.wait(BUILD_DELAY)
+    end
+
+    model:Destroy()
+end
+    
         built += 1
         counterLabel.Text = built .. "/" .. total
 
