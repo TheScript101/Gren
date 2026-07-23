@@ -147,7 +147,6 @@ end
 --// GUI FIXED
 local gui = Instance.new("ScreenGui")
 gui.Name = "ExecutorAutoBuilder"
-gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 
 local parentGui = game:GetService("CoreGui")
