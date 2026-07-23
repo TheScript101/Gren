@@ -151,8 +151,13 @@ local function buildModel(model, counterLabel)
             -- Anchor preserved already
             
             -- Collision preserved (NO SyncCollision)
-            newPart.CanCollide = part.CanCollide
-        end
+fireSync("SyncCollision", {
+    { 
+        Part = newPart,
+        CanCollide = part.CanCollide  -- TRUE or FALSE based on original model
+    }
+})
+
 
         built += 1
         counterLabel.Text = built .. "/" .. total
