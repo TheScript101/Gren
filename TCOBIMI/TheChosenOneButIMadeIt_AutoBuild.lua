@@ -158,9 +158,19 @@ end
 --// GUI FIXED
 local gui = Instance.new("ScreenGui")
 gui.Name = "ExecutorAutoBuilder"
-gui.IgnoreGuiInset = true -- ensures it doesn’t get hidden behind Roblox top bar
-gui.ResetOnSpawn = false  -- keeps GUI after respawn
-gui.Parent = game:GetService("CoreGui") -- ✅ use CoreGui for executors
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+local parentGui = game:GetService("CoreGui")
+pcall(function()
+    gui.Parent = parentGui
+end)
+
+if not gui.Parent then
+    pcall(function()
+        gui.Parent = StarterGui
+    end)
+end
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 400, 0, 200)
