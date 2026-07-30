@@ -161,27 +161,32 @@ local function runSkill()
 
     task.wait(0.5)
 
-    -- 2) Float animation with velocity (3.64 → 4.43)
-    playAnimationSegment(floatTrack, 3.64, 4.43)
+    -- 2) Float animation
+    floatTrack:Play()
+    floatTrack.TimePosition = 3.64
+    floatTrack:AdjustSpeed(1)
 
     local bvUp = Instance.new("BodyVelocity")
     bvUp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     bvUp.Velocity = Vector3.new(0, 25, 0)
     bvUp.Parent = root
 
-    task.wait(1)
+    -- Wait until just before the hover pose
+    task.wait(0.76)
+
+    -- Freeze at the hover frame
+    floatTrack.TimePosition = 4.40
+    floatTrack:AdjustSpeed(0)
+
+    -- Remove the upward force
     bvUp:Destroy()
 
-    -- Freeze float animation
-    floatTrack:Play()
-    floatTrack.TimePosition = 4.40
-    floatTrack:AdjustSpeed(0.005)
-
-    -- 3) Anchor aura (0.5s)
+    -- 3) Stay floating while anchored
     freezeChar()
     task.wait(0.5)
     unfreezeChar()
 
+    -- Stop the float animation
     floatTrack:Stop()
 
     -- 4) Teleport down
