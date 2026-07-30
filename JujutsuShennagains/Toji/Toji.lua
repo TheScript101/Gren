@@ -1,4 +1,4 @@
---// Mela Custom Move (Executor Safe, Timestamp + Anchor Fix)
+--// Custom Move (Executor Safe, Timestamp + Anchor Fix)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,6 +23,7 @@ local TARGET_IDS = {
     ["rbxassetid://116040503139675"] = true,
     ["rbxassetid://91074768993486"] = true,
     ["rbxassetid://131358603583212"] = true,
+    ["rbxassetid://100532748201417"] = true,
 }
 
 -- Skill animations
@@ -145,7 +146,7 @@ end
 
 local running = false
 
-local function runSkill()
+local function runSkill(triggerId)
     if running then return end
     running = true
 
@@ -156,10 +157,27 @@ local function runSkill()
 
     enableNoclip()
 
-    -- 1) Startup invis (play segment at 0.01 → 0.5)
-    playAnimationSegment(invisTrack, 0.01, 0.5)
+-- 1) Startup invis
+invisTrack:Play()
+invisTrack:AdjustSpeed(1)
 
-    task.wait(0.5)
+-- Let it play until the freeze frame
+task.wait(0.1) -- 0.10 - 0
+
+-- Freeze at 0.10 seconds
+invisTrack.TimePosition = 0.10
+invisTrack:AdjustSpeed(0)
+
+local startupDelay = 0.5
+
+if triggerId == "rbxassetid://100532748201417" then
+    startupDelay = 2
+end
+
+task.wait(startupDelay)
+
+-- Stop it before starting the float
+invisTrack:Stop()
 
     -- 2) Float animation
     floatTrack:Play()
@@ -208,7 +226,7 @@ local function connectDetector(h)
         local anim = track.Animation
         local id = anim and anim.AnimationId
         if id and TARGET_IDS[id] then
-            task.spawn(runSkill)
+            runSkill(id)
         end
     end)
 end
