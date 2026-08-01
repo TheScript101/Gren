@@ -1,7 +1,6 @@
 --// SERVICES
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 --// CONFIGURATION
@@ -9,155 +8,157 @@ local BUILD_DELAY = 0.25 -- Updated per your request
 
 --// RELIABLE SYNCAPI DETECTION
 local function getSync()
-    local char = LocalPlayer.Character
-    if not char then return nil end
+    local char = LocalPlayer.Character
+    if not char then return nil end
 
-    for _, item in ipairs(char:GetChildren()) do
-        if item:FindFirstChild("SyncAPI") and item.SyncAPI:FindFirstChild("ServerEndpoint") then
-            return item.SyncAPI.ServerEndpoint
-        end
-    end
+    for _, item in ipairs(char:GetChildren()) do
+        if item:FindFirstChild("SyncAPI") and item.SyncAPI:FindFirstChild("ServerEndpoint") then
+            return item.SyncAPI.ServerEndpoint
+        end
+    end
 
-    warn("SyncAPI not found in character.")
-    return nil
+    warn("SyncAPI not found in character.")
+    return nil
 end
 
 local function fireSync(name, payload)
-    local ep = getSync()
-    if not ep then return end
-    ep:InvokeServer(name, payload)
+    local ep = getSync()
+    if not ep then return end
+    ep:InvokeServer(name, payload)
 end
 
 local function createPart(shape, cf, parent)
-    local ep = getSync()
-    if not ep then return nil end
-    return ep:InvokeServer("CreatePart", shape, cf, parent)
+    local ep = getSync()
+    if not ep then return nil end
+    return ep:InvokeServer("CreatePart", shape, cf, parent)
 end
 
 --// SHAPE DETECTION
 local function detectShape(part)
-    if part:IsA("Part") then
-        if part.Shape == Enum.PartType.Ball then return "Ball" end
-        if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
-        return "Normal"
-    elseif part:IsA("WedgePart") then return "Wedge"
-    elseif part:IsA("CornerWedgePart") then return "Corner"
-    elseif part:IsA("TrussPart") then return "Truss"
-    elseif part:IsA("Seat") then return "Seat"
-    elseif part:IsA("VehicleSeat") then return "VehicleSeat"
-    elseif part:IsA("SpawnLocation") then return "Spawn"
-    end
-    return "Normal"
+    if part:IsA("Part") then
+        if part.Shape == Enum.PartType.Ball then return "Ball" end
+        if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
+        return "Normal"
+    elseif part:IsA("WedgePart") then return "Wedge"
+    elseif part:IsA("CornerWedgePart") then return "Corner"
+    elseif part:IsA("TrussPart") then return "Truss"
+    elseif part:IsA("Seat") then return "Seat"
+    elseif part:IsA("VehicleSeat") then return "VehicleSeat"
+    elseif part:IsA("SpawnLocation") then return "Spawn"
+    end
+    return "Normal"
 end
 
 --// BUILD FUNCTION
 local stopBuild = false
 local function buildModel(model, counterLabel)
-    stopBuild = false
+    stopBuild = false
 
-    local hrp = Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    -- Cleanup scripts
-    for _, desc in ipairs(model:GetDescendants()) do
-        if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("ModuleScript") then
-            desc:Destroy()
-        end
-    end
+    -- Cleanup scripts
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("ModuleScript") then
+            desc:Destroy()
+        end
+    end
 
-    -- Ghost preview
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local ghost = part:Clone()
-            ghost.Anchored = true
-            ghost.CanCollide = false
-            ghost.Transparency = 0.7
-            ghost.Parent = workspace
-            game:GetService("Debris"):AddItem(ghost, 5)
-        end
-    end
+    -- Ghost preview
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local ghost = part:Clone()
+            ghost.Anchored = true
+            ghost.CanCollide = false
+            ghost.Transparency = 0.7
+            ghost.Parent = workspace
+            game:GetService("Debris"):AddItem(ghost, 5)
+        end
+    end
 
-    -- Spawn position
-    local spawnPos = hrp.Position + hrp.CFrame.LookVector * 15
+    -- Spawn position
+    local spawnPos = hrp.Position + hrp.CFrame.LookVector * 15
 
-    -- Move model
-    if model:IsA("Model") and model.PrimaryPart then
-        model:SetPrimaryPartCFrame(CFrame.new(spawnPos))
-    else
-        local min = Vector3.new(math.huge, math.huge, math.huge)
-        for _, p in ipairs(model:GetDescendants()) do
-            if p:IsA("BasePart") then
-                min = Vector3.new(
-                    math.min(min.X, p.Position.X),
-                    math.min(min.Y, p.Position.Y),
-                    math.min(min.Z, p.Position.Z)
-                )
-            end
-        end
+    -- Move model
+    if model:IsA("Model") and model.PrimaryPart then
+        model:SetPrimaryPartCFrame(CFrame.new(spawnPos))
+    else
+        local min = Vector3.new(math.huge, math.huge, math.huge)
+        for _, p in ipairs(model:GetDescendants()) do
+            if p:IsA("BasePart") then
+                min = Vector3.new(
+                    math.min(min.X, p.Position.X),
+                    math.min(min.Y, p.Position.Y),
+                    math.min(min.Z, p.Position.Z)
+                )
+            end
+        end
 
-        if min.X ~= math.huge then
-            local offset = spawnPos - min
-            for _, p in ipairs(model:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CFrame = p.CFrame + offset
-                end
-            end
-        end
-    end
+        if min.X ~= math.huge then
+            local offset = spawnPos - min
+            for _, p in ipairs(model:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.CFrame = p.CFrame + offset
+                end
+            end
+        end
+    end
 
-    -- Build parts
-    local parts = {}
-    for _, p in ipairs(model:GetDescendants()) do
-        if p:IsA("BasePart") then table.insert(parts, p) end
-    end
+    -- Build parts
+    local parts = {}
+    for _, p in ipairs(model:GetDescendants()) do
+        if p:IsA("BasePart") then table.insert(parts, p) end
+    end
 
-    local total = #parts
-    local built = 0
+    local total = #parts
+    local built = 0
 
-        for _, part in ipairs(parts) do
-        if stopBuild then break end
+        for _, part in ipairs(parts) do
+        if stopBuild then break end
 
-        local shape = detectShape(part)
-        local newPart = createPart(shape, part.CFrame, workspace)
+        local shape = detectShape(part)
+        local newPart = createPart(shape, part.CFrame, workspace)
 
-        if newPart then
-            fireSync("SyncResize", { { Part = newPart, CFrame = part.CFrame, Size = part.Size } })
-            fireSync("SyncMove", { { Part = newPart, CFrame = part.CFrame } })
-            fireSync("SyncRotate", { { Part = newPart, CFrame = part.CFrame } })
-            fireSync("SyncMaterial", { { Part = newPart, Material = part.Material } })
-            fireSync("SyncColor", { { Part = newPart, Color = part.Color } })
-            fireSync("SyncMaterial", { { Part = newPart, Transparency = part.Transparency } })
-            fireSync("SyncSurface", { { Part = newPart, Surfaces = {
-                Top = part.TopSurface, Bottom = part.BottomSurface,
-                Front = part.FrontSurface, Back = part.BackSurface,
-                Left = part.LeftSurface, Right = part.RightSurface
-            }}})
-            fireSync("SyncShadow", { { Part = newPart, CastShadow = false } })
-            fireSync("SyncCollision", { { Part = newPart, CanCollide = part.CanCollide } })
-        end
+        if newPart then
+            fireSync("SyncResize", { { Part = newPart, CFrame = part.CFrame, Size = part.Size } })
+            fireSync("SyncMove", { { Part = newPart, CFrame = part.CFrame } })
+            fireSync("SyncRotate", { { Part = newPart, CFrame = part.CFrame } })
+            fireSync("SyncMaterial", { { Part = newPart, Material = part.Material } })
+            fireSync("SyncColor", { { Part = newPart, Color = part.Color } })
+            fireSync("SyncMaterial", { { Part = newPart, Transparency = part.Transparency } })
+            fireSync("SyncSurface", { { Part = newPart, Surfaces = {
+                Top = part.TopSurface, Bottom = part.BottomSurface,
+                Front = part.FrontSurface, Back = part.BackSurface,
+                Left = part.LeftSurface, Right = part.RightSurface
+            }}})
+            fireSync("SyncShadow", { { Part = newPart, CastShadow = false } })
+            fireSync("SyncCollision", { { Part = newPart, CanCollide = part.CanCollide } })
+        end
 
-        built += 1
-        counterLabel.Text = built .. "/" .. total
-        task.wait(BUILD_DELAY)
-    end
+        built += 1
+        counterLabel.Text = built .. "/" .. total
+        task.wait(BUILD_DELAY)
+    end
 
-    model:Destroy()
+    model:Destroy()
 end
 
 --// GUI FIXED
 local gui = Instance.new("ScreenGui")
 gui.Name = "ExecutorAutoBuilder"
+gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 
 local parentGui = game:GetService("CoreGui")
 pcall(function()
-    gui.Parent = parentGui
+    gui.Parent = parentGui
 end)
 
 if not gui.Parent then
-    pcall(function()
-        gui.Parent = playerGui
-    end)
+    pcall(function()
+        local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+gui.Parent = playerGui
+    end)
 end
 
 local frame = Instance.new("Frame")
@@ -230,41 +231,41 @@ toggleBtn.Parent = gui
 
 local isVisible = true
 toggleBtn.MouseButton1Click:Connect(function()
-    isVisible = not isVisible
-    frame.Visible = isVisible
+    isVisible = not isVisible
+    frame.Visible = isVisible
 end)
 
 -- BUTTONS
 buildBtn.MouseButton1Click:Connect(function()
-    local assetId = tonumber(idBox.Text)
-    if not assetId then 
-        counterLabel.Text = "Invalid Asset ID"
-        return 
-    end
-    
-    counterLabel.Text = "Loading Model..."
-    
-    local success, objects = pcall(function()
-        return game:GetObjects("rbxassetid://" .. assetId)
-    end)
-    
-    if success and objects and #objects > 0 then
-        local wrapper = Instance.new("Folder")
-        wrapper.Name = "TempBuildWrapper"
-        
-        for _, obj in ipairs(objects) do
-            obj.Parent = wrapper
-        end
-        
-        task.spawn(function()
-            buildModel(wrapper, counterLabel)
-        end)
-    else
-        counterLabel.Text = "Failed to load Asset"
-    end
+    local assetId = tonumber(idBox.Text)
+    if not assetId then 
+        counterLabel.Text = "Invalid Asset ID"
+        return 
+    end
+    
+    counterLabel.Text = "Loading Model..."
+    
+    local success, objects = pcall(function()
+        return game:GetObjects("rbxassetid://" .. assetId)
+    end)
+    
+    if success and objects and #objects > 0 then
+        local wrapper = Instance.new("Folder")
+        wrapper.Name = "TempBuildWrapper"
+        
+        for _, obj in ipairs(objects) do
+            obj.Parent = wrapper
+        end
+        
+        task.spawn(function()
+            buildModel(wrapper, counterLabel)
+        end)
+    else
+        counterLabel.Text = "Failed to load Asset"
+    end
 end)
 
 stopBtn.MouseButton1Click:Connect(function()
-    stopBuild = true
-    counterLabel.Text = "Stopped"
+    stopBuild = true
+    counterLabel.Text = "Stopped"
 end)
