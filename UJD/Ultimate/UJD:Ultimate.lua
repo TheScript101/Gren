@@ -150,23 +150,19 @@ CombatTab:CreateToggle({
                 end
                 lp.SimulationRadius = -100
             end)
-
-            -- disable TouchInterests globally
-            Workspace.DescendantAdded:Connect(function(descendant)
-                if descendant:IsA("TouchTransmitter") or descendant:IsA("TouchInterest") then
-                    if descendant.Parent and descendant.Parent:IsA("BasePart") and not inExcludedZone(descendant.Parent) then
-                        descendant.Parent.CanTouch = false
-                    end
-                end
-            end)
-
-            for _,v in ipairs(Workspace:GetDescendants()) do
-                if v:IsA("TouchInterest") and v.Parent and v.Parent:IsA("BasePart") and not inExcludedZone(v.Parent) then
-                    v.Parent.CanTouch = false
+        else
+            -- ✅ Disconnect and reset
+            if GodModeConn then GodModeConn:Disconnect() GodModeConn = nil end
+            for _,v in pairs(lp.Character:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = true
                 end
             end
-        else
-            if GodModeConn then GodModeConn:Disconnect() end
+            for _,v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = true
+                end
+            end
         end
     end
 })
@@ -177,9 +173,16 @@ CombatTab:CreateToggle({
 local LessBlatantEnabled = false
 local protectedParts = {}
 
--- helper: random delay between 0.25 and 0.5
-local function randomDelay()
-    return math.random(25,50)/100
+-- helper: weighted random delay
+local function weightedDelay()
+    local roll = math.random(1,4)
+    if roll <= 2 then
+        return 0 -- 2/4 chance full godmode instantly
+    elseif roll == 3 then
+        return 0.25 -- 1/4 chance
+    else
+        return 0.5 -- 1/4 chance
+    end
 end
 
 local function protectPart(part)
@@ -187,8 +190,8 @@ local function protectPart(part)
     if inExcludedZone(part) then return end
     if protectedParts[part] then return end
 
-    -- allow touch for a short time
-    task.delay(randomDelay(), function()
+    local delayTime = weightedDelay()
+    task.delay(delayTime, function()
         if LessBlatantEnabled and part.Parent and part:IsDescendantOf(Workspace) then
             part.CanTouch = false
             protectedParts[part] = true
@@ -208,7 +211,6 @@ CombatTab:CreateToggle({
                     protectPart(v)
                 end
             end
-
             -- new parts
             Workspace.DescendantAdded:Connect(function(descendant)
                 if LessBlatantEnabled and descendant:IsA("TouchInterest") then
@@ -219,7 +221,7 @@ CombatTab:CreateToggle({
                 end
             end)
         else
-            -- reset
+            -- ✅ Reset all parts
             for part,_ in pairs(protectedParts) do
                 if part and part:IsA("BasePart") then
                     part.CanTouch = true
@@ -229,7 +231,6 @@ CombatTab:CreateToggle({
         end
     end
 })
-
 
 -----------------------------------------------------------
 --// PLAYER TAB
