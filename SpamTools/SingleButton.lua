@@ -65,20 +65,27 @@ toggleVisibility.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- SPAM FUNCTION
----------------------------------------------------------
----------------------------------------------------------
 -- SPAM FUNCTION (one-by-one rapid cycle)
 ---------------------------------------------------------
 local function spamToolsFunction()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+    -- auto-stop if humanoid dies
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.Died:Connect(function()
+            getgenv().spamTools = false
+            spamButton.Text = "Start Spamming Tools"
+            spamButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        end)
+    end
 
     while getgenv().spamTools do
         local backpack = LocalPlayer.Backpack
         if not backpack then task.wait(0.01) continue end
 
         for _, tool in ipairs(backpack:GetChildren()) do
-            if not getgenv().spamTools then break end -- stop instantly if toggled off
+            if not getgenv().spamTools then break end
             if tool:IsA("Tool") then
                 -- Equip
                 tool.Parent = character
