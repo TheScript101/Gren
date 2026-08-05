@@ -65,7 +65,7 @@ toggleVisibility.MouseButton1Click:Connect(function()
 end)
 
 ---------------------------------------------------------
--- SPAM FUNCTION (one-by-one rapid cycle)
+-- SAFE SPAM FUNCTION (no freeze, waits for tools)
 ---------------------------------------------------------
 local function spamToolsFunction()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -80,34 +80,46 @@ local function spamToolsFunction()
         end)
     end
 
-    while getgenv().spamTools do
-        local backpack = LocalPlayer.Backpack
-        if not backpack then task.wait(0.01) continue end
+    -- ⭐ ALWAYS wait 0.25s before starting spam
+    task.wait(0.25)
 
+    while getgenv().spamTools do
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+        -- ⭐ If backpack missing or empty → wait safely
+        if not backpack or #backpack:GetChildren() == 0 then
+            task.wait(0.25)
+            continue
+        end
+
+        -- ⭐ Loop through tools safely
         for _, tool in ipairs(backpack:GetChildren()) do
             if not getgenv().spamTools then break end
-            if tool:IsA("Tool") then
-                -- Equip
-                tool.Parent = character
-                task.wait(0.01)
+            if not tool:IsA("Tool") then continue end
 
-                -- Hold equipped briefly
-                task.wait(0.05)
+            -- Equip
+            tool.Parent = character
+            task.wait(0.01)
 
-                -- Use/activate
-                if tool:FindFirstChild("Remote") then
-                    pcall(function() tool.Remote:FireServer() end)
-                else
-                    pcall(function() tool:Activate() end)
-                end
+            -- Hold equipped briefly
+            task.wait(0.05)
 
-                -- Small delay before next tool
-                task.wait(0.02)
-
-                -- Unequip back to backpack
-                tool.Parent = backpack
+            -- Use/activate
+            if tool:FindFirstChild("Remote") then
+                pcall(function() tool.Remote:FireServer() end)
+            else
+                pcall(function() tool:Activate() end)
             end
+
+            -- Small delay before next tool
+            task.wait(0.02)
+
+            -- Unequip back to backpack
+            tool.Parent = backpack
         end
+
+        -- tiny loop delay
+        task.wait(0.01)
     end
 end
 
