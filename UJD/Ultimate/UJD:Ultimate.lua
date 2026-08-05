@@ -10,6 +10,12 @@ local lp = Players.LocalPlayer
 local char = lp.Character or lp.CharacterAdded:Wait()
 local hum = char:WaitForChild("Humanoid")
 
+lp.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    hum = newChar:WaitForChild("Humanoid")
+    setupChar(newChar) -- reapply jump/walkspeed logic
+end)
+
 -- Rayfield UI
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
@@ -35,9 +41,19 @@ local HitboxSize = 2
 CombatTab:CreateToggle({
     Name = "Enable Hitbox For Sans",
     CurrentValue = false,
-    Callback = function(v)
-        HitboxEnabled = v
+Callback = function(v)
+    HitboxEnabled = v
+    if not v then
+        for _,plr in ipairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local root = plr.Character.HumanoidRootPart
+                root.Size = Vector3.new(2,2,1) -- default size
+                root.Transparency = 0
+                root.CanCollide = true
+            end
+        end
     end
+end
 })
 
 CombatTab:CreateSlider({
@@ -143,7 +159,9 @@ CombatTab:CreateToggle({
         GodModeEnabled = v
         if GodModeEnabled then
             GodModeConn = RunService.Stepped:Connect(function()
-                for _,v in pairs(lp.Character:GetChildren()) do
+                local character = lp.Character
+                if not character then return end
+                for _,v in pairs(character:GetChildren()) do
                     if v:IsA("BasePart") and not inExcludedZone(v) then
                         v.CanTouch = false
                     end
@@ -172,6 +190,7 @@ CombatTab:CreateToggle({
 -----------------------------------------------------------
 local LessBlatantEnabled = false
 local protectedParts = {}
+local lessBlatantConn
 
 -- helper: weighted random delay
 local function weightedDelay()
@@ -212,14 +231,15 @@ CombatTab:CreateToggle({
                 end
             end
             -- new parts
-            Workspace.DescendantAdded:Connect(function(descendant)
-                if LessBlatantEnabled and descendant:IsA("TouchInterest") then
-                    local parent = descendant.Parent
-                    if parent and parent:IsA("BasePart") then
-                        protectPart(parent)
-                    end
-                end
-            end)
+lessBlatantConn = Workspace.DescendantAdded:Connect(function(descendant)
+    if LessBlatantEnabled and descendant:IsA("TouchInterest") then
+        local parent = descendant.Parent
+        if parent and parent:IsA("BasePart") then
+            protectPart(parent)
+        end
+    end
+end)
+
         else
             -- ✅ Reset all parts
             for part,_ in pairs(protectedParts) do
@@ -228,6 +248,7 @@ CombatTab:CreateToggle({
                 end
             end
             protectedParts = {}
+            if lessBlatantConn then lessBlatantConn:Disconnect() lessBlatantConn = nil end
         end
     end
 })
@@ -239,6 +260,7 @@ local PlayerTab = Window:CreateTab("Player")
 
 -- No Jump Cooldown
 local NoJumpCooldown = false
+local jumpConn
 
 PlayerTab:CreateToggle({
     Name = "No Jump Cooldown",
@@ -261,7 +283,8 @@ end)
 
 local function setupChar(char)
     local hum = char:WaitForChild("Humanoid")
-    RunService.RenderStepped:Connect(function()
+    if jumpConn then jumpConn:Disconnect() end
+    jumpConn = RunService.RenderStepped:Connect(function()
         if NoJumpCooldown then
             hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
             hum.AutoJumpEnabled = false
