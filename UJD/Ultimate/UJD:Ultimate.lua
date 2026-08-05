@@ -261,6 +261,7 @@ local VisualsTab = Window:CreateTab("Visuals")
 local DodgeESPEnabled = false
 local dodgeESPConnections = {}
 local dodgeESPLabels = {}
+local dodgeESPCharAdded = {}
 
 -- helper: create billboard above player
 local function createDodgeESP(plr)
@@ -277,7 +278,7 @@ local function createDodgeESP(plr)
     -- BillboardGui
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "DodgeESP"
-    billboard.Size = UDim2.new(0, 120, 0, 40)
+    billboard.Size = UDim2.new(4, 0, 1, 0) -- constant size, not affected by zoom
     billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.Adornee = head
     billboard.AlwaysOnTop = true
@@ -323,27 +324,47 @@ VisualsTab:CreateToggle({
             for _,plr in ipairs(Players:GetPlayers()) do
                 if plr ~= lp then
                     createDodgeESP(plr)
+                    -- listen for respawn
+                    dodgeESPCharAdded[plr] = plr.CharacterAdded:Connect(function()
+                        task.wait(1) -- wait for character to load
+                        if DodgeESPEnabled then
+                            createDodgeESP(plr)
+                        end
+                    end)
                 end
             end
             -- add ESP for new players
             Players.PlayerAdded:Connect(function(plr)
                 if DodgeESPEnabled then
                     createDodgeESP(plr)
+                    dodgeESPCharAdded[plr] = plr.CharacterAdded:Connect(function()
+                        task.wait(1)
+                        if DodgeESPEnabled then
+                            createDodgeESP(plr)
+                        end
+                    end)
                 end
             end)
             -- cleanup when players leave
             Players.PlayerRemoving:Connect(function(plr)
                 removeDodgeESP(plr)
+                if dodgeESPCharAdded[plr] then
+                    dodgeESPCharAdded[plr]:Disconnect()
+                    dodgeESPCharAdded[plr] = nil
+                end
             end)
         else
             -- disable ESP
             for _,plr in ipairs(Players:GetPlayers()) do
                 removeDodgeESP(plr)
+                if dodgeESPCharAdded[plr] then
+                    dodgeESPCharAdded[plr]:Disconnect()
+                    dodgeESPCharAdded[plr] = nil
+                end
             end
         end
     end
 })
-
 
 -----------------------------------------------------------
 --// PLAYER TAB
