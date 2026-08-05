@@ -254,6 +254,98 @@ end)
 })
 
 -----------------------------------------------------------
+--// VISUALS TAB
+-----------------------------------------------------------
+local VisualsTab = Window:CreateTab("Visuals")
+
+local DodgeESPEnabled = false
+local dodgeESPConnections = {}
+local dodgeESPLabels = {}
+
+-- helper: create billboard above player
+local function createDodgeESP(plr)
+    if not plr.Character or not plr.Character:FindFirstChild("Head") then return end
+    local head = plr.Character.Head
+
+    -- check workspace.<username>.Sans and workspace.<username>.Dodges
+    local playerFolder = Workspace:FindFirstChild(plr.Name)
+    if not playerFolder then return end
+    local sansFolder = playerFolder:FindFirstChild("Sans")
+    local dodgesVal = playerFolder:FindFirstChild("Dodges")
+    if not sansFolder or not dodgesVal or not dodgesVal:IsA("IntValue") then return end
+
+    -- BillboardGui
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DodgeESP"
+    billboard.Size = UDim2.new(0, 120, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextScaled = true
+    textLabel.Text = "Dodges: " .. dodgesVal.Value
+    textLabel.Parent = billboard
+
+    -- update connection
+    local conn = dodgesVal:GetPropertyChangedSignal("Value"):Connect(function()
+        textLabel.Text = "Dodges: " .. dodgesVal.Value
+    end)
+
+    dodgeESPConnections[plr] = conn
+    dodgeESPLabels[plr] = billboard
+end
+
+-- helper: remove billboard
+local function removeDodgeESP(plr)
+    if dodgeESPConnections[plr] then
+        dodgeESPConnections[plr]:Disconnect()
+        dodgeESPConnections[plr] = nil
+    end
+    if dodgeESPLabels[plr] then
+        dodgeESPLabels[plr]:Destroy()
+        dodgeESPLabels[plr] = nil
+    end
+end
+
+VisualsTab:CreateToggle({
+    Name = "Dodge ESP",
+    CurrentValue = false,
+    Callback = function(v)
+        DodgeESPEnabled = v
+        if DodgeESPEnabled then
+            -- add ESP for all current players
+            for _,plr in ipairs(Players:GetPlayers()) do
+                if plr ~= lp then
+                    createDodgeESP(plr)
+                end
+            end
+            -- add ESP for new players
+            Players.PlayerAdded:Connect(function(plr)
+                if DodgeESPEnabled then
+                    createDodgeESP(plr)
+                end
+            end)
+            -- cleanup when players leave
+            Players.PlayerRemoving:Connect(function(plr)
+                removeDodgeESP(plr)
+            end)
+        else
+            -- disable ESP
+            for _,plr in ipairs(Players:GetPlayers()) do
+                removeDodgeESP(plr)
+            end
+        end
+    end
+})
+
+
+-----------------------------------------------------------
 --// PLAYER TAB
 -----------------------------------------------------------
 local PlayerTab = Window:CreateTab("Player")
