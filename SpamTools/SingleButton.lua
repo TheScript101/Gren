@@ -67,26 +67,40 @@ end)
 ---------------------------------------------------------
 -- SPAM FUNCTION
 ---------------------------------------------------------
+---------------------------------------------------------
+-- SPAM FUNCTION (one-by-one rapid cycle)
+---------------------------------------------------------
 local function spamToolsFunction()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
     while getgenv().spamTools do
-        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        local backpack = LocalPlayer.Backpack
+        if not backpack then task.wait(0.01) continue end
+
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if not getgenv().spamTools then break end -- stop instantly if toggled off
             if tool:IsA("Tool") then
+                -- Equip
                 tool.Parent = character
+                task.wait(0.01)
+
+                -- Hold equipped briefly
                 task.wait(0.05)
 
+                -- Use/activate
                 if tool:FindFirstChild("Remote") then
                     pcall(function() tool.Remote:FireServer() end)
                 else
                     pcall(function() tool:Activate() end)
                 end
 
-                task.wait(spamInterval)
+                -- Small delay before next tool
+                task.wait(0.02)
+
+                -- Unequip back to backpack
+                tool.Parent = backpack
             end
         end
-
-        task.wait(spamInterval)
     end
 end
 
