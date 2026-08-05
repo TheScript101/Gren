@@ -172,6 +172,66 @@ CombatTab:CreateToggle({
 })
 
 -----------------------------------------------------------
+-- GodMode (Less Blatant)
+-----------------------------------------------------------
+local LessBlatantEnabled = false
+local protectedParts = {}
+
+-- helper: random delay between 0.25 and 0.5
+local function randomDelay()
+    return math.random(25,50)/100
+end
+
+local function protectPart(part)
+    if not part:IsA("BasePart") then return end
+    if inExcludedZone(part) then return end
+    if protectedParts[part] then return end
+
+    -- allow touch for a short time
+    task.delay(randomDelay(), function()
+        if LessBlatantEnabled and part.Parent and part:IsDescendantOf(Workspace) then
+            part.CanTouch = false
+            protectedParts[part] = true
+        end
+    end)
+end
+
+CombatTab:CreateToggle({
+    Name = "GodMode (Less Blatant)",
+    CurrentValue = false,
+    Callback = function(v)
+        LessBlatantEnabled = v
+        if LessBlatantEnabled then
+            -- existing parts
+            for _,v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("BasePart") and v:FindFirstChildWhichIsA("TouchInterest") then
+                    protectPart(v)
+                end
+            end
+
+            -- new parts
+            Workspace.DescendantAdded:Connect(function(descendant)
+                if LessBlatantEnabled and descendant:IsA("TouchInterest") then
+                    local parent = descendant.Parent
+                    if parent and parent:IsA("BasePart") then
+                        protectPart(parent)
+                    end
+                end
+            end)
+        else
+            -- reset
+            for part,_ in pairs(protectedParts) do
+                if part and part:IsA("BasePart") then
+                    part.CanTouch = true
+                end
+            end
+            protectedParts = {}
+        end
+    end
+})
+
+
+-----------------------------------------------------------
 --// PLAYER TAB
 -----------------------------------------------------------
 local PlayerTab = Window:CreateTab("Player")
