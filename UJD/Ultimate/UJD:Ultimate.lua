@@ -55,14 +55,18 @@ task.spawn(function()
         if HitboxEnabled then
             for _,plr in ipairs(Players:GetPlayers()) do
                 if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local root = plr.Character.HumanoidRootPart
-                    root.CanCollide = false
-                    if HitboxSize == 1 then
-                        root.Size = Vector3.new(2,1,1)
-                        root.Transparency = 0.75
-                    else
-                        root.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-                        root.Transparency = 0.75
+                    -- ✅ Check if workspace.<username>.Sans exists
+                    local playerFolder = Workspace:FindFirstChild(plr.Name)
+                    if playerFolder and playerFolder:FindFirstChild("Sans") then
+                        local root = plr.Character.HumanoidRootPart
+                        root.CanCollide = false
+                        if HitboxSize == 1 then
+                            root.Size = Vector3.new(2,1,1)
+                            root.Transparency = 0.75
+                        else
+                            root.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                            root.Transparency = 0.75
+                        end
                     end
                 end
             end
