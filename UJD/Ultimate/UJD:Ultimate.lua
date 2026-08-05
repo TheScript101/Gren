@@ -33,7 +33,7 @@ local HitboxEnabled = false
 local HitboxSize = 2
 
 CombatTab:CreateToggle({
-    Name = "Hitbox",
+    Name = "Enable Hitbox For Sans",
     CurrentValue = false,
     Callback = function(v)
         HitboxEnabled = v
