@@ -260,81 +260,58 @@ local VisualsTab = Window:CreateTab("Visuals")
 
 local DodgeESPEnabled = false
 local dodgeESPLabels = {}
-local dodgeESPValueConnections = {}
-local dodgeESPFolderConnections = {}
 
--- Remove ESP cleanly
 local function removeESP(plr)
     if dodgeESPLabels[plr] then
         dodgeESPLabels[plr]:Destroy()
         dodgeESPLabels[plr] = nil
     end
-    if dodgeESPValueConnections[plr] then
-        dodgeESPValueConnections[plr]:Disconnect()
-        dodgeESPValueConnections[plr] = nil
-    end
 end
 
--- Create ESP if Sans + Dodges exist
-local function tryCreateESP(plr)
-    removeESP(plr)
-
+local function ensureESP(plr)
     local char = plr.Character
-    if not char then return end
+    if not char then return removeESP(plr) end
+
     local head = char:FindFirstChild("Head")
-    if not head then return end
+    if not head then return removeESP(plr) end
 
     local folder = Workspace:FindFirstChild(plr.Name)
-    if not folder then return end
+    if not folder then return removeESP(plr) end
 
     local sans = folder:FindFirstChild("Sans")
     local dodges = folder:FindFirstChild("Dodges")
 
-    if not sans or not dodges or not dodges:IsA("IntValue") then return end
+    if not sans or not dodges or not dodges:IsA("IntValue") then
+        return removeESP(plr)
+    end
 
-    -- BillboardGui (constant size)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "DodgeESP"
-    billboard.Size = UDim2.new(4, 0, 1, 0) -- constant size
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Adornee = head
-    billboard.Parent = head
+    -- create if missing
+    local billboard = dodgeESPLabels[plr]
+    if not billboard or not billboard.Parent then
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = "DodgeESP"
+        billboard.Size = UDim2.new(4, 0, 1, 0)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Adornee = head
+        billboard.Parent = head
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Enum.Font.GothamBold
-    label.TextScaled = true
-    label.Text = "Dodges: " .. dodges.Value
-    label.Parent = billboard
+        local label = Instance.new("TextLabel")
+        label.Name = "Text"
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.Parent = billboard
 
-    dodgeESPLabels[plr] = billboard
+        dodgeESPLabels[plr] = billboard
+    end
 
-    -- live update
-    dodgeESPValueConnections[plr] = dodges:GetPropertyChangedSignal("Value"):Connect(function()
+    local label = billboard:FindFirstChild("Text")
+    if label then
         label.Text = "Dodges: " .. dodges.Value
-    end)
-end
-
--- Watch workspace folder changes
-local function watchPlayerFolder(plr)
-    local folder = Workspace:FindFirstChild(plr.Name)
-    if not folder then return end
-
-    -- Listen for Sans or Dodges being added/removed
-    dodgeESPFolderConnections[plr] = folder.ChildAdded:Connect(function(child)
-        if DodgeESPEnabled then
-            tryCreateESP(plr)
-        end
-    end)
-
-    folder.ChildRemoved:Connect(function(child)
-        if DodgeESPEnabled then
-            tryCreateESP(plr)
-        end
-    end)
+    end
 end
 
 VisualsTab:CreateToggle({
@@ -343,42 +320,25 @@ VisualsTab:CreateToggle({
     Callback = function(v)
         DodgeESPEnabled = v
 
-        if v then
-            -- Enable ESP for all players
-            for _,plr in ipairs(Players:GetPlayers()) do
-                if plr ~= lp then
-                    tryCreateESP(plr)
-
-                    -- respawn listener
-                    plr.CharacterAdded:Connect(function()
-                        task.wait(0.5)
-                        if DodgeESPEnabled then
-                            tryCreateESP(plr)
+        if DodgeESPEnabled then
+            task.spawn(function()
+                while DodgeESPEnabled do
+                    for _,plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= lp then
+                            ensureESP(plr)
                         end
-                    end)
-
-                    -- workspace folder listener
-                    watchPlayerFolder(plr)
+                    end
+                    task.wait(0.2)
                 end
-            end
 
-            -- new players
-            Players.PlayerAdded:Connect(function(plr)
-                if DodgeESPEnabled then
-                    task.wait(0.5)
-                    tryCreateESP(plr)
-                    watchPlayerFolder(plr)
+                -- cleanup when turned off
+                for _,plr in ipairs(Players:GetPlayers()) do
+                    removeESP(plr)
                 end
             end)
-
         else
-            -- disable ESP
             for _,plr in ipairs(Players:GetPlayers()) do
                 removeESP(plr)
-                if dodgeESPFolderConnections[plr] then
-                    dodgeESPFolderConnections[plr]:Disconnect()
-                    dodgeESPFolderConnections[plr] = nil
-                end
             end
         end
     end
