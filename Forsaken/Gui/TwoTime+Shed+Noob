@@ -14,15 +14,15 @@ local dashAnimUnder50 = "rbxassetid://115946474977409"
 -- Animation IDs with per-animation settings
 local targetAnims = {
     -- Shedletsky
-    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, dashDistance = 6 },
-    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, dashDistance = 8 },
+    ["rbxassetid://116618003477002"] = { dashDelay = dashDelay, dashDistance = 2.5},
+    ["rbxassetid://121781457295101"] = { dashDelay = 0.25, dashDistance = 2.5},
 
     -- Two Time
-    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, dashDistance = 6 },
+    ["rbxassetid://86545133269813"] = { dashDelay = 0.05, dashDistance = 2.5 },
 
     -- Noob
-    ["rbxassetid://124033675853489"] = { dashDelay = 0.15, dashDistance = 8 },
-    ["rbxassetid://96771054624545"] = { dashDelay = 0.15, dashDistance = 8 },
+    ["rbxassetid://124033675853489"] = { dashDelay = 0.15, dashDistance = 1 },
+    ["rbxassetid://96771054624545"] = { dashDelay = 0.15, dashDistance = 1 },
 }
 
 -- Get animation config
