@@ -27,7 +27,7 @@ local selectionBoxMode = false
 
 -- long press
 local multiSelectPressStart = nil
-local LONG_PRESS_TIME = 5
+local LONG_PRESS_TIME = 3
 
 -- retry load
 local failedIndices = {}
@@ -106,20 +106,30 @@ end
 local function detectPartType(part)
     local name = part.Name
 
-    local specialShapes = {
-        ["3 Point Pyramid"] = true,
-        ["Cone"] = true,
-        ["Half Ball"] = true,
-        ["Half Cylinder"] = true,
-        ["Half Hollow Cylinder"] = true,
-        ["Head"] = true,
-        ["Hole"] = true,
-        ["Hollow Cylinder"] = true,
-        ["Pyramid"] = true,
-        ["Ramp"] = true,
-        ["Star"] = true,
-        ["Torus"] = true
-    }
+local specialShapes = {
+    ["3 Point Pyramid"] = true,
+    ["Cone"] = true,
+    ["Half Ball"] = true,
+    ["Half Cylinder"] = true,
+    ["Half Hollow Cylinder"] = true,
+    ["Head"] = true,
+    ["Hole"] = true,
+    ["Hollow Cylinder"] = true,
+    ["Pyramid"] = true,
+    ["Ramp"] = true,
+    ["Star"] = true,
+    ["Torus"] = true,
+    -- new parts
+    ["UV Sphere 4x32"] = true,
+    ["UV Sphere 32x4"] = true,
+    ["UV Sphere 2"] = true,
+    ["UV Sphere 1"] = true,
+    ["ICO Sphere 2"] = true,
+    ["ICO Sphere 1"] = true,
+    ["Truss"] = true,
+    ["CornerWedge"] = true
+}
+
 
     if specialShapes[name] then
         return name
@@ -738,6 +748,25 @@ selectAllBtn.TextSize = 14
 selectAllBtn.Text = "Select All"
 Instance.new("UICorner", selectAllBtn).CornerRadius = UDim.new(0, 6)
 
+local clearBtn = Instance.new("TextButton", loadingPage)
+clearBtn.Size = UDim2.new(1, -20, 0, 32)
+clearBtn.Position = UDim2.new(0, 10, 0, 200)
+clearBtn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+clearBtn.TextColor3 = Color3.fromRGB(255,255,255)
+clearBtn.Font = Enum.Font.GothamBold
+clearBtn.TextSize = 14
+clearBtn.Text = "Clear Selected"
+Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 6)
+
+clearBtn.MouseButton1Click:Connect(function()
+    selectedParts = {}
+    for _, hl in pairs(highlights) do
+        if hl and hl.Parent then hl:Destroy() end
+    end
+    highlights = {}
+    loadStatus.Text = "Selection cleared"
+end)
+
 --========================================================--
 -- HIGHLIGHT / SELECTION HELPERS
 --========================================================--
@@ -1082,7 +1111,7 @@ local function buildOnePart(index, data, totalParts, loadedCountRef)
 
     local materialEnum = Enum.Material[materialName] or Enum.Material.Plastic
     pcall(function()
-        Events.PaintObject:InvokeServer({newPart}, "Material", materialEnum)
+        Events.PaintObject:InvokeServer({newPart}, "Material", Enum.Material[savedMaterial])
     end)
 
     for key, value in pairs(behaviors) do
