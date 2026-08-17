@@ -819,7 +819,7 @@ local function togglePartSelection(part)
 end
 
 --========================================================--
--- MULTI-SELECT INPUT (CLICK + BOX)
+-- MULTI-SELECT INPUT (CLICK + BOX) [PATCHED]
 --========================================================--
 
 local selectionBoxFrame = Instance.new("Frame")
@@ -896,24 +896,22 @@ local function selectPartsInScreenBox(p1, p2)
 
     for _, obj in ipairs(items:GetDescendants()) do
         if (obj:IsA("BasePart") or obj:IsA("Model")) and isValidItemPart(obj) then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(obj.Position)
-            if onScreen then
-                if screenPos.X >= minX and screenPos.X <= maxX and screenPos.Y >= minY and screenPos.Y <= maxY then
-                    local realPart = obj
-if obj:IsA("Model") then
-    realPart = obj:FindFirstChildWhichIsA("BasePart", true)
-end
-
-if realPart then
-    selectedParts[realPart] = true
-    addHighlight(realPart)
-end
+            local realPart = obj
+            if obj:IsA("Model") then
+                realPart = obj:FindFirstChildWhichIsA("BasePart", true)
+            end
+            if realPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(realPart.Position)
+                if onScreen and screenPos.X >= minX and screenPos.X <= maxX and screenPos.Y >= minY and screenPos.Y <= maxY then
+                    selectedParts[realPart] = true
+                    addHighlight(realPart)
                 end
             end
         end
     end
 end
 
+-- START BOX
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if not multiSelectEnabled then return end
@@ -937,6 +935,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- DRAG BOX
 UserInputService.InputChanged:Connect(function(input, gp)
     if gp then return end
     if not selectionBoxMode or not boxStartPos then return end
@@ -952,20 +951,16 @@ UserInputService.InputChanged:Connect(function(input, gp)
     end
 end)
 
+-- FINISH BOX
 UserInputService.InputEnded:Connect(function(input, gp)
     if gp then return end
     if not selectionBoxMode or not boxStartPos then return end
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         local endPos = UserInputService:GetMouseLocation()
-        selectionBoxFrame.Visible = false
-        selectionBoxFrame.Size = UDim2.fromOffset(0, 0)
-
         selectPartsInScreenBox(boxStartPos, endPos)
-
         boxStartPos = nil
-        selectionBoxMode = false
-        setMultiSelectVisual()
+        selectionBoxFrame.Visible = false
     end
 end)
 
