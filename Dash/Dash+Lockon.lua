@@ -40,7 +40,7 @@ gui.Parent = CoreGui
 
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 120, 0, 45)
-button.Position = UDim2.new(1, -140, 0.25, 0) -- NEW POSITION
+button.Position = UDim2.new(1, -140, 0.21, 0) -- NEW POSITION
 button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 button.Text = "DASH"
 button.TextSize = 20
@@ -70,8 +70,8 @@ local function dash()
 
     local root = char:FindFirstChild("HumanoidRootPart")
     if root then
-        for i = 1, 12 do
-            root.CFrame = root.CFrame + (root.CFrame.LookVector * 2.5)
+        for i = 1, 10 do
+            root.CFrame = root.CFrame + (root.CFrame.LookVector * 1.8)
             task.wait(0.02)
         end
     end
