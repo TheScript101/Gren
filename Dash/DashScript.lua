@@ -40,7 +40,7 @@ gui.Parent = CoreGui
 
 local button = Instance.new("TextButton")
 button.Size = UDim2.new(0, 120, 0, 45)
-button.Position = UDim2.new(1, -140, 0.25, -20) -- NEW POSITION
+button.Position = UDim2.new(1, -140, 0.25, 0) -- NEW POSITION
 button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 button.Text = "DASH"
 button.TextSize = 20
