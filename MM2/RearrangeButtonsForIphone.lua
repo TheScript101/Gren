@@ -26,7 +26,7 @@ emotes.Size = UDim2.new(1, 100, 1, 0)
 -- SHIFTLOCK (MouseLock)
 ----------------------------------------------------------------
 local mouseLock = container:WaitForChild("MouseLock"):WaitForChild("Container")
-mouseLock.Position = UDim2.new(0, 408, 0, 305)
+mouseLock.Position = UDim2.new(0, 398, 0, 285)
 mouseLock.Size = UDim2.new(1, 25, 1, 25)
 
 -- Optional: also force shiftlock itself above siblings
