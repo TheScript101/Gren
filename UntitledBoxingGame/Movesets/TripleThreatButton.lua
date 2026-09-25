@@ -133,8 +133,8 @@ end
 -- DODGE ANIMATION
 --==================================================
 
-local function playDodgeAnimation(humanoid)
-    if not humanoid then
+local function playDodgeAnimation(humanoid, config)
+    if not humanoid or not config then
         return
     end
 
@@ -145,14 +145,11 @@ local function playDodgeAnimation(humanoid)
         animator.Parent = humanoid
     end
 
-    -- Pick a random configured dodge animation
-    local config = DODGE_ANIMS[math.random(1, #DODGE_ANIMS)]
-
     local animId = config[1]
     local startTime = tonumber(config[2]) or 0
     local endTime = tonumber(config[3]) or 10
     local speed = tonumber(config[4]) or 1
-
+    
     -- Safety
     if startTime < 0 then
         startTime = 0
