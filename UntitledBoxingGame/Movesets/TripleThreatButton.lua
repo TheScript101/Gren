@@ -24,33 +24,33 @@ local DEFAULT_END_TIME = 10
 local DEFAULT_SPEED = 1
 
 --// Dodge Animation + Configurations
---// Format: { AnimationId, StartTime, EndTime, Speed }
+--// Format:
+--// { AnimationId, StartTime, EndTime, Speed }
 
 local DODGE_ANIMS = {
-    -- Anim 1 removed
 
-    -- Anim 2 = BACKWARDS
+    -- Anim 2 = BACK
     Back = {
         "rbxassetid://95396574958565",
-        0.25, -- Start
-        10,   -- End
+        0.25, -- Start time
+        10,   -- Maximum end time
         1.5   -- Speed
     },
 
-    -- Anim 3 = RIGHT
-    Right = {
+    -- Anim 3 = LEFT
+    Left = {
         "rbxassetid://118107094802513",
-        0.5, -- Start
-        3.8, -- End
+        0.5, -- Start time
+        10,  -- Maximum end time
         2    -- Speed
     },
 
-    -- Anim 4 = LEFT
-    Left = {
+    -- Anim 4 = RIGHT
+    Right = {
         "rbxassetid://110118007517198",
-        0,    -- Start
-        1.55, -- End
-        2     -- Speed
+        0,    -- Start time
+        1.55, -- Maximum end time
+        1.8   -- Speed
     }
 }
 
@@ -135,7 +135,7 @@ end
 
 local function playDodgeAnimation(humanoid, config)
     if not humanoid or not config then
-        return
+        return nil
     end
 
     local animator = humanoid:FindFirstChildOfClass("Animator")
@@ -149,19 +149,6 @@ local function playDodgeAnimation(humanoid, config)
     local startTime = tonumber(config[2]) or 0
     local endTime = tonumber(config[3]) or 10
     local speed = tonumber(config[4]) or 1
-    
-    -- Safety
-    if startTime < 0 then
-        startTime = 0
-    end
-
-    if endTime <= startTime then
-        endTime = startTime + 0.01
-    end
-
-    if speed <= 0 then
-        speed = 1
-    end
 
     local animation = Instance.new("Animation")
     animation.AnimationId = animId
@@ -172,66 +159,81 @@ local function playDodgeAnimation(humanoid, config)
 
     if not success or not track then
         animation:Destroy()
-        return
+        return nil
     end
 
-    -- NEVER loop the dodge animation
+    -- Never allow the dodge animation to loop.
     track.Looped = false
 
-    track.Priority = Enum.AnimationPriority.Action
+    -- Highest normal animation priority.
+    track.Priority = Enum.AnimationPriority.Action4
 
-    -- Start playing
+    -- Play the animation first so Roblox loads its length.
     track:Play(0, 1, speed)
 
-    -- Jump to the configured starting position.
-    if startTime > 0 then
-        pcall(function()
-            track.TimePosition = startTime
-        end)
+    -- Wait for Roblox to know the animation's length.
+    local timeout = os.clock() + 2
+
+    while track.Length <= 0 and os.clock() < timeout do
+        task.wait()
     end
 
-    -- Stop at the configured maximum end time.
+    -- Make sure the animation hasn't already stopped.
+    if not track.IsPlaying then
+        track:Stop(0)
+        animation:Destroy()
+        return nil
+    end
+
+    -- Clamp the starting position to the actual animation length.
+    if track.Length > 0 then
+        startTime = math.clamp(startTime, 0, math.max(0, track.Length - 0.01))
+    end
+
+    -- Set the requested starting point.
+    track.TimePosition = startTime
+
+    -- Re-apply speed after changing TimePosition.
+    track:AdjustSpeed(speed)
+
+    -- Watch the animation and stop it at the configured maximum.
     task.spawn(function()
-        local startClock = os.clock()
+        while track and track.IsPlaying do
 
-        while track.IsPlaying do
-            local elapsed = os.clock() - startClock
-
-            -- Animation naturally reached its end.
+            -- If the animation naturally reaches its end,
+            -- let it end normally.
             if track.Length > 0 and track.TimePosition >= track.Length - 0.03 then
                 break
             end
 
-            -- Configured maximum reached.
+            -- If the configured maximum is reached,
+            -- force the animation to end.
             if track.TimePosition >= endTime then
-                break
-            end
-
-            -- Extra safety timeout.
-            if elapsed > 15 then
                 break
             end
 
             task.wait()
         end
 
-        if track and track.IsPlaying then
-            track:Stop(0)
-        end
-    end)
-
-    -- Cleanup
-    task.delay(16, function()
         if track then
             pcall(function()
-                track:Stop(0)
+                if track.IsPlaying then
+                    track:Stop(0)
+                end
             end)
         end
-
-        if animation then
-            animation:Destroy()
-        end
     end)
+
+    -- Cleanup.
+    task.delay(12, function()
+        pcall(function()
+            track:Stop(0)
+        end)
+
+        animation:Destroy()
+    end)
+
+    return track
 end
 --==================================================
 -- RAYCAST HELPERS
@@ -273,38 +275,41 @@ local function getDodgeDirection(root, character)
     local left = -root.CFrame.RightVector
     local back = -root.CFrame.LookVector
 
-    local rightClear = isDirectionClear(root, character, right)
-    local leftClear = isDirectionClear(root, character, left)
+    local directions = {
+        {
+            name = "Left",
+            vector = left
+        },
 
-    -- Both sides available:
-    -- randomly choose left/right.
-    if rightClear and leftClear then
-        if math.random(1, 2) == 1 then
-            return left
-        else
-            return right
+        {
+            name = "Right",
+            vector = right
+        },
+
+        {
+            name = "Back",
+            vector = back
+        }
+    }
+
+    local available = {}
+
+    for _, option in ipairs(directions) do
+        if isDirectionClear(root, character, option.vector) then
+            table.insert(available, option)
         end
     end
 
-    -- Right blocked -> use left.
-    if not rightClear and leftClear then
-        return left
+    -- Nothing is available.
+    -- Do NOT dodge.
+    if #available == 0 then
+        return nil, nil
     end
 
-    -- Left blocked -> use right.
-    if rightClear and not leftClear then
-        return right
-    end
+    -- Randomly choose from EVERY direction that is available.
+    local selected = available[math.random(1, #available)]
 
-    -- Both sides blocked -> try backwards.
-    local backClear = isDirectionClear(root, character, back)
-
-    if backClear then
-        return back
-    end
-
-    -- Completely trapped.
-    return nil
+    return selected.vector, selected.name
 end
 
 --==================================================
@@ -323,35 +328,42 @@ local function performDodge(character)
         return false
     end
 
-    local direction = getDodgeDirection(root, character)
+    local direction, dodgeType = getDodgeDirection(root, character)
 
-    if not direction then
+    -- Completely trapped.
+    if not direction or not dodgeType then
         return false
     end
 
-    -- Determine which direction was selected.
-    local rightDot = direction:Dot(root.CFrame.RightVector)
-    local backDot = direction:Dot(-root.CFrame.LookVector)
+    local animationConfig = DODGE_ANIMS[dodgeType]
 
-    local dodgeType
-
-    if backDot > 0.7 then
-        -- Backwards dodge
-        dodgeType = "Back"
-
-    elseif rightDot > 0 then
-        -- Right dodge
-        dodgeType = "Right"
-
-    else
-        -- Left dodge
-        dodgeType = "Left"
+    if not animationConfig then
+        return false
     end
 
     dodging = true
 
-    -- Play the animation corresponding to the dodge direction.
-    playDodgeAnimation(humanoid, DODGE_ANIMS[dodgeType])
+    --==================================================
+    -- 0.5 SECOND STUN
+    --==================================================
+
+    local oldWalkSpeed = humanoid.WalkSpeed
+    local oldJumpPower = humanoid.JumpPower
+    local oldAutoRotate = humanoid.AutoRotate
+
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid.AutoRotate = false
+
+    --==================================================
+    -- PLAY DIRECTION-SPECIFIC DODGE ANIMATION
+    --==================================================
+
+    playDodgeAnimation(humanoid, animationConfig)
+
+    --==================================================
+    -- DODGE MOVEMENT
+    --==================================================
 
     local destination = root.Position + direction * DODGE_DISTANCE
 
@@ -372,13 +384,25 @@ local function performDodge(character)
 
     tween:Play()
 
-    task.delay(DODGE_TIME + 0.05, function()
+    --==================================================
+    -- END STUN AFTER 0.5 SECONDS
+    --==================================================
+
+    task.delay(0.5, function()
+        if humanoid and humanoid.Parent then
+            humanoid.WalkSpeed = oldWalkSpeed
+            humanoid.JumpPower = oldJumpPower
+            humanoid.AutoRotate = oldAutoRotate
+        end
+    end)
+
+    -- Prevent another dodge during this dodge.
+    task.delay(0.5, function()
         dodging = false
     end)
 
     return true
 end
-
 --==================================================
 -- ACTIVATE / COOLDOWN
 --==================================================
