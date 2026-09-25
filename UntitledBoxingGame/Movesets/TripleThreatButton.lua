@@ -23,33 +23,34 @@ local DEFAULT_START_TIME = 0
 local DEFAULT_END_TIME = 10
 local DEFAULT_SPEED = 1
 
+--// Dodge Animation + Configurations
+--// Format: { AnimationId, StartTime, EndTime, Speed }
+
 local DODGE_ANIMS = {
-    {
-        "rbxassetid://101592986007162",
-        DEFAULT_START_TIME,
-        DEFAULT_END_TIME,
-        DEFAULT_SPEED
-    },
+    -- Anim 1 removed
 
-    {
+    -- Anim 2 = BACKWARDS
+    Back = {
         "rbxassetid://95396574958565",
-        DEFAULT_START_TIME,
-        DEFAULT_END_TIME,
-        DEFAULT_SPEED
+        0.25, -- Start
+        10,   -- End
+        1.5   -- Speed
     },
 
-    {
+    -- Anim 3 = RIGHT
+    Right = {
         "rbxassetid://118107094802513",
-        DEFAULT_START_TIME,
-        DEFAULT_END_TIME,
-        DEFAULT_SPEED
+        0.5, -- Start
+        3.8, -- End
+        2    -- Speed
     },
 
-    {
+    -- Anim 4 = LEFT
+    Left = {
         "rbxassetid://110118007517198",
-        DEFAULT_START_TIME,
-        DEFAULT_END_TIME,
-        DEFAULT_SPEED
+        0,    -- Start
+        1.55, -- End
+        2     -- Speed
     }
 }
 
@@ -331,9 +332,29 @@ local function performDodge(character)
         return false
     end
 
+    -- Determine which direction was selected.
+    local rightDot = direction:Dot(root.CFrame.RightVector)
+    local backDot = direction:Dot(-root.CFrame.LookVector)
+
+    local dodgeType
+
+    if backDot > 0.7 then
+        -- Backwards dodge
+        dodgeType = "Back"
+
+    elseif rightDot > 0 then
+        -- Right dodge
+        dodgeType = "Right"
+
+    else
+        -- Left dodge
+        dodgeType = "Left"
+    end
+
     dodging = true
 
-    playDodgeAnimation(humanoid)
+    -- Play the animation corresponding to the dodge direction.
+    playDodgeAnimation(humanoid, DODGE_ANIMS[dodgeType])
 
     local destination = root.Position + direction * DODGE_DISTANCE
 
@@ -345,7 +366,10 @@ local function performDodge(character)
             Enum.EasingDirection.Out
         ),
         {
-            CFrame = CFrame.new(destination, destination + root.CFrame.LookVector)
+            CFrame = CFrame.new(
+                destination,
+                destination + root.CFrame.LookVector
+            )
         }
     )
 
