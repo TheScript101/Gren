@@ -60,9 +60,22 @@ local DODGE_ANIMS = {
 
 local MAX_DODGES = 3
 local DETECTION_DISTANCE = 10
+
 local DODGE_DISTANCE = 10
-local DODGE_TIME = 0.20
+local DODGE_TIME = 0.10 -- Very fast tween
+
+local WALL_PADDING = 1.0 -- Extra space kept away from walls
 local COOLDOWN_TIME = 5
+
+local DODGE_STUN_TIME = 0.5
+
+-- VFX
+local DODGE_GLOW_TIME = 0.8
+local DODGE_GLOW_START_TRANSPARENCY = 0.6
+local DODGE_GLOW_END_TRANSPARENCY = 1
+
+-- SFX
+local DODGE_SOUND_ID = "rbxassetid://133546724906971"
 
 --==================================================
 -- STATE
@@ -252,18 +265,66 @@ local function makeRayParams(character)
     return params
 end
 
-local function isDirectionClear(root, character, direction)
+local function getSafeDodgeDistance(root, character, direction)
     local params = makeRayParams(character)
 
+    local maxDistance = DODGE_DISTANCE
+
+    -- Approximate the character's horizontal size.
+    local halfWidth = math.max(
+        root.Size.X,
+        root.Size.Z
+    ) * 0.5
+
+    -- Keep a little extra distance from walls.
+    local sideOffset = halfWidth + WALL_PADDING
+
     local origin = root.Position
+    local dir = direction.Unit
 
-    local result = workspace:Raycast(
+    -- Three rays:
+    -- center
+    -- left side of the character
+    -- right side of the character
+    local origins = {
         origin,
-        direction.Unit * DODGE_DISTANCE,
-        params
-    )
 
-    return result == nil
+        origin + root.CFrame.RightVector * sideOffset,
+
+        origin - root.CFrame.RightVector * sideOffset
+    }
+
+    local closestDistance = maxDistance
+
+    for _, rayOrigin in ipairs(origins) do
+        local result = workspace:Raycast(
+            rayOrigin,
+            dir * maxDistance,
+            params
+        )
+
+        if result then
+            local distance = (result.Position - rayOrigin).Magnitude
+
+            -- Leave padding between the player and the wall.
+            distance = distance - WALL_PADDING
+
+            closestDistance = math.min(
+                closestDistance,
+                distance
+            )
+        end
+    end
+
+    -- Not enough room to dodge.
+    if closestDistance <= 0.5 then
+        return 0
+    end
+
+    return math.min(
+        closestDistance,
+        maxDistance
+    )
 end
 
 --==================================================
@@ -295,21 +356,104 @@ local function getDodgeDirection(root, character)
     local available = {}
 
     for _, option in ipairs(directions) do
-        if isDirectionClear(root, character, option.vector) then
-            table.insert(available, option)
+        local safeDistance = getSafeDodgeDistance(
+            root,
+            character,
+            option.vector
+        )
+
+        if safeDistance > 0 then
+            table.insert(available, {
+                name = option.name,
+                vector = option.vector,
+                distance = safeDistance
+            })
         end
     end
 
-    -- Nothing is available.
-    -- Do NOT dodge.
+    -- Completely surrounded.
     if #available == 0 then
-        return nil, nil
+        return nil, nil, 0
     end
 
-    -- Randomly choose from EVERY direction that is available.
-    local selected = available[math.random(1, #available)]
+    -- Randomize between EVERY available direction.
+    local selected = available[
+        math.random(1, #available)
+    ]
 
-    return selected.vector, selected.name
+    return selected.vector, selected.name, selected.distance
+end
+
+    
+--==================================================
+-- VFX
+--==================================================
+local function playDodgeVFX(character)
+    --==================================================
+    -- WHITE GLOW
+    --==================================================
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "TripleThreatGlow"
+
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+
+    highlight.FillTransparency = DODGE_GLOW_START_TRANSPARENCY
+    highlight.OutlineTransparency = DODGE_GLOW_START_TRANSPARENCY
+
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
+
+    -- Fade the glow away over 0.8 seconds.
+    local fade = TweenService:Create(
+        highlight,
+        TweenInfo.new(
+            DODGE_GLOW_TIME,
+            Enum.EasingStyle.Linear,
+            Enum.EasingDirection.Out
+        ),
+        {
+            FillTransparency = DODGE_GLOW_END_TRANSPARENCY,
+            OutlineTransparency = DODGE_GLOW_END_TRANSPARENCY
+        }
+    )
+
+    fade:Play()
+
+    task.delay(DODGE_GLOW_TIME, function()
+        if highlight then
+            highlight:Destroy()
+        end
+    end)
+
+    --==================================================
+    -- SOUND
+    --==================================================
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if root then
+        local sound = Instance.new("Sound")
+        sound.Name = "TripleThreatDodgeSFX"
+        sound.SoundId = DODGE_SOUND_ID
+        sound.Volume = 1
+        sound.RollOffMaxDistance = 100
+        sound.Parent = root
+
+        sound:Play()
+
+        sound.Ended:Connect(function()
+            sound:Destroy()
+        end)
+
+        -- Backup cleanup if Ended doesn't fire.
+        task.delay(10, function()
+            if sound and sound.Parent then
+                sound:Destroy()
+            end
+        end)
+    end
 end
 
 --==================================================
@@ -328,10 +472,12 @@ local function performDodge(character)
         return false
     end
 
-    local direction, dodgeType = getDodgeDirection(root, character)
+    -- Find a direction AND the actual safe distance.
+    local direction, dodgeType, safeDistance =
+        getDodgeDirection(root, character)
 
-    -- Completely trapped.
-    if not direction or not dodgeType then
+    -- No opening.
+    if not direction or not dodgeType or safeDistance <= 0 then
         return false
     end
 
@@ -343,6 +489,79 @@ local function performDodge(character)
 
     dodging = true
 
+    --==================================================
+    -- STUN
+    --==================================================
+
+    local oldWalkSpeed = humanoid.WalkSpeed
+    local oldJumpPower = humanoid.JumpPower
+    local oldAutoRotate = humanoid.AutoRotate
+
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid.AutoRotate = false
+
+    --==================================================
+    -- DODGE ANIMATION
+    --==================================================
+
+    playDodgeAnimation(
+        humanoid,
+        animationConfig
+    )
+
+    --==================================================
+    -- VFX + SFX
+    --==================================================
+
+    playDodgeVFX(character)
+
+    --==================================================
+    -- WALL-SAFE TWEEN
+    --==================================================
+
+    local destination =
+        root.Position +
+        direction.Unit * safeDistance
+
+    local tween = TweenService:Create(
+        root,
+
+        TweenInfo.new(
+            DODGE_TIME,
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.Out
+        ),
+
+        {
+            CFrame = CFrame.new(
+                destination,
+                destination + root.CFrame.LookVector
+            )
+        }
+    )
+
+    tween:Play()
+
+    --==================================================
+    -- END STUN
+    --==================================================
+
+    task.delay(DODGE_STUN_TIME, function()
+        if humanoid and humanoid.Parent then
+            humanoid.WalkSpeed = oldWalkSpeed
+            humanoid.JumpPower = oldJumpPower
+            humanoid.AutoRotate = oldAutoRotate
+        end
+    end)
+
+    -- Prevent another dodge during the current dodge.
+    task.delay(DODGE_STUN_TIME, function()
+        dodging = false
+    end)
+
+    return true
+end
     --==================================================
     -- 0.5 SECOND STUN
     --==================================================
