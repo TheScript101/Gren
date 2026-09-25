@@ -34,7 +34,7 @@ local DODGE_ANIMS = {
         "rbxassetid://95396574958565",
         0.25, -- Start time
         10,   -- Maximum end time
-        1.5   -- Speed
+        3   -- Speed
     },
 
     -- Anim 3 = LEFT
