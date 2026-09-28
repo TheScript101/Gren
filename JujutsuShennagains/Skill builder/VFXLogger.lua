@@ -414,6 +414,49 @@ local function capture(obj)
 
     local p = snapshot.properties
 
+------------------------------------------------------------
+-- REBUILD EXPLORER
+------------------------------------------------------------
+
+    local function rebuildExplorer()
+    -- Clear old rows
+    for _, row in pairs(rows) do
+        row:Destroy()
+    end
+    rows = {}
+
+    local entries = getEntries()
+    local searchText = string.lower(search.Text)
+
+    countLabel.Text = "Logged: " .. tostring(#entries)
+
+    for _, snapshot in ipairs(entries) do
+        if isEntryVisible(snapshot) then
+            if searchText == "" or string.find(string.lower(snapshot.fullName), searchText) then
+                
+                local depth = getDepth(snapshot)
+
+                local row = Instance.new("TextButton")
+                row.Size = UDim2.new(1, -4, 0, 24)
+                row.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+                row.TextColor3 = Color3.new(1, 1, 1)
+                row.Font = Enum.Font.Gotham
+                row.TextSize = 13
+                row.TextXAlignment = Enum.TextXAlignment.Left
+                row.Text = string.rep("   ", depth) .. snapshot.fullName
+                row.Parent = explorer
+
+                rows[snapshot] = row
+
+                row.Activated:Connect(function()
+                    displaySnapshot(snapshot)
+                end)
+            end
+        end
+    end
+end
+
+
     --------------------------------------------------------
     -- COMMON
     --------------------------------------------------------
