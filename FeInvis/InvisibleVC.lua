@@ -53,7 +53,7 @@ local function createGui()
     screenGui.ResetOnSpawn = false
     screenGui.Parent = _LocalPlayer:WaitForChild("PlayerGui")
 
-    textButton.Size = UDim2.new(0, 100, 0, 50)
+    textButton.Size = UDim2.new(0, 150, 0, 50)
     textButton.Position = UDim2.new(0.5, -50, 0.1, 0)
     textButton.Text = "Invisible (VC Works)"
     textButton.BackgroundColor3 = Color3.fromHex("#121215")
