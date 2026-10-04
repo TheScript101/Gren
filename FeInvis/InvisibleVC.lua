@@ -55,7 +55,7 @@ local function createGui()
 
     textButton.Size = UDim2.new(0, 100, 0, 50)
     textButton.Position = UDim2.new(0.5, -50, 0.1, 0)
-    textButton.Text = "Rilix invis"
+    textButton.Text = "Invisible (VC Works)"
     textButton.BackgroundColor3 = Color3.fromHex("#ff00c8")
     textButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     textButton.Parent = screenGui
