@@ -1,4 +1,3 @@
-
 --// CHAMS TOGGLE
 
 local Players = game:GetService("Players")
