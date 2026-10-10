@@ -306,7 +306,7 @@ end)
 local pickLockToggle = Instance.new("TextButton")
 pickLockToggle.Name = "PickLockToggleBtn"
 pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
-pickLockToggle.Position = UDim2.new(1, -60, 0.3588, 0)
+pickLockToggle.Position = UDim2.new(1, -100, 0.3588, 0)
 pickLockToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 pickLockToggle.Text = "âš™ï¸"
 pickLockToggle.Font = Enum.Font.GothamBold
