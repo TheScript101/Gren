@@ -1,0 +1,5 @@
+-- Walk speed
+loadstring(game:HttpGet(""))()
+
+-- Cam lock
+loadstring(game:HttpGet(""))()
