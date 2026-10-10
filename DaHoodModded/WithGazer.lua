@@ -6,3 +6,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/ref
 
 -- Gazer
 loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-GAZER-FE-ANIMATION-EDITOR-54459"))()
+
+-- Chams
+loadstring(game:HttpGet("https://raw.githubusercontent.com/TheScript101/Gren/refs/heads/main/DaHoodModded/Chams.lua"))()
