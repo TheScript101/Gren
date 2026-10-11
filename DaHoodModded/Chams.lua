@@ -1,38 +1,43 @@
 --// CHAMS TOGGLE
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local chamsEnabled = false
-local chamsHighlights = {}
+local highlights = {}
 
---// Button
-local chamsButton = Instance.new("TextButton")
-chamsButton.Name = "ChamsToggle"
-chamsButton.Size = UDim2.fromOffset(115, 35)
-chamsButton.Position = UDim2.new(0.5, 65, 0.5, -17)
-chamsButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-chamsButton.TextColor3 = Color3.new(1, 1, 1)
-chamsButton.Text = "Chams: OFF"
-chamsButton.TextSize = 14
-chamsButton.Font = Enum.Font.GothamBold
-chamsButton.BorderSizePixel = 0
-chamsButton.Active = true
-chamsButton.Parent = gui -- Uses the existing ScreenGui
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "ChamsGui"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui")
 
-local chamsCorner = Instance.new("UICorner")
-chamsCorner.CornerRadius = UDim.new(0, 8)
-chamsCorner.Parent = chamsButton
+--// BUTTON
+local button = Instance.new("TextButton")
+button.Name = "ChamsButton"
+button.Size = UDim2.new(0, 130, 0, 36)
+button.Position = UDim2.new(0, 20, 0, 220)
+button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "Chams: OFF"
+button.TextSize = 14
+button.Font = Enum.Font.GothamBold
+button.BorderSizePixel = 0
+button.Parent = gui
 
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = button
+
+--// CHAMS
 local function removeChams(player)
-    local highlight = chamsHighlights[player]
+    local highlight = highlights[player]
     if highlight then
         highlight:Destroy()
-        chamsHighlights[player] = nil
+        highlights[player] = nil
     end
 end
 
-local function applyChams(player)
+local function addChams(player)
     if not chamsEnabled or player == LocalPlayer then
         return
     end
@@ -45,60 +50,61 @@ local function applyChams(player)
     removeChams(player)
 
     local highlight = Instance.new("Highlight")
-    highlight.Name = "SimpleWhiteChams"
+    highlight.Name = "PlayerChams"
     highlight.Adornee = character
-    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillColor = Color3.new(1, 1, 1)
+    highlight.OutlineColor = Color3.new(1, 1, 1)
     highlight.FillTransparency = 0.5
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.OutlineTransparency = 0.5
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = gui
+    highlight.Parent = character
 
-    chamsHighlights[player] = highlight
+    highlights[player] = highlight
 end
 
-local function setChams(state)
-    chamsEnabled = state
-
-    chamsButton.Text = "Chams: " .. (state and "ON" or "OFF")
-    chamsButton.BackgroundColor3 = state
-        and Color3.fromRGB(35, 145, 70)
-        or Color3.fromRGB(45, 45, 45)
-
-    if state then
-        for _, player in ipairs(Players:GetPlayers()) do
-            applyChams(player)
-        end
-    else
-        for player in pairs(chamsHighlights) do
-            removeChams(player)
+local function updateChams()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if chamsEnabled then
+                addChams(player)
+            else
+                removeChams(player)
+            end
         end
     end
+
+    button.Text = chamsEnabled and "Chams: ON" or "Chams: OFF"
 end
 
-chamsButton.Activated:Connect(function()
-    setChams(not chamsEnabled)
+--// TOGGLE
+button.Activated:Connect(function()
+    chamsEnabled = not chamsEnabled
+    updateChams()
 end)
 
-Players.PlayerAdded:Connect(function(player)
+--// PLAYER / RESPAWN SUPPORT
+local function setupPlayer(player)
+    if player == LocalPlayer then
+        return
+    end
+
     player.CharacterAdded:Connect(function()
+        task.wait(0.5)
         if chamsEnabled then
-            task.wait(0.2)
-            applyChams(player)
+            addChams(player)
         end
     end)
-end)
 
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        player.CharacterAdded:Connect(function()
-            if chamsEnabled then
-                task.wait(0.2)
-                applyChams(player)
-            end
-        end)
+    if chamsEnabled then
+        addChams(player)
     end
 end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
 
 Players.PlayerRemoving:Connect(function(player)
     removeChams(player)
