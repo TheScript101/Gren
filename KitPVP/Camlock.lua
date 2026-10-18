@@ -269,6 +269,13 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
+    local character = LockedTarget.Character
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health < 0 then
+        setLocking(false)
+        return
+    end
+
     local targetPart = (aimHeadEnabled and character:FindFirstChild("Head")) or character:FindFirstChild("HumanoidRootPart")
     if not targetPart then return end
 
