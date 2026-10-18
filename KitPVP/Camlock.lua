@@ -1,6 +1,9 @@
+
 -- LocalScript inside StarterGui
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -29,6 +32,7 @@ panel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 panel.BorderSizePixel = 0
 panel.Active = true
 panel.Parent = screenGui
+
 local panelCorner = Instance.new("UICorner")
 panelCorner.CornerRadius = UDim.new(0, 14)
 panelCorner.Parent = panel
@@ -61,19 +65,21 @@ local function makeModeButton(parent, xOffset, yOffset, text)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     btn.BorderSizePixel = 0
     btn.Parent = parent
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = btn
+
     return btn
 end
 
--- The first four mode buttons
+-- Lock mode buttons
 local alwaysBtn = makeModeButton(buttonsFrame, 0, 0, "Always Nearest")
 local toggleBtn = makeModeButton(buttonsFrame, 240, 0, "Toggle Nearest")
 local alwaysCamBtn = makeModeButton(buttonsFrame, 0, 50, "Always CamLock")
 local toggleCamBtn = makeModeButton(buttonsFrame, 240, 50, "Toggle CamLock")
 
--- Requested aim options
+-- Aim options
 local aimHeadBtn = makeModeButton(buttonsFrame, 0, 100, "AimHead: OFF")
 local aimBasedBtn = makeModeButton(buttonsFrame, 240, 100, "Aim Based: OFF")
 
@@ -97,20 +103,24 @@ lockToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 lockToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 lockToggle.Font = Enum.Font.GothamBold
 lockToggle.TextSize = 16
-lockToggle.Text = "ðŸ”’ OFF"
+lockToggle.Text = "LOCK OFF"
 lockToggle.Active = true
 lockToggle.Parent = screenGui
 
 local function clearHighlight()
     if HighlightHandle then
-        pcall(function() HighlightHandle:Destroy() end)
+        HighlightHandle:Destroy()
         HighlightHandle = nil
     end
 end
 
 local function applyHighlightToCharacter(char)
     clearHighlight()
-    if not char then return end
+
+    if not char then
+        return
+    end
+
     local highlight = Instance.new("Highlight")
     highlight.Adornee = char
     highlight.FillColor = Color3.fromRGB(255, 40, 40)
@@ -119,12 +129,18 @@ local function applyHighlightToCharacter(char)
     highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = screenGui
+
     HighlightHandle = highlight
 end
 
+-- Find the player closest to the center of the camera
 local function getPlayerFromCameraAim()
     Camera = workspace.CurrentCamera
-    if not Camera then return nil end
+
+    if not Camera then
+        return nil
+    end
+
     local viewport = Camera.ViewportSize
     local center = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
     local maxRadius = 80
@@ -133,11 +149,17 @@ local function getPlayerFromCameraAim()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local part = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
-            if humanoid and humanoid.Health >= 2 and part then
+            local part = player.Character:FindFirstChild("Head")
+                or player.Character:FindFirstChild("HumanoidRootPart")
+
+            -- Only exclude dead targets, not targets with low HP
+            if humanoid and humanoid.Health > 0 and part then
                 local point = Camera:WorldToViewportPoint(part.Position)
+
                 if point.Z > 0 then
-                    local distance = (Vector2.new(point.X, point.Y) - center).Magnitude
+                    local distance =
+                        (Vector2.new(point.X, point.Y) - center).Magnitude
+
                     if distance <= maxRadius and distance < bestDistance then
                         bestDistance = distance
                         bestPlayer = player
@@ -146,26 +168,43 @@ local function getPlayerFromCameraAim()
             end
         end
     end
+
     return bestPlayer
 end
 
+-- Find the nearest living player
 local function getNearestPlayer()
-    if aimBasedEnabled and (mode == "Toggle" or mode == "ToggleCam") then
+    if aimBasedEnabled
+        and (mode == "Toggle" or mode == "ToggleCam") then
+
         local aimed = getPlayerFromCameraAim()
-        if aimed then return aimed end
+
+        if aimed then
+            return aimed
+        end
     end
 
     local myCharacter = LocalPlayer.Character
-    local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
+    local myRoot = myCharacter
+        and myCharacter:FindFirstChild("HumanoidRootPart")
+
+    if not myRoot then
+        return nil
+    end
 
     local closest, closestDistance = nil, math.huge
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if humanoid and humanoid.Health >= 2 and root then
+            local humanoid =
+                player.Character:FindFirstChildOfClass("Humanoid")
+            local root =
+                player.Character:FindFirstChild("HumanoidRootPart")
+
+            -- Changed from Health >= 2 to Health > 0
+            if humanoid and humanoid.Health > 0 and root then
                 local distance = (myRoot.Position - root.Position).Magnitude
+
                 if distance < closestDistance then
                     closestDistance = distance
                     closest = player
@@ -173,48 +212,85 @@ local function getNearestPlayer()
             end
         end
     end
+
     return closest
 end
 
 local function rotateTowards(position)
     local character = LocalPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local direction = Vector3.new(position.X, root.Position.Y, position.Z) - root.Position
+    local root = character
+        and character:FindFirstChild("HumanoidRootPart")
+
+    if not root then
+        return
+    end
+
+    local direction =
+        Vector3.new(position.X, root.Position.Y, position.Z) - root.Position
+
     if direction.Magnitude > 0 then
-        root.CFrame = CFrame.new(root.Position, root.Position + direction.Unit)
+        root.CFrame = CFrame.new(
+            root.Position,
+            root.Position + direction.Unit
+        )
     end
 end
 
 local function setLocking(on)
     Locking = on
+
     if not on then
         LockedTarget = nil
         clearHighlight()
-        lockToggle.Text = "ðŸ”’ OFF"
+
+        lockToggle.Text = "LOCK OFF"
         lockToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         statusLabel.Text = ("Mode: %s | Lock: OFF"):format(mode)
+
         local camera = workspace.CurrentCamera
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        local humanoid = LocalPlayer.Character
+            and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+
         if camera and humanoid then
             camera.CameraSubject = humanoid
             camera.CameraType = Enum.CameraType.Custom
         end
+
         return
     end
 
     LockedTarget = getNearestPlayer()
-    if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
-    lockToggle.Text = "ðŸ”’ ON"
+
+    if LockedTarget then
+        applyHighlightToCharacter(LockedTarget.Character)
+    end
+
+    lockToggle.Text = "LOCK ON"
     lockToggle.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    statusLabel.Text = LockedTarget
+        and ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name)
+        or ("Mode: %s | Lock: ON (no target)"):format(mode)
 end
 
 local function setMode(newMode)
     mode = newMode
-    alwaysBtn.BackgroundColor3 = (mode == "Always") and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
-    toggleBtn.BackgroundColor3 = (mode == "Toggle") and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
-    alwaysCamBtn.BackgroundColor3 = (mode == "AlwaysCam") and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
-    toggleCamBtn.BackgroundColor3 = (mode == "ToggleCam") and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
+
+    alwaysBtn.BackgroundColor3 =
+        mode == "Always" and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
+
+    toggleBtn.BackgroundColor3 =
+        mode == "Toggle" and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
+
+    alwaysCamBtn.BackgroundColor3 =
+        mode == "AlwaysCam" and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
+
+    toggleCamBtn.BackgroundColor3 =
+        mode == "ToggleCam" and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
+
     if mode == "Always" or mode == "AlwaysCam" then
         setLocking(true)
     else
@@ -222,75 +298,130 @@ local function setMode(newMode)
     end
 end
 
-alwaysBtn.MouseButton1Click:Connect(function() setMode("Always") end)
-toggleBtn.MouseButton1Click:Connect(function() setMode("Toggle") end)
-alwaysCamBtn.MouseButton1Click:Connect(function() setMode("AlwaysCam") end)
-toggleCamBtn.MouseButton1Click:Connect(function() setMode("ToggleCam") end)
-lockToggle.MouseButton1Click:Connect(function() setLocking(not Locking) end)
+-- Button connections
+alwaysBtn.MouseButton1Click:Connect(function()
+    setMode("Always")
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    setMode("Toggle")
+end)
+
+alwaysCamBtn.MouseButton1Click:Connect(function()
+    setMode("AlwaysCam")
+end)
+
+toggleCamBtn.MouseButton1Click:Connect(function()
+    setMode("ToggleCam")
+end)
+
+lockToggle.MouseButton1Click:Connect(function()
+    setLocking(not Locking)
+end)
 
 aimHeadBtn.MouseButton1Click:Connect(function()
     aimHeadEnabled = not aimHeadEnabled
-    aimHeadBtn.Text = "AimHead: " .. (aimHeadEnabled and "ON" or "OFF")
-    aimHeadBtn.BackgroundColor3 = aimHeadEnabled and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
+
+    aimHeadBtn.Text = "AimHead: "
+        .. (aimHeadEnabled and "ON" or "OFF")
+
+    aimHeadBtn.BackgroundColor3 = aimHeadEnabled
+        and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
 end)
 
 aimBasedBtn.MouseButton1Click:Connect(function()
     aimBasedEnabled = not aimBasedEnabled
-    aimBasedBtn.Text = "Aim Based: " .. (aimBasedEnabled and "ON" or "OFF")
-    aimBasedBtn.BackgroundColor3 = aimBasedEnabled and Color3.fromRGB(70, 70, 80) or Color3.fromRGB(40, 40, 50)
+
+    aimBasedBtn.Text = "Aim Based: "
+        .. (aimBasedEnabled and "ON" or "OFF")
+
+    aimBasedBtn.BackgroundColor3 = aimBasedEnabled
+        and Color3.fromRGB(70, 70, 80)
+        or Color3.fromRGB(40, 40, 50)
 end)
 
--- Main lock loop. A target below 2 HP immediately unlocks and turns the lock button off.
+-- Main lock loop
 RunService.RenderStepped:Connect(function()
-    if not Locking then return end
+    if not Locking then
+        return
+    end
 
+    -- Unlock only if the target is gone or actually dead
     if LockedTarget then
         local character = LockedTarget.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health < 2 then
+        local humanoid = character
+            and character:FindFirstChildOfClass("Humanoid")
+
+        if not character or not character.Parent
+            or not humanoid or humanoid.Health <= 0 then
             setLocking(false)
             return
         end
     end
 
+    -- Always modes continually select the nearest living target
     if mode == "Always" or mode == "AlwaysCam" then
         local nearest = getNearestPlayer()
+
         if nearest ~= LockedTarget then
             LockedTarget = nearest
-            if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) else clearHighlight() end
+
+            if LockedTarget then
+                applyHighlightToCharacter(LockedTarget.Character)
+            else
+                clearHighlight()
+            end
         end
     elseif not LockedTarget then
         LockedTarget = getNearestPlayer()
-        if LockedTarget then applyHighlightToCharacter(LockedTarget.Character) end
+
+        if LockedTarget then
+            applyHighlightToCharacter(LockedTarget.Character)
+        end
     end
 
     if not LockedTarget or not LockedTarget.Character then
-        statusLabel.Text = ("Mode: %s | Lock: ON (no target)"):format(mode)
+        statusLabel.Text =
+            ("Mode: %s | Lock: ON (no target)"):format(mode)
         return
     end
 
     local character = LockedTarget.Character
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health < 0 then
+
+    -- No 2-HP threshold; only zero HP counts as dead
+    if not humanoid or humanoid.Health <= 0 then
         setLocking(false)
         return
     end
 
-    local targetPart = (aimHeadEnabled and character:FindFirstChild("Head")) or character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return end
+    local targetPart =
+        (aimHeadEnabled and character:FindFirstChild("Head"))
+        or character:FindFirstChild("HumanoidRootPart")
+
+    if not targetPart then
+        return
+    end
 
     rotateTowards(targetPart.Position)
 
     if mode == "AlwaysCam" or mode == "ToggleCam" then
         Camera = workspace.CurrentCamera
+
         if Camera then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+            Camera.CFrame = CFrame.new(
+                Camera.CFrame.Position,
+                targetPart.Position
+            )
         end
     end
 
-    statusLabel.Text = ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name)
+    statusLabel.Text =
+        ("Mode: %s | Lock: ON -> %s"):format(mode, LockedTarget.Name)
 end)
 
+-- Unlock if the selected player leaves
 Players.PlayerRemoving:Connect(function(player)
     if LockedTarget == player then
         setLocking(false)
@@ -302,7 +433,7 @@ LocalPlayer.CharacterRemoving:Connect(function()
     LockedTarget = nil
 end)
 
--- Small gear button to show/hide the panel
+-- Gear button to show/hide the panel
 local pickLockToggle = Instance.new("TextButton")
 pickLockToggle.Name = "PickLockToggleBtn"
 pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
@@ -314,7 +445,12 @@ pickLockToggle.TextSize = 20
 pickLockToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 pickLockToggle.Parent = screenGui
 
+local gearCorner = Instance.new("UICorner")
+gearCorner.CornerRadius = UDim.new(0, 8)
+gearCorner.Parent = pickLockToggle
+
 local panelVisible = true
+
 pickLockToggle.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     panel.Visible = panelVisible
