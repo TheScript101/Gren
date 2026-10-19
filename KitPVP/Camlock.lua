@@ -1,4 +1,3 @@
-
 -- LocalScript inside StarterGui
 
 local Players = game:GetService("Players")
@@ -437,7 +436,7 @@ end)
 local pickLockToggle = Instance.new("TextButton")
 pickLockToggle.Name = "PickLockToggleBtn"
 pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
-pickLockToggle.Position = UDim2.new(0.35, 0, 0.85, -339)
+pickLockToggle.Position = UDim2.new(0.30, 0, 0.85, -339)
 pickLockToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 pickLockToggle.Text = "⚙️"
 pickLockToggle.Font = Enum.Font.GothamBold
