@@ -97,7 +97,7 @@ statusLabel.Parent = panel
 local lockToggle = Instance.new("TextButton")
 lockToggle.Name = "LockToggleBtn"
 lockToggle.Size = UDim2.new(0, 80, 0, 40)
-lockToggle.Position = UDim2.new(0.5, 163, 0.85, -339)
+lockToggle.Position = UDim2.new(0.5, 175, 0.85, -339)
 lockToggle.AnchorPoint = Vector2.new(0.5, 0)
 lockToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 lockToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -437,7 +437,7 @@ end)
 local pickLockToggle = Instance.new("TextButton")
 pickLockToggle.Name = "PickLockToggleBtn"
 pickLockToggle.Size = UDim2.new(0, 40, 0, 40)
-pickLockToggle.Position = UDim2.new(1, -100, 0.3588, 0)
+pickLockToggle.Position = UDim2.new(0.35, 0, 0.85, -339)
 pickLockToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 pickLockToggle.Text = "⚙️"
 pickLockToggle.Font = Enum.Font.GothamBold
