@@ -46,16 +46,16 @@ ModelBox.TextColor3 = Color3.new(1, 1, 1)
 ModelBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 ModelBox.Parent = Frame
 
--- ====== ADDED: Size Multiplier TextBox (starts at 1) ======
-local SizeMultiplierBox = Instance.new("TextBox")
-SizeMultiplierBox.Size = UDim2.new(0.3, 0, 0, 30)
-SizeMultiplierBox.Position = UDim2.new(0.7, 0, 0, 10) -- above the spawn button area
-SizeMultiplierBox.PlaceholderText = "Size Multiplier"
-SizeMultiplierBox.Text = "1"
-SizeMultiplierBox.TextSize = 16
-SizeMultiplierBox.TextColor3 = Color3.new(1, 1, 1)
-SizeMultiplierBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-SizeMultiplierBox.Parent = Frame
+-- ====== REPLACED: Transparency TextBox (starts at 0) ======
+local TransparencyBox = Instance.new("TextBox")
+TransparencyBox.Size = UDim2.new(0, 3, 0, 30)
+TransparencyBox.Position = UDim2.new(0.7, 0, 0, 10) -- above the spawn button area
+TransparencyBox.PlaceholderText = "Transparency"
+TransparencyBox.Text = "0"
+TransparencyBox.TextSize = 16
+TransparencyBox.TextColor3 = Color3.new(1, 1, 1)
+TransparencyBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TransparencyBox.Parent = Frame
 -- ============================================================
 
 -- Spawn Button
@@ -93,27 +93,17 @@ ModelBox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
--- ====== REPLACED scaleModel: Use official Model:ScaleTo() API ======
-local function scaleModel(model, multiplier)
-    -- if multiplier is 1 or model missing, nothing to do
-    if not model or not multiplier or multiplier == 1 then
-        return
-    end
+-- ====== REPLACED: setModelTransparency Function ======
+local function setModelTransparency(model, transparency)
+    if not model then return end
+    
+    transparency = tonumber(transparency) or 0
+    transparency = math.clamp(transparency, 0, 1)
 
-    -- Ensure multiplier is a number
-    multiplier = tonumber(multiplier) or 1
-    if multiplier == 1 then return end
-
-    -- Try to call the new ScaleTo API. Use pcall to avoid runtime errors.
-    local ok, err = pcall(function()
-        -- Some models may require that they are parented to Workspace and have a proper pivot.
-        -- ScaleTo will scale around the model pivot.
-        model:ScaleTo(multiplier)
-    end)
-
-    if not ok then
-        -- If ScaleTo does not exist or fails, warn so you can debug.
-        warn("Model:ScaleTo failed or is not available for this model:", err)
+    for _, desc in ipairs(model:GetDescendants()) do
+        if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Texture") then
+            desc.Transparency = transparency
+        end
     end
 end
 -- ============================================================
@@ -133,7 +123,7 @@ SpawnButton.MouseButton1Click:Connect(function()
             -- Remove Humanoids and unwanted scripts first
             for _, desc in ipairs(model:GetDescendants()) do
                 if desc:IsA("Humanoid") or desc:IsA("Script") or desc:IsA("ModuleScript") then
-                    wait(0.01)
+                    task.wait(0.01)
                 end
             end
 
@@ -161,20 +151,9 @@ SpawnButton.MouseButton1Click:Connect(function()
                 model:MoveTo(spawnPosition)
             end
 
-            -- ====== ADDED: Read multiplier and scale the model using ScaleTo() ======
-            local multiplier = tonumber(SizeMultiplierBox.Text)
-            if not multiplier or type(multiplier) ~= "number" then
-                multiplier = 1
-            end
-
-            if multiplier and multiplier ~= 1 then
-                local ok, errmsg = pcall(function()
-                    scaleModel(model, multiplier)
-                end)
-                if not ok then
-                    warn("Scaling failed: ", errmsg)
-                end
-            end
+            -- ====== REPLACED: Read transparency and set it ======
+            local transparency = tonumber(TransparencyBox.Text) or 0
+            setModelTransparency(model, transparency)
             -- ============================================================
         end
     end
