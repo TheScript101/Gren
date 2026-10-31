@@ -49,6 +49,88 @@ if fileSupport() then
     end)
 end
 
+
+--==================================================
+-- GROUND SUPPORT / AIR DETECTION
+--==================================================
+
+local function getSupportRaycastParams()
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+
+    local excluded = {}
+
+    local character = LocalPlayer.Character
+    if character then
+        table.insert(excluded, character)
+    end
+
+    params.FilterDescendantsInstances = excluded
+    return params
+end
+
+-- Checks whether a previously placed block touches this position.
+-- Only blocks already successfully placed by this build count.
+local function hasPlacedSupport(position, placedPositions)
+    local tolerance = 0.2
+
+    for _, placedPosition in ipairs(placedPositions) do
+        local difference = position - placedPosition
+
+        local below =
+            math.abs(difference.X) < tolerance
+            and math.abs(difference.Z) < tolerance
+            and math.abs(difference.Y - GRID) < tolerance
+
+        local sideX =
+            math.abs(math.abs(difference.X) - GRID) < tolerance
+            and math.abs(difference.Y) < tolerance
+            and math.abs(difference.Z) < tolerance
+
+        local sideZ =
+            math.abs(math.abs(difference.Z) - GRID) < tolerance
+            and math.abs(difference.Y) < tolerance
+            and math.abs(difference.X) < tolerance
+
+        if below or sideX or sideZ then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Checks whether the position is touching the existing ground
+-- or another existing object directly underneath it.
+local function hasGroundSupport(position, raycastParams)
+    local result = workspace:Raycast(
+        position,
+        Vector3.new(0, -(GRID + 0.25), 0),
+        raycastParams
+    )
+
+    return result ~= nil
+end
+
+-- A block is allowed to spawn only if it has a support path.
+local function canPlaceSupportedBlock(
+    position,
+    placedPositions,
+    raycastParams
+)
+    -- Already-built blocks can support blocks above or beside them.
+    if hasPlacedSupport(position, placedPositions) then
+        return true
+    end
+
+    -- Existing ground or map objects can support the first blocks.
+    if hasGroundSupport(position, raycastParams) then
+        return true
+    end
+
+    return false
+end
+
 --==================================================
 -- GUI
 --==================================================
@@ -1052,8 +1134,9 @@ end
 
 SaveBuildBtn.MouseButton1Click:Connect(openRegionEditor)
 
+
 --==================================================
--- AUTO BUILD
+-- AUTO BUILD - BOTTOM TO TOP + AIR DETECTION
 --==================================================
 
 StartBtn.MouseButton1Click:Connect(function()
@@ -1063,11 +1146,9 @@ StartBtn.MouseButton1Click:Connect(function()
     end
 
     if #selectedQueue == 0 then
-
         StatusLabel.Text = "Please select a preset first!"
         StatusLabel.TextColor3 =
             Color3.fromRGB(231, 76, 60)
-
         return
     end
 
@@ -1078,61 +1159,174 @@ StartBtn.MouseButton1Click:Connect(function()
 
     local groundPos = getGroundPosition()
 
-    -- Convert relative positions to world positions ONCE.
+    -- Convert saved relative positions into world positions.
     local finalBuildQueue = {}
 
     for _, block in ipairs(selectedQueue) do
-
         table.insert(finalBuildQueue, {
             material = block.material,
             pos = groundPos + block.pos
         })
     end
 
+    -- Sort from lowest Y to highest Y.
+    table.sort(finalBuildQueue, function(a, b)
+        if math.abs(a.pos.Y - b.pos.Y) > 0.01 then
+            return a.pos.Y < b.pos.Y
+        end
+
+        if math.abs(a.pos.X - b.pos.X) > 0.01 then
+            return a.pos.X < b.pos.X
+        end
+
+        return a.pos.Z < b.pos.Z
+    end)
+
+    -- Blocks successfully placed by this build.
+    -- These become support for later blocks.
+    local placedPositions = {}
+
+    -- Blocks waiting for their support.
+    local pendingBlocks = {}
+
+    for _, block in ipairs(finalBuildQueue) do
+        table.insert(pendingBlocks, block)
+    end
+
+    local raycastParams = getSupportRaycastParams()
+
+    local placedCount = 0
+    local totalBlocks = #finalBuildQueue
+
+    StatusLabel.Text = "Checking ground support..."
     StatusLabel.TextColor3 =
         Color3.fromRGB(241, 196, 15)
 
     currentBuildTask = task.spawn(function()
 
-        for i, blockData in ipairs(finalBuildQueue) do
+        local placementFailed = false
 
-            while isPaused and isBuilding do
-                task.wait(0.05)
+        -- Keep scanning until every supported block is built.
+        -- Each successful placement can unlock more blocks.
+        while #pendingBlocks > 0 and isBuilding do
+
+            local madeProgress = false
+            local index = 1
+
+            while index <= #pendingBlocks and isBuilding do
+
+                -- Pause handling.
+                while isPaused and isBuilding do
+                    task.wait(0.05)
+                end
+
+                if not isBuilding then
+                    break
+                end
+
+                local blockData = pendingBlocks[index]
+
+                local supported = canPlaceSupportedBlock(
+                    blockData.pos,
+                    placedPositions,
+                    raycastParams
+                )
+
+                if supported then
+
+                    -- Place the block only after support is detected.
+                    local success = placeBlock(
+                        blockData.material,
+                        blockData.pos
+                    )
+
+                    if not success then
+                        placementFailed = true
+
+                        StatusLabel.Text =
+                            "Placement failed at block " ..
+                            (placedCount + 1)
+
+                        StatusLabel.TextColor3 =
+                            Color3.fromRGB(231, 76, 60)
+
+                        break
+                    end
+
+                    -- Remember this block as a valid support.
+                    table.insert(
+                        placedPositions,
+                        blockData.pos
+                    )
+
+                    placedCount += 1
+                    madeProgress = true
+
+                    -- Remove it from the waiting list.
+                    table.remove(pendingBlocks, index)
+
+                    StatusLabel.Text =
+                        "Building bottom-up... (" ..
+                        placedCount .. "/" .. totalBlocks .. ")"
+
+                    StatusLabel.TextColor3 =
+                        Color3.fromRGB(241, 196, 15)
+
+                    -- Keep your requested build speed.
+                    task.wait(0.001)
+
+                else
+
+                    -- Not supported yet.
+                    -- Leave it in the queue and try again
+                    -- after other blocks have been placed.
+                    index += 1
+
+                end
             end
 
-            if not isBuilding then
+            if placementFailed or not isBuilding then
                 break
             end
 
-            local success = placeBlock(
-                blockData.material,
-                blockData.pos
-            )
+            -- If nothing could be placed during this pass,
+            -- the remaining blocks have no detected support path.
+            if not madeProgress then
+                break
+            end
+        end
 
-            if not success then
+        -- Final status.
+        if isBuilding then
+
+            if placementFailed then
+
+                -- Error status was already displayed.
+
+            elseif #pendingBlocks == 0 then
 
                 StatusLabel.Text =
-                    "Placement failed at block " .. i
+                    "✅ Build Complete! (" ..
+                    placedCount .. " blocks)"
+
+                StatusLabel.TextColor3 =
+                    Color3.fromRGB(46, 204, 113)
+
+            else
+
+                StatusLabel.Text =
+                    "⚠️ " .. #pendingBlocks ..
+                    " unsupported blocks left! Add a support path."
 
                 StatusLabel.TextColor3 =
                     Color3.fromRGB(231, 76, 60)
 
-                break
+                warn(
+                    "AutoBuild: " ..
+                    #pendingBlocks ..
+                    " blocks could not find a support path to the ground."
+                )
             end
-
-            StatusLabel.Text =
-                "Building... (" ..
-                i .. "/" .. #finalBuildQueue .. ")"
-
-            -- Requested build speed
-            task.wait(0.001)
-        end
-
-        if isBuilding then
-
-            StatusLabel.Text = "✅ Build Complete!"
-            StatusLabel.TextColor3 =
-                Color3.fromRGB(46, 204, 113)
         end
 
         isBuilding = false
