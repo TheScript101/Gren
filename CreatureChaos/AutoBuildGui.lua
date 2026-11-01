@@ -60,13 +60,38 @@ if fileSupport() then
     end)
 end
 
--- Gui Helper
+--==================================================
+-- BUTTON CREATOR
+--==================================================
+
+local function createButton(name, text, color, position, size, parent)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.Position = position
+    btn.Size = size
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = parent
+
+    Instance.new("UICorner", btn).CornerRadius =
+        UDim.new(0, 6)
+
+    return btn
+end
+
+--==================================================
+-- POSITION ADJUSTERS (+4 / -4)
+--==================================================
+
 local function createPositionAdjusters(parent, startY, onChanged)
     local offset = Vector3.zero
 
     local function makeAxis(axis, y)
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0, 35, 0, 28)
+        label.Size = UDim2.new(0, 25, 0, 28)
         label.Position = UDim2.new(0, 8, 0, y)
         label.BackgroundTransparency = 1
         label.Text = axis
@@ -76,9 +101,10 @@ local function createPositionAdjusters(parent, startY, onChanged)
         label.Parent = parent
 
         local valueLabel = Instance.new("TextLabel")
-        valueLabel.Size = UDim2.new(0, 55, 0, 28)
-        valueLabel.Position = UDim2.new(0, 45, 0, y)
+        valueLabel.Size = UDim2.new(0, 40, 0, 28)
+        valueLabel.Position = UDim2.new(0, 35, 0, y)
         valueLabel.BackgroundTransparency = 1
+        valueLabel.Text = "0"
         valueLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
         valueLabel.Font = Enum.Font.Gotham
         valueLabel.TextSize = 11
@@ -88,8 +114,8 @@ local function createPositionAdjusters(parent, startY, onChanged)
             axis .. "Minus",
             "-4",
             Color3.fromRGB(60, 60, 75),
-            UDim2.new(0, 105, 0, y),
-            UDim2.new(0, 55, 0, 28),
+            UDim2.new(0, 85, 0, y),
+            UDim2.new(0, 65, 0, 28),
             parent
         )
 
@@ -97,25 +123,22 @@ local function createPositionAdjusters(parent, startY, onChanged)
             axis .. "Plus",
             "+4",
             Color3.fromRGB(60, 60, 75),
-            UDim2.new(0, 165, 0, y),
-            UDim2.new(0, 55, 0, 28),
+            UDim2.new(0, 155, 0, y),
+            UDim2.new(0, 65, 0, 28),
             parent
         )
 
         local function update(amount)
             if axis == "X" then
                 offset += Vector3.new(amount, 0, 0)
+                valueLabel.Text = tostring(offset.X)
             elseif axis == "Y" then
                 offset += Vector3.new(0, amount, 0)
+                valueLabel.Text = tostring(offset.Y)
             else
                 offset += Vector3.new(0, 0, amount)
+                valueLabel.Text = tostring(offset.Z)
             end
-
-            valueLabel.Text = tostring(
-                axis == "X" and offset.X
-                or axis == "Y" and offset.Y
-                or offset.Z
-            )
 
             onChanged(offset)
         end
@@ -132,10 +155,6 @@ local function createPositionAdjusters(parent, startY, onChanged)
     makeAxis("X", startY)
     makeAxis("Y", startY + 35)
     makeAxis("Z", startY + 70)
-
-    return function()
-        return offset
-    end
 end
 
 --==================================================
@@ -202,26 +221,8 @@ Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
 --==================================================
--- BUTTON CREATOR
+-- Buttons
 --==================================================
-
-local function createButton(name, text, color, position, size, parent)
-    local btn = Instance.new("TextButton")
-    btn.Name = name
-    btn.Text = text
-    btn.BackgroundColor3 = color
-    btn.Position = position
-    btn.Size = size
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
-    btn.Parent = parent
-
-    Instance.new("UICorner", btn).CornerRadius =
-        UDim.new(0, 6)
-
-    return btn
-end
 
 local StartBtn = createButton(
     "StartBtn", "▶ Auto Build",
@@ -1475,7 +1476,7 @@ local function openPreviewEditor()
     info.Size = UDim2.new(0.9, 0, 0, 25)
     info.Position = UDim2.new(0.05, 0, 0, 32)
     info.BackgroundTransparency = 1
-    info.Text = "Drag the sliders to move the build"
+    info.Text = "Use +4 and -4 to move the build"
     info.TextColor3 = Color3.fromRGB(170, 170, 180)
     info.Font = Enum.Font.Gotham
     info.TextSize = 10
