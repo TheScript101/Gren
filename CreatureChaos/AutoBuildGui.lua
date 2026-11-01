@@ -1140,7 +1140,7 @@ SaveBuildBtn.MouseButton1Click:Connect(openRegionEditor)
 
 
 --==================================================
--- AUTO BUILD + FINAL POSITION VERIFICATION
+-- AUTO BUILD + FINAL REPAIR PASS
 --==================================================
 
 StartBtn.MouseButton1Click:Connect(function()
@@ -1162,36 +1162,13 @@ StartBtn.MouseButton1Click:Connect(function()
     local groundPos = getGroundPosition()
     local finalBuildQueue = {}
 
-    -- Convert relative positions into world positions.
+    -- Convert relative positions to world positions once.
     for _, block in ipairs(selectedQueue) do
-
         table.insert(finalBuildQueue, {
             material = block.material,
             pos = groundPos + block.pos
         })
-
     end
-
-    -- Sort bottom to top.
-    local function sortBottomToTop(queue)
-
-        table.sort(queue, function(a, b)
-
-            if a.pos.Y == b.pos.Y then
-
-                if a.pos.X == b.pos.X then
-                    return a.pos.Z < b.pos.Z
-                end
-
-                return a.pos.X < b.pos.X
-            end
-
-            return a.pos.Y < b.pos.Y
-        end)
-
-    end
-
-    sortBottomToTop(finalBuildQueue)
 
     local total = #finalBuildQueue
 
@@ -1201,8 +1178,10 @@ StartBtn.MouseButton1Click:Connect(function()
     currentBuildTask = task.spawn(function()
 
         local placedCount = 0
+        local pending = {}
 
-        -- FIRST PASS: normal building.
+        -- NORMAL BUILD PASS
+        -- Keeps the existing fast placement speed.
         for i, blockData in ipairs(finalBuildQueue) do
 
             while isPaused and isBuilding do
@@ -1213,39 +1192,25 @@ StartBtn.MouseButton1Click:Connect(function()
                 break
             end
 
-            if not blockExists(blockData.pos) then
-                placeBlock(blockData.material, blockData.pos)
-            end
+            local success = placeBlock(
+                blockData.material,
+                blockData.pos
+            )
 
-            if blockExists(blockData.pos) then
+            if success then
                 placedCount += 1
+            else
+                table.insert(pending, blockData)
             end
 
             StatusLabel.Text =
-                "Building: " .. i .. "/" .. total
+                "Building: " .. i .. "/" .. total ..
+                " | Waiting: " .. #pending
 
             task.wait(BUILD_SPEED)
         end
 
-        -- FINAL CHECK: find every missing block.
-        local pending = {}
-
-        if isBuilding then
-
-            StatusLabel.Text = "Checking all block positions..."
-
-            for _, blockData in ipairs(finalBuildQueue) do
-
-                if not blockExists(blockData.pos) then
-                    table.insert(pending, blockData)
-                end
-
-            end
-        end
-
-        -- FINAL RESORT: retry missing blocks bottom to top.
-        -- This gives lower supports another chance to appear
-        -- before higher blocks are attempted.
+        -- SUPPORT RETRIES
         local retryPass = 0
         local noProgressPasses = 0
 
@@ -1263,23 +1228,10 @@ StartBtn.MouseButton1Click:Connect(function()
 
             retryPass += 1
 
-            -- Recheck positions before every retry pass.
-            local missing = {}
-
-            for _, blockData in ipairs(pending) do
-
-                if not blockExists(blockData.pos) then
-                    table.insert(missing, blockData)
-                end
-
-            end
-
-            pending = missing
-            sortBottomToTop(pending)
-
+            local stillPending = {}
             local placedThisPass = 0
 
-            for i, blockData in ipairs(pending) do
+            for _, blockData in ipairs(pending) do
 
                 while isPaused and isBuilding do
                     task.wait(0.05)
@@ -1289,35 +1241,27 @@ StartBtn.MouseButton1Click:Connect(function()
                     break
                 end
 
-                -- Only retry if the position is still empty.
-                if not blockExists(blockData.pos) then
-                    placeBlock(blockData.material, blockData.pos)
-                end
+                local success = placeBlock(
+                    blockData.material,
+                    blockData.pos
+                )
 
-                if blockExists(blockData.pos) then
+                if success then
+                    placedCount += 1
                     placedThisPass += 1
+                else
+                    table.insert(stillPending, blockData)
                 end
 
                 StatusLabel.Text =
-                    "Final check " .. retryPass ..
-                    " | Placing bottom-up: " .. i ..
-                    "/" .. #pending
+                    "Support pass " .. retryPass ..
+                    " | Placed: " .. placedCount .. "/" .. total ..
+                    " | Waiting: " .. #stillPending
 
                 task.wait(BUILD_SPEED)
             end
 
-            -- Remove anything that successfully appeared.
-            local stillMissing = {}
-
-            for _, blockData in ipairs(pending) do
-
-                if not blockExists(blockData.pos) then
-                    table.insert(stillMissing, blockData)
-                end
-
-            end
-
-            pending = stillMissing
+            pending = stillPending
 
             if placedThisPass == 0 then
                 noProgressPasses += 1
@@ -1326,47 +1270,226 @@ StartBtn.MouseButton1Click:Connect(function()
             end
         end
 
-        -- FINAL VERIFICATION.
+        -- FINAL POSITION CHECK
+        -- This scan happens once after the normal build.
         if isBuilding then
 
-            local finalMissing = {}
-            placedCount = 0
+            StatusLabel.Text = "Checking build positions..."
+            StatusLabel.TextColor3 = Color3.fromRGB(241, 196, 15)
 
-            for _, blockData in ipairs(finalBuildQueue) do
+            -- Allow placed parts time to replicate.
+            task.wait(0.15)
 
-                if blockExists(blockData.pos) then
-                    placedCount += 1
-                else
-                    table.insert(finalMissing, blockData)
+            if isBuilding then
+
+                local targetParent = getTargetParent()
+                local existingBlocks = {}
+
+                -- Create a lookup of existing blocks.
+                -- No full workspace scan is done per expected block.
+                local descendants = targetParent:GetDescendants()
+
+                for _, obj in ipairs(descendants) do
+
+                    if obj:IsA("BasePart") then
+
+                        local relative = obj.Position - groundPos
+
+                        local gx = math.floor(relative.X / GRID + 0.5)
+                        local gy = math.floor(relative.Y / GRID + 0.5)
+                        local gz = math.floor(relative.Z / GRID + 0.5)
+
+                        local key =
+                            gx .. ":" .. gy .. ":" .. gz
+
+                        if not existingBlocks[key] then
+                            existingBlocks[key] = {}
+                        end
+
+                        table.insert(existingBlocks[key], obj)
+                    end
                 end
 
+                -- Remove duplicate target positions from the
+                -- expected list so one occupied position is
+                -- not needlessly placed multiple times.
+                local expectedPositions = {}
+
+                for _, blockData in ipairs(finalBuildQueue) do
+
+                    local relative = blockData.pos - groundPos
+
+                    local gx = math.floor(relative.X / GRID + 0.5)
+                    local gy = math.floor(relative.Y / GRID + 0.5)
+                    local gz = math.floor(relative.Z / GRID + 0.5)
+
+                    local key =
+                        gx .. ":" .. gy .. ":" .. gz
+
+                    expectedPositions[key] = {
+                        material = blockData.material,
+                        pos = blockData.pos,
+                        key = key
+                    }
+                end
+
+                -- Find positions that are actually empty.
+                local repairQueue = {}
+
+                for key, blockData in pairs(expectedPositions) do
+
+                    local found = false
+                    local candidates = existingBlocks[key]
+
+                    if candidates then
+
+                        for _, part in ipairs(candidates) do
+
+                            if (part.Position - blockData.pos).Magnitude
+                                <= GRID * 0.45 then
+
+                                found = true
+                                break
+                            end
+                        end
+                    end
+
+                    if not found then
+                        table.insert(repairQueue, blockData)
+                    end
+                end
+
+                -- Sort ONLY the repair queue bottom-to-top.
+                table.sort(repairQueue, function(a, b)
+
+                    if a.pos.Y == b.pos.Y then
+
+                        if a.pos.X == b.pos.X then
+                            return a.pos.Z < b.pos.Z
+                        end
+
+                        return a.pos.X < b.pos.X
+                    end
+
+                    return a.pos.Y < b.pos.Y
+                end)
+
+                -- FINAL REPAIR PASS
+                if #repairQueue > 0 then
+
+                    StatusLabel.Text =
+                        "Repairing " .. #repairQueue .. " missing blocks..."
+
+                    for i, blockData in ipairs(repairQueue) do
+
+                        while isPaused and isBuilding do
+                            task.wait(0.05)
+                        end
+
+                        if not isBuilding then
+                            break
+                        end
+
+                        placeBlock(
+                            blockData.material,
+                            blockData.pos
+                        )
+
+                        StatusLabel.Text =
+                            "Final repair: " .. i .. "/" .. #repairQueue
+
+                        task.wait(BUILD_SPEED)
+                    end
+
+                    -- One final scan after repair.
+                    if isBuilding then
+
+                        task.wait(0.15)
+
+                        local remaining = {}
+                        local finalDescendants =
+                            targetParent:GetDescendants()
+
+                        local finalPositions = {}
+
+                        for _, obj in ipairs(finalDescendants) do
+
+                            if obj:IsA("BasePart") then
+
+                                local relative = obj.Position - groundPos
+
+                                local gx = math.floor(relative.X / GRID + 0.5)
+                                local gy = math.floor(relative.Y / GRID + 0.5)
+                                local gz = math.floor(relative.Z / GRID + 0.5)
+
+                                local key =
+                                    gx .. ":" .. gy .. ":" .. gz
+
+                                if not finalPositions[key] then
+                                    finalPositions[key] = {}
+                                end
+
+                                table.insert(finalPositions[key], obj)
+                            end
+                        end
+
+                        for key, blockData in pairs(expectedPositions) do
+
+                            local found = false
+                            local candidates = finalPositions[key]
+
+                            if candidates then
+
+                                for _, part in ipairs(candidates) do
+
+                                    if (part.Position - blockData.pos).Magnitude
+                                        <= GRID * 0.45 then
+
+                                        found = true
+                                        break
+                                    end
+                                end
+                            end
+
+                            if not found then
+                                table.insert(remaining, blockData)
+                            end
+                        end
+
+                        if #remaining == 0 then
+
+                            StatusLabel.Text =
+                                "✅ Build Complete! Final repair successful."
+
+                            StatusLabel.TextColor3 =
+                                Color3.fromRGB(46, 204, 113)
+
+                        else
+
+                            StatusLabel.Text =
+                                "⚠️ Build finished with " ..
+                                #remaining .. " missing blocks."
+
+                            StatusLabel.TextColor3 =
+                                Color3.fromRGB(241, 196, 15)
+                        end
+                    end
+
+                else
+
+                    StatusLabel.Text =
+                        "✅ Build Complete! All positions verified."
+
+                    StatusLabel.TextColor3 =
+                        Color3.fromRGB(46, 204, 113)
+                end
             end
+        end
 
-            if #finalMissing == 0 then
-
-                StatusLabel.Text =
-                    "✅ Build Complete! (" ..
-                    placedCount .. "/" .. total .. ")"
-
-                StatusLabel.TextColor3 =
-                    Color3.fromRGB(46, 204, 113)
-
-            else
-
-                StatusLabel.Text =
-                    "⚠️ Build incomplete: " ..
-                    #finalMissing .. " blocks missing"
-
-                StatusLabel.TextColor3 =
-                    Color3.fromRGB(241, 196, 15)
-            end
-
-        else
+        if not isBuilding then
 
             StatusLabel.Text = "⏹ Status: Stopped"
-            StatusLabel.TextColor3 =
-                Color3.fromRGB(231, 76, 60)
-
+            StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
         end
 
         isBuilding = false
