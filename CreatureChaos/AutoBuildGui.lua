@@ -8,6 +8,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -16,6 +17,9 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local BUILD_SPEED = 0.001
 local GRID = 4
 local SAVE_FOLDER = "AutoBuildPro_Saves"
+local MAX_RETRY_PASSES = 8
+local RETRY_WAIT = 0.1
+local SLIDER_RANGE = 25 -- Maximum movement in grid blocks
 
 -- REMOTES
 local BuildRemote = ReplicatedStorage:WaitForChild("buildRequest")
@@ -28,6 +32,13 @@ local isPaused = false
 local currentBuildTask = nil
 local selectedQueue = {}
 local customPresets = {}
+
+-- Build position is locked when a preset is selected.
+local buildAnchor = nil
+local previewOffset = Vector3.zero
+local previewGui = nil
+local previewParts = {}
+local previewVisible = false
 
 --==================================================
 -- OPTIONAL FILE SUPPORT
@@ -47,6 +58,84 @@ if fileSupport() then
             makefolder(SAVE_FOLDER)
         end
     end)
+end
+
+-- Gui Helper
+local function createPositionAdjusters(parent, startY, onChanged)
+    local offset = Vector3.zero
+
+    local function makeAxis(axis, y)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 35, 0, 28)
+        label.Position = UDim2.new(0, 8, 0, y)
+        label.BackgroundTransparency = 1
+        label.Text = axis
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 13
+        label.Parent = parent
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(0, 55, 0, 28)
+        valueLabel.Position = UDim2.new(0, 45, 0, y)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
+        valueLabel.Font = Enum.Font.Gotham
+        valueLabel.TextSize = 11
+        valueLabel.Parent = parent
+
+        local minus = createButton(
+            axis .. "Minus",
+            "-4",
+            Color3.fromRGB(60, 60, 75),
+            UDim2.new(0, 105, 0, y),
+            UDim2.new(0, 55, 0, 28),
+            parent
+        )
+
+        local plus = createButton(
+            axis .. "Plus",
+            "+4",
+            Color3.fromRGB(60, 60, 75),
+            UDim2.new(0, 165, 0, y),
+            UDim2.new(0, 55, 0, 28),
+            parent
+        )
+
+        local function update(amount)
+            if axis == "X" then
+                offset += Vector3.new(amount, 0, 0)
+            elseif axis == "Y" then
+                offset += Vector3.new(0, amount, 0)
+            else
+                offset += Vector3.new(0, 0, amount)
+            end
+
+            valueLabel.Text = tostring(
+                axis == "X" and offset.X
+                or axis == "Y" and offset.Y
+                or offset.Z
+            )
+
+            onChanged(offset)
+        end
+
+        minus.MouseButton1Click:Connect(function()
+            update(-GRID)
+        end)
+
+        plus.MouseButton1Click:Connect(function()
+            update(GRID)
+        end)
+    end
+
+    makeAxis("X", startY)
+    makeAxis("Y", startY + 35)
+    makeAxis("Z", startY + 70)
+
+    return function()
+        return offset
+    end
 end
 
 --==================================================
@@ -117,7 +206,6 @@ Title.Parent = TitleBar
 --==================================================
 
 local function createButton(name, text, color, position, size, parent)
-
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Text = text
@@ -167,9 +255,26 @@ local SaveBuildBtn = createButton(
     MainFrame
 )
 
+-- NEW BUTTONS
+local PreviewBtn = createButton(
+    "PreviewBtn", "👁 Show Preview",
+    Color3.fromRGB(52, 120, 190),
+    UDim2.new(0.05, 0, 0.405, 0),
+    UDim2.new(0.425, 0, 0, 32),
+    MainFrame
+)
+
+local ClearAllBtn = createButton(
+    "ClearAllBtn", "🗑 Clear All",
+    Color3.fromRGB(170, 55, 55),
+    UDim2.new(0.525, 0, 0.405, 0),
+    UDim2.new(0.425, 0, 0, 32),
+    MainFrame
+)
+
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 22)
-StatusLabel.Position = UDim2.new(0.05, 0, 0.41, 0)
+StatusLabel.Position = UDim2.new(0.05, 0, 0.48, 0)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Status: Idle"
 StatusLabel.TextColor3 = Color3.fromRGB(170, 170, 180)
@@ -179,7 +284,7 @@ StatusLabel.Parent = MainFrame
 
 local PresetHeader = Instance.new("TextLabel")
 PresetHeader.Size = UDim2.new(0.9, 0, 0, 22)
-PresetHeader.Position = UDim2.new(0.05, 0, 0.465, 0)
+PresetHeader.Position = UDim2.new(0.05, 0, 0.535, 0)
 PresetHeader.BackgroundTransparency = 1
 PresetHeader.Text = "Select Build Preset / My Premades:"
 PresetHeader.TextColor3 = Color3.new(1, 1, 1)
@@ -189,8 +294,8 @@ PresetHeader.TextXAlignment = Enum.TextXAlignment.Left
 PresetHeader.Parent = MainFrame
 
 local ScrollContainer = Instance.new("ScrollingFrame")
-ScrollContainer.Size = UDim2.new(0.9, 0, 0, 190)
-ScrollContainer.Position = UDim2.new(0.05, 0, 0.52, 0)
+ScrollContainer.Size = UDim2.new(0.9, 0, 0, 165)
+ScrollContainer.Position = UDim2.new(0.05, 0, 0.59, 0)
 ScrollContainer.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 ScrollContainer.BorderSizePixel = 0
 ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -208,9 +313,15 @@ UIListLayout.Parent = ScrollContainer
 --==================================================
 -- POSITION HELPERS
 --==================================================
+local function snapToGrid(position)
+    return Vector3.new(
+        math.floor(position.X / GRID + 0.5) * GRID,
+        math.floor(position.Y / GRID + 0.5) * GRID,
+        math.floor(position.Z / GRID + 0.5) * GRID
+    )
+end
 
 local function getGroundPosition()
-
     local char = LocalPlayer.Character
         or LocalPlayer.CharacterAdded:Wait()
 
@@ -237,28 +348,214 @@ local function getGroundPosition()
     return root.Position + Vector3.new(0, 4, 0)
 end
 
-
 --==================================================
--- BLOCK PLACEMENT + MATERIAL SUBSTITUTION
+-- PREVIEW COLORS
 --==================================================
 
-local MATERIALS = {
-    "trapdoor",
-    "wooden_plank",
-    "slime_block",
-    "scaffold",
-    "obsidian",
-    "oak_log",
-    "iron_block",
-    "ice",
-    "glowstone",
-    "glass",
-    "cobweb",
-    "cobblestone"
+local PreviewColors = {
+    oak_log = Color3.fromRGB(105, 70, 40),
+    wooden_plank = Color3.fromRGB(181, 139, 91),
+    obsidian = Color3.fromRGB(28, 22, 42),
+    slime_block = Color3.fromRGB(80, 220, 75),
+    cobweb = Color3.fromRGB(180, 180, 185),
+    glass = Color3.fromRGB(100, 190, 235),
+    cobblestone = Color3.fromRGB(110, 110, 110),
+    iron_block = Color3.fromRGB(185, 190, 195),
+    ice = Color3.fromRGB(155, 220, 245),
+    glowstone = Color3.fromRGB(255, 210, 90),
+    scaffold = Color3.fromRGB(190, 155, 90),
+    trapdoor = Color3.fromRGB(130, 85, 45),
+    door = Color3.fromRGB(130, 85, 45),
 }
 
-local function getTargetParent()
+local function getPreviewColor(material)
+    local key = string.lower(tostring(material))
+    return PreviewColors[key] or Color3.fromRGB(150, 150, 160)
+end
 
+--==================================================
+-- PREVIEW PARTS
+--==================================================
+
+local function clearPreviewParts()
+    for _, part in ipairs(previewParts) do
+        if part and part.Parent then
+            part:Destroy()
+        end
+    end
+
+    table.clear(previewParts)
+end
+
+local function updatePreviewParts()
+    if not previewVisible or not buildAnchor then
+        return
+    end
+
+    clearPreviewParts()
+
+    for _, blockData in ipairs(selectedQueue) do
+        local ghost = Instance.new("Part")
+        ghost.Name = "AutoBuild_PreviewBlock"
+        ghost.Size = Vector3.new(4, 4, 4)
+        ghost.Anchored = true
+        ghost.CanCollide = false
+        ghost.CanTouch = false
+        ghost.CanQuery = false
+        ghost.CastShadow = false
+        ghost.Material = Enum.Material.SmoothPlastic
+        ghost.Transparency = 0.45
+        ghost.Color = getPreviewColor(blockData.material)
+        ghost.Position = buildAnchor + previewOffset + blockData.pos
+        ghost.Parent = workspace
+
+        table.insert(previewParts, ghost)
+    end
+end
+
+local function closePreview()
+    previewVisible = false
+    clearPreviewParts()
+
+    if previewGui then
+        previewGui:Destroy()
+        previewGui = nil
+    end
+
+    PreviewBtn.Text = "👁 Show Preview"
+end
+
+--==================================================
+-- DRAGGABLE AXIS SLIDER
+--==================================================
+
+local function createAxisSlider(parent, axisName, yPosition, initialValue, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(0.92, 0, 0, 42)
+    row.Position = UDim2.new(0.04, 0, 0, yPosition)
+    row.BackgroundTransparency = 1
+    row.Parent = parent
+
+    local axisLabel = Instance.new("TextLabel")
+    axisLabel.Size = UDim2.new(0, 35, 1, 0)
+    axisLabel.BackgroundTransparency = 1
+    axisLabel.Text = axisName
+    axisLabel.TextColor3 = Color3.new(1, 1, 1)
+    axisLabel.Font = Enum.Font.GothamBold
+    axisLabel.TextSize = 13
+    axisLabel.Parent = row
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 48, 1, 0)
+    valueLabel.Position = UDim2.new(1, -48, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
+    valueLabel.Font = Enum.Font.Gotham
+    valueLabel.TextSize = 11
+    valueLabel.Parent = row
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1, -95, 0, 8)
+    track.Position = UDim2.new(0, 40, 0.5, -4)
+    track.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+    track.BorderSizePixel = 0
+    track.Active = true
+    track.Parent = row
+
+    Instance.new("UICorner", track).CornerRadius =
+        UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(16, 16)
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.BackgroundColor3 = Color3.fromRGB(70, 160, 230)
+    knob.BorderSizePixel = 0
+    knob.Active = true
+    knob.Parent = track
+
+    Instance.new("UICorner", knob).CornerRadius =
+        UDim.new(1, 0)
+
+    local value = math.clamp(initialValue or 0, -SLIDER_RANGE, SLIDER_RANGE)
+    local dragging = false
+
+    local function setValue(newValue)
+        value = math.clamp(
+            math.floor(newValue + 0.5),
+            -SLIDER_RANGE,
+            SLIDER_RANGE
+        )
+
+        local alpha = (value + SLIDER_RANGE) / (SLIDER_RANGE * 2)
+        knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+        valueLabel.Text = tostring(value * GRID)
+        callback(value * GRID)
+    end
+
+    local function updateFromInput(input)
+        local width = track.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local x = input.Position.X - track.AbsolutePosition.X
+        local alpha = math.clamp(x / width, 0, 1)
+        local newValue = alpha * (SLIDER_RANGE * 2) - SLIDER_RANGE
+
+        setValue(newValue)
+    end
+
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
+            updateFromInput(input)
+        end
+    end)
+
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
+            updateFromInput(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            updateFromInput(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = false
+        end
+    end)
+
+    setValue(value)
+
+    return {
+        SetValue = setValue
+    }
+end
+
+--==================================================
+-- BLOCK PLACEMENT
+--==================================================
+
+local function getTargetParent()
     local mapFolder = workspace:FindFirstChild("Map")
 
     if mapFolder then
@@ -280,124 +577,176 @@ local function getTargetParent()
     return workspace.Terrain
 end
 
--- Check whether a block actually exists at the requested position.
-local function blockExists(position)
+local function placeBlock(material, position)
+    local targetParent = getTargetParent()
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-
-        if obj:IsA("BasePart") then
-
-            local difference = obj.Position - position
-
-            if math.abs(difference.X) <= 1.5
-                and math.abs(difference.Y) <= 1.5
-                and math.abs(difference.Z) <= 1.5 then
-
-                return true
-            end
-        end
-    end
-
-    return false
-end
-
--- Try placing one material and wait for the block to appear.
-local function tryMaterial(material, position)
-
-    if not isBuilding then
-        return false
-    end
-
-    pcall(function()
-
+    local success, result = pcall(function()
         ChangeBuildEvent:FireServer(
             "ChangeBlock",
             material
         )
 
-        BuildRemote:InvokeServer(
+        return BuildRemote:InvokeServer(
             "Place",
             {
                 material,
                 position,
-                getTargetParent(),
+                targetParent,
                 0
             }
         )
-
     end)
 
-    -- Allow time for the server to create/replicate the block.
-    for i = 1, 6 do
-
-        if not isBuilding then
-            return false
-        end
-
-        task.wait(0.05)
-
-        if blockExists(position) then
-            return true
-        end
-    end
-
-    return false
-end
-
--- Requested material first, then substitutes if necessary.
-local function placeBlock(material, position)
-
-    if not isBuilding then
+    if not success then
+        warn("AutoBuild placement error:", result)
         return false
     end
 
-    -- Don't place another block if one is already there.
-    if blockExists(position) then
-        return true
-    end
-
-    -- Doors must only use the door material.
-    if material == "door" then
-        return tryMaterial("door", position)
-    end
-
-    -- Try the requested material first.
-    if tryMaterial(material, position) then
-        return true
-    end
-
-    -- Try every other supported material.
-    for _, substitute in ipairs(MATERIALS) do
-
-        if not isBuilding then
-            return false
-        end
-
-        if substitute ~= material then
-
-            if tryMaterial(substitute, position) then
-                return true
-            end
-        end
-    end
-
-    return false
+    return true
 end
 
+--==================================================
+-- BUILD OWNERSHIP / CLEAR ALL
+--==================================================
+
+local function isOwnedByLocalPlayer(block)
+    local creator = block:FindFirstChild("Creator", true)
+
+    if not creator or not creator:IsA("ValueBase") then
+        return false
+    end
+
+    local creatorValue = tostring(creator.Value)
+
+    return creatorValue == LocalPlayer.Name
+        or creatorValue == tostring(LocalPlayer.UserId)
+end
+
+ClearAllBtn.MouseButton1Click:Connect(function()
+    if isBuilding then
+        StatusLabel.Text = "Stop the current build first!"
+        StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+        return
+    end
+
+    local buildingParts = workspace:FindFirstChild("BuildingParts")
+
+    if not buildingParts then
+        StatusLabel.Text = "BuildingParts folder not found!"
+        StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+        return
+    end
+
+    local clearing = true
+
+    ClearAllBtn.Text = "🗑 Clearing..."
+
+    task.spawn(function()
+        local totalDeleted = 0
+        local noProgressPasses = 0
+
+        while clearing do
+            local ownedBlocks = {}
+
+            -- Refresh the list each pass.
+            for _, block in ipairs(buildingParts:GetChildren()) do
+                if isOwnedByLocalPlayer(block) then
+                    table.insert(ownedBlocks, block)
+                end
+            end
+
+            if #ownedBlocks == 0 then
+                break
+            end
+
+            local beforeCount = #ownedBlocks
+
+            for _, block in ipairs(ownedBlocks) do
+                if not clearing then
+                    break
+                end
+
+                if block and block.Parent then
+                    local success, result = pcall(function()
+                        return BuildRemote:InvokeServer(
+                            "Delete",
+                            {block}
+                        )
+                    end)
+
+                    if success then
+                        totalDeleted += 1
+                    else
+                        warn("Clear All deletion error:", result)
+                    end
+                end
+
+                StatusLabel.Text =
+                    "Clearing... " .. totalDeleted .. " requests sent"
+
+                -- 0.01 second interval between deletion requests.
+                task.wait(0.01)
+            end
+
+            task.wait(0.15)
+
+            local remaining = 0
+
+            for _, block in ipairs(buildingParts:GetChildren()) do
+                if isOwnedByLocalPlayer(block) then
+                    remaining += 1
+                end
+            end
+
+            if remaining == 0 then
+                break
+            end
+
+            if remaining >= beforeCount then
+                noProgressPasses += 1
+            else
+                noProgressPasses = 0
+            end
+
+            -- Avoid an endless loop if the server refuses deletion.
+            if noProgressPasses >= 5 then
+                break
+            end
+        end
+
+        ClearAllBtn.Text = "🗑 Clear All"
+
+        local remaining = 0
+
+        for _, block in ipairs(buildingParts:GetChildren()) do
+            if isOwnedByLocalPlayer(block) then
+                remaining += 1
+            end
+        end
+
+        if remaining == 0 then
+            StatusLabel.Text = "✅ All your builds cleared!"
+            StatusLabel.TextColor3 = Color3.fromRGB(46, 204, 113)
+        else
+            StatusLabel.Text =
+                "⚠ " .. remaining .. " blocks could not be deleted"
+
+            StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+        end
+    end)
+end)
 --==================================================
 -- PRESET GENERATORS
 -- All preset positions are RELATIVE.
 --==================================================
 
 local function generateHouse()
-
     local queue = {}
     local s = GRID
 
     for y = 0, 2 do
         for x = 0, 3 do
             for z = 0, 3 do
-
                 local wall =
                     x == 0 or x == 3 or z == 0 or z == 3
 
@@ -432,7 +781,6 @@ local function generateHouse()
 end
 
 local function generateMansion()
-
     local queue = {}
     local s = GRID
 
@@ -448,7 +796,6 @@ local function generateMansion()
 
     -- Pillars
     for y = 1, 4 do
-
         for _, p in ipairs({
             Vector3.new(0, y*s, 0),
             Vector3.new(0, y*s, 6*s),
@@ -457,7 +804,6 @@ local function generateMansion()
             Vector3.new(3*s, y*s, 0),
             Vector3.new(0, y*s, 3*s)
         }) do
-
             table.insert(queue, {
                 material = "oak_log",
                 pos = p
@@ -469,7 +815,6 @@ local function generateMansion()
     for y = 1, 3 do
         for x = 0, 6 do
             for z = 0, 6 do
-
                 local outer =
                     x == 0 or x == 6 or z == 0 or z == 6
 
@@ -485,7 +830,6 @@ local function generateMansion()
 
     -- Iron trim
     for x = 1, 5 do
-
         table.insert(queue, {
             material = "iron_block",
             pos = Vector3.new(x*s, 4*s, 0)
@@ -508,7 +852,6 @@ local function generateMansion()
         Vector3.new(2*s, 3*s, 0),
         Vector3.new(4*s, 3*s, 0)
     }) do
-
         table.insert(queue, {
             material = "glass",
             pos = p
@@ -548,7 +891,6 @@ local function generateMansion()
         Vector3.new(2*s, 3*s, 4*s),
         Vector3.new(4*s, 3*s, 2*s)
     }) do
-
         table.insert(queue, {
             material = "glowstone",
             pos = p
@@ -583,14 +925,12 @@ local function generateMansion()
 end
 
 local function generateTower()
-
     local queue = {}
     local s = GRID
 
     for y = 0, 5 do
         for x = 0, 2 do
             for z = 0, 2 do
-
                 local wall =
                     x == 0 or x == 2 or z == 0 or z == 2
 
@@ -615,18 +955,15 @@ local function generateTower()
 end
 
 local function generatePyramid()
-
     local queue = {}
     local s = GRID
     local size = 5
 
     for y = 0, size - 1 do
-
         local layerSize = size - y
 
         for x = 0, layerSize - 1 do
             for z = 0, layerSize - 1 do
-
                 table.insert(queue, {
                     material = "cobblestone",
                     pos = Vector3.new(x*s, y*s, z*s)
@@ -639,13 +976,11 @@ local function generatePyramid()
 end
 
 local function generateBridge()
-
     local queue = {}
     local s = GRID
 
     for x = 0, 5 do
         for z = 0, 1 do
-
             table.insert(queue, {
                 material = "wooden_plank",
                 pos = Vector3.new(x*s, 0, z*s)
@@ -661,11 +996,9 @@ end
 --==================================================
 
 local function encodeQueue(queue)
-
     local data = {}
 
     for _, block in ipairs(queue) do
-
         table.insert(data, {
             material = block.material,
             x = block.pos.X,
@@ -678,11 +1011,9 @@ local function encodeQueue(queue)
 end
 
 local function decodeQueue(data)
-
     local queue = {}
 
     for _, block in ipairs(data) do
-
         if type(block.material) == "string"
             and type(block.x) == "number"
             and type(block.y) == "number"
@@ -703,6 +1034,29 @@ local function decodeQueue(data)
 end
 
 --==================================================
+-- PRESET SELECTION
+--==================================================
+
+local function selectPreset(name, func)
+    selectedQueue = func()
+
+    -- Lock the location at the moment the preset is selected.
+    buildAnchor = snapToGrid(getGroundPosition())
+    previewOffset = Vector3.zero
+
+    StatusLabel.Text =
+        "Loaded: " .. name ..
+        " (" .. #selectedQueue .. " blocks)"
+
+    StatusLabel.TextColor3 =
+        Color3.fromRGB(46, 204, 113)
+
+    if previewVisible then
+        updatePreviewParts()
+    end
+end
+
+--==================================================
 -- PRESET LIST
 --==================================================
 
@@ -714,7 +1068,6 @@ local presets = {
 }
 
 local function refreshPresetsList()
-
     for _, child in ipairs(ScrollContainer:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -724,7 +1077,6 @@ local function refreshPresetsList()
     local totalItems = 0
 
     local function addPreset(name, func, color)
-
         local btn = createButton(
             name,
             "  " .. name,
@@ -738,15 +1090,7 @@ local function refreshPresetsList()
         btn.TextXAlignment = Enum.TextXAlignment.Left
 
         btn.MouseButton1Click:Connect(function()
-
-            selectedQueue = func()
-
-            StatusLabel.Text =
-                "Loaded: " .. name ..
-                " (" .. #selectedQueue .. " blocks)"
-
-            StatusLabel.TextColor3 =
-                Color3.fromRGB(46, 204, 113)
+            selectPreset(name, func)
         end)
 
         totalItems += 1
@@ -762,7 +1106,6 @@ local function refreshPresetsList()
 
     -- In-memory custom presets
     for name, queue in pairs(customPresets) do
-
         addPreset(
             name,
             function()
@@ -774,17 +1117,13 @@ local function refreshPresetsList()
 
     -- File presets
     if fileSupport() then
-
         local success, files = pcall(function()
             return listfiles(SAVE_FOLDER)
         end)
 
         if success then
-
             for _, filePath in ipairs(files) do
-
                 if filePath:sub(-5) == ".json" then
-
                     local fileName =
                         filePath:match("([^/\\]+)$")
                         :gsub("%.json$", "")
@@ -803,9 +1142,7 @@ local function refreshPresetsList()
                         Enum.TextXAlignment.Left
 
                     btn.MouseButton1Click:Connect(function()
-
                         local ok, result = pcall(function()
-
                             local data =
                                 HttpService:JSONDecode(
                                     readfile(filePath)
@@ -815,18 +1152,10 @@ local function refreshPresetsList()
                         end)
 
                         if ok and result and #result > 0 then
-
-                            selectedQueue = result
-
-                            StatusLabel.Text =
-                                "Loaded: " .. fileName ..
-                                " (" .. #result .. " blocks)"
-
-                            StatusLabel.TextColor3 =
-                                Color3.fromRGB(46, 204, 113)
-
+                            selectPreset(fileName, function()
+                                return result
+                            end)
                         else
-
                             StatusLabel.Text =
                                 "Failed to load preset!"
 
@@ -848,11 +1177,10 @@ end
 refreshPresetsList()
 
 --==================================================
--- REGION SELECTION / X Y SIZE CONTROLLER
+-- REGION SELECTION / DRAGGABLE POSITION CONTROLS
 --==================================================
 
 local function openRegionEditor()
-
     MainFrame.Visible = false
 
     local char = LocalPlayer.Character
@@ -864,12 +1192,15 @@ local function openRegionEditor()
         and root.Position + Vector3.new(0, 3, 0)
         or Vector3.new(0, 10, 0)
 
+    local regionOffset = Vector3.zero
+
     local selectPart = Instance.new("Part")
     selectPart.Name = "AutoBuild_SelectionBox"
     selectPart.Size = Vector3.new(12, 12, 12)
     selectPart.Position = spawnPos
     selectPart.Anchored = true
     selectPart.CanCollide = false
+    selectPart.CanQuery = false
     selectPart.Transparency = 0.5
     selectPart.Color = Color3.fromRGB(52, 152, 219)
     selectPart.Material = Enum.Material.Neon
@@ -881,10 +1212,10 @@ local function openRegionEditor()
     controlGui.Parent = PlayerGui
 
     local panel = Instance.new("ScrollingFrame")
-    panel.Size = UDim2.new(0, 280, 0, 280)
-    panel.Position = UDim2.new(0.5, -140, 0.5, -140)
+    panel.Size = UDim2.new(0, 280, 0, 390)
+    panel.Position = UDim2.new(0.5, -140, 0.5, -195)
     panel.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
-    panel.CanvasSize = UDim2.new(0, 0, 0, 340)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 430)
     panel.ScrollBarThickness = 4
     panel.Parent = controlGui
 
@@ -900,8 +1231,22 @@ local function openRegionEditor()
     pTitle.TextSize = 13
     pTitle.Parent = panel
 
-    local function regionButton(name, text, x, y, color)
+    local function updateRegionPosition()
+        selectPart.Position = spawnPos + regionOffset
+    end
 
+local regionOffset = Vector3.zero
+
+local getRegionOffset = createPositionAdjusters(
+    panel,
+    38,
+    function(offset)
+        regionOffset = offset
+        selectPart.Position = snapToGrid(spawnPos) + regionOffset
+    end
+    )
+
+    local function regionButton(name, text, x, y, color)
         return createButton(
             name,
             text,
@@ -912,99 +1257,49 @@ local function openRegionEditor()
         )
     end
 
-    -- POSITION
-    local moveUp = regionButton(
-        "MoveUp", "Move UP Y+", 0, 38
-    )
-
-    local moveDown = regionButton(
-        "MoveDown", "Move DOWN Y-", 1, 38
-    )
-
-    local moveFwd = regionButton(
-        "MoveFwd", "Forward Z+", 0, 72
-    )
-
-    local moveBck = regionButton(
-        "MoveBck", "Back Z-", 1, 72
-    )
-
-    local moveRight = regionButton(
-        "MoveRight", "Right X+", 0, 106
-    )
-
-    local moveLeft = regionButton(
-        "MoveLeft", "Left X-", 1, 106
-    )
-
     -- SIZE X
     local sizeXUp = regionButton(
-        "SizeXUp", "Width X +4", 0, 149,
+        "SizeXUp", "Width X +4", 0, 180,
         Color3.fromRGB(70, 50, 90)
     )
 
     local sizeXDown = regionButton(
-        "SizeXDown", "Width X -4", 1, 149,
+        "SizeXDown", "Width X -4", 1, 180,
         Color3.fromRGB(70, 50, 90)
     )
 
     -- SIZE Y
     local sizeYUp = regionButton(
-        "SizeYUp", "Height Y +4", 0, 183,
+        "SizeYUp", "Height Y +4", 0, 214,
         Color3.fromRGB(70, 50, 90)
     )
 
     local sizeYDown = regionButton(
-        "SizeYDown", "Height Y -4", 1, 183,
+        "SizeYDown", "Height Y -4", 1, 214,
         Color3.fromRGB(70, 50, 90)
     )
 
     -- SIZE Z
     local sizeZUp = regionButton(
-        "SizeZUp", "Depth Z +4", 0, 217,
+        "SizeZUp", "Depth Z +4", 0, 248,
         Color3.fromRGB(70, 50, 90)
     )
 
     local sizeZDown = regionButton(
-        "SizeZDown", "Depth Z -4", 1, 217,
+        "SizeZDown", "Depth Z -4", 1, 248,
         Color3.fromRGB(70, 50, 90)
     )
 
     -- SAVE / CANCEL
     local saveBtn = regionButton(
-        "Save", "Save Build", 0, 260,
+        "Save", "Save Build", 0, 292,
         Color3.fromRGB(46, 204, 113)
     )
 
     local backBtn = regionButton(
-        "Back", "Cancel", 1, 260,
+        "Back", "Cancel", 1, 292,
         Color3.fromRGB(231, 76, 60)
     )
-
-    -- Position controls
-    moveUp.MouseButton1Click:Connect(function()
-        selectPart.Position += Vector3.new(0, 4, 0)
-    end)
-
-    moveDown.MouseButton1Click:Connect(function()
-        selectPart.Position -= Vector3.new(0, 4, 0)
-    end)
-
-    moveFwd.MouseButton1Click:Connect(function()
-        selectPart.Position += Vector3.new(0, 0, 4)
-    end)
-
-    moveBck.MouseButton1Click:Connect(function()
-        selectPart.Position -= Vector3.new(0, 0, 4)
-    end)
-
-    moveRight.MouseButton1Click:Connect(function()
-        selectPart.Position += Vector3.new(4, 0, 0)
-    end)
-
-    moveLeft.MouseButton1Click:Connect(function()
-        selectPart.Position -= Vector3.new(4, 0, 0)
-    end)
 
     -- Independent size controls
     sizeXUp.MouseButton1Click:Connect(function()
@@ -1046,7 +1341,6 @@ local function openRegionEditor()
     backBtn.MouseButton1Click:Connect(closeEditor)
 
     saveBtn.MouseButton1Click:Connect(function()
-
         local scannedQueue = {}
 
         local minBound =
@@ -1056,9 +1350,7 @@ local function openRegionEditor()
             selectPart.Position + selectPart.Size / 2
 
         for _, obj in ipairs(workspace:GetDescendants()) do
-
             if obj:IsA("BasePart") and obj ~= selectPart then
-
                 local pos = obj.Position
 
                 if pos.X >= minBound.X
@@ -1090,11 +1382,9 @@ local function openRegionEditor()
         end
 
         if #scannedQueue == 0 then
-
             StatusLabel.Text = "No blocks found in region!"
             StatusLabel.TextColor3 =
                 Color3.fromRGB(231, 76, 60)
-
             return
         end
 
@@ -1106,9 +1396,7 @@ local function openRegionEditor()
         local fileSaved = false
 
         if fileSupport() then
-
             local success = pcall(function()
-
                 local path =
                     SAVE_FOLDER .. "/" .. presetName .. ".json"
 
@@ -1138,365 +1426,392 @@ end
 
 SaveBuildBtn.MouseButton1Click:Connect(openRegionEditor)
 
+--==================================================
+-- PREVIEW EDITOR
+--==================================================
+
+local function openPreviewEditor()
+    if #selectedQueue == 0 or not buildAnchor then
+        StatusLabel.Text = "Select a preset first!"
+        StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+        return
+    end
+
+    if previewGui then
+        closePreview()
+        return
+    end
+
+    MainFrame.Visible = false
+    previewVisible = true
+
+    previewGui = Instance.new("ScreenGui")
+    previewGui.Name = "BuildPreviewControlGui"
+    previewGui.ResetOnSpawn = false
+    previewGui.Parent = PlayerGui
+
+    local panel = Instance.new("Frame")
+    panel.Size = UDim2.new(0, 300, 0, 250)
+    panel.Position = UDim2.new(0.5, -150, 0.5, -125)
+    panel.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    panel.BorderSizePixel = 0
+    panel.Active = true
+    panel.Draggable = true
+    panel.Parent = previewGui
+
+    Instance.new("UICorner", panel).CornerRadius =
+        UDim.new(0, 8)
+
+    local heading = Instance.new("TextLabel")
+    heading.Size = UDim2.new(1, 0, 0, 35)
+    heading.BackgroundTransparency = 1
+    heading.Text = "👁 Move Build Preview"
+    heading.TextColor3 = Color3.new(1, 1, 1)
+    heading.Font = Enum.Font.GothamBold
+    heading.TextSize = 14
+    heading.Parent = panel
+
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(0.9, 0, 0, 25)
+    info.Position = UDim2.new(0.05, 0, 0, 32)
+    info.BackgroundTransparency = 1
+    info.Text = "Drag the sliders to move the build"
+    info.TextColor3 = Color3.fromRGB(170, 170, 180)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 10
+    info.Parent = panel
+
+    createPositionAdjusters(
+    panel,
+    65,
+    function(offset)
+        previewOffset = offset
+        updatePreviewParts()
+    end
+    )
+
+    local closeBtn = createButton(
+        "ClosePreview",
+        "✓ Done",
+        Color3.fromRGB(46, 160, 100),
+        UDim2.new(0.05, 0, 0, 205),
+        UDim2.new(0.9, 0, 0, 32),
+        panel
+    )
+
+    closeBtn.MouseButton1Click:Connect(function()
+        previewGui:Destroy()
+        previewGui = nil
+        MainFrame.Visible = true
+        PreviewBtn.Text = "👁 Show Preview"
+    end)
+
+    updatePreviewParts()
+    PreviewBtn.Text = "✖ Close Preview"
+end
+
+PreviewBtn.MouseButton1Click:Connect(function()
+    if previewGui then
+        closePreview()
+        MainFrame.Visible = true
+    else
+        openPreviewEditor()
+    end
+end)
 
 --==================================================
--- AUTO BUILD + FINAL REPAIR PASS
+-- FAST BUILD RETRY SYSTEM
+--==================================================
+
+local function positionKey(position)
+    local x = math.floor(position.X / GRID + 0.5)
+    local y = math.floor(position.Y / GRID + 0.5)
+    local z = math.floor(position.Z / GRID + 0.5)
+
+    return x .. ":" .. y .. ":" .. z
+end
+
+local function getOwnedBuildPositions()
+    local occupied = {}
+
+    local buildingParts = workspace:FindFirstChild("BuildingParts")
+    if not buildingParts then
+        return occupied
+    end
+
+    -- Scan the placed build objects once per pass.
+    for _, blockObject in ipairs(buildingParts:GetChildren()) do
+        if isOwnedByLocalPlayer(blockObject) then
+            if blockObject:IsA("BasePart") then
+                occupied[positionKey(blockObject.Position)] = true
+            end
+
+            for _, descendant in ipairs(blockObject:GetDescendants()) do
+                if descendant:IsA("BasePart") then
+                    occupied[positionKey(descendant.Position)] = true
+                end
+            end
+        end
+    end
+
+    return occupied
+end
+
+local function getMissingBlocks(buildQueue)
+    local occupied = getOwnedBuildPositions()
+    local missing = {}
+
+    for _, blockData in ipairs(buildQueue) do
+        if not occupied[positionKey(blockData.pos)] then
+            table.insert(missing, blockData)
+        end
+    end
+
+    return missing
+end
+
+local function sortRetryQueue(queue, passNumber)
+    local floors = {}
+
+    for _, block in ipairs(queue) do
+        local floorY = math.floor(block.pos.Y / GRID + 0.5)
+
+        floors[floorY] = floors[floorY] or {}
+        table.insert(floors[floorY], block)
+    end
+
+    local floorNumbers = {}
+
+    for floorY in pairs(floors) do
+        table.insert(floorNumbers, floorY)
+    end
+
+    table.sort(floorNumbers)
+
+    local result = {}
+
+    for _, floorY in ipairs(floorNumbers) do
+        local floorBlocks = floors[floorY]
+
+        -- Different random order on every retry.
+        for i = #floorBlocks, 2, -1 do
+            local j = math.random(1, i)
+            floorBlocks[i], floorBlocks[j] =
+                floorBlocks[j], floorBlocks[i]
+        end
+
+        for _, block in ipairs(floorBlocks) do
+            table.insert(result, block)
+        end
+    end
+
+    for i = 1, #queue do
+        queue[i] = result[i]
+    end
+end
+
+local function waitWhilePaused()
+    while isPaused and isBuilding do
+        task.wait(0.05)
+    end
+
+    return isBuilding
+end
+
+local function retryMissingBlocks(finalBuildQueue)
+    local noProgressPasses = 0
+    local previousMissingCount = #finalBuildQueue
+
+    for pass = 1, MAX_RETRY_PASSES do
+        if not waitWhilePaused() then
+            return false
+        end
+
+        local missing = getMissingBlocks(finalBuildQueue)
+
+        if #missing == 0 then
+            return true
+        end
+
+        StatusLabel.Text =
+            "Retry " .. pass .. " - " ..
+            #missing .. " blocks missing..."
+
+        StatusLabel.TextColor3 =
+            Color3.fromRGB(241, 196, 15)
+
+        sortRetryQueue(missing, pass)
+
+        -- Retry missing blocks from the bottom floor upward.
+        for _, blockData in ipairs(missing) do
+            if not waitWhilePaused() then
+                return false
+            end
+
+            placeBlock(
+                blockData.material,
+                blockData.pos
+            )
+        end
+
+        -- Allow server replication before checking the next pass.
+        task.wait(RETRY_WAIT)
+
+        local remaining = getMissingBlocks(finalBuildQueue)
+
+        if #remaining == 0 then
+            return true
+        end
+
+        if #remaining < previousMissingCount then
+            noProgressPasses = 0
+        else
+            noProgressPasses += 1
+        end
+
+        previousMissingCount = #remaining
+
+        -- Avoid an endless loop if the server refuses placements.
+        if noProgressPasses >= 3 then
+            break
+        end
+    end
+
+    return #getMissingBlocks(finalBuildQueue) == 0
+end
+
+--==================================================
+-- AUTO BUILD
 --==================================================
 
 StartBtn.MouseButton1Click:Connect(function()
-
     if isBuilding then
         return
     end
 
     if #selectedQueue == 0 then
         StatusLabel.Text = "Please select a preset first!"
-        StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+        StatusLabel.TextColor3 =
+            Color3.fromRGB(231, 76, 60)
         return
+    end
+
+    if not buildAnchor then
+        buildAnchor = snapToGrid(getGroundPosition())
     end
 
     isBuilding = true
     isPaused = false
+
     PauseBtn.Text = "⏸ Pause"
 
-    local groundPos = getGroundPosition()
+    -- Use the locked preview position, not the player's current position.
     local finalBuildQueue = {}
 
-    -- Convert relative positions to world positions once.
     for _, block in ipairs(selectedQueue) do
         table.insert(finalBuildQueue, {
             material = block.material,
-            pos = groundPos + block.pos
+            pos = buildAnchor + previewOffset + block.pos
         })
     end
 
-    local total = #finalBuildQueue
-
-    StatusLabel.Text = "Starting build..."
-    StatusLabel.TextColor3 = Color3.fromRGB(241, 196, 15)
+    StatusLabel.TextColor3 =
+        Color3.fromRGB(241, 196, 15)
 
     currentBuildTask = task.spawn(function()
+            -- Sort initial build from bottom to top.
+table.sort(finalBuildQueue, function(a, b)
+    return a.pos.Y < b.pos.Y
+end)
 
-        local placedCount = 0
-        local pending = {}
+-- Randomize blocks within each floor.
+local function randomizeFloors(queue)
+    local floors = {}
 
-        -- NORMAL BUILD PASS
-        -- Keeps the existing fast placement speed.
+    for _, block in ipairs(queue) do
+        local floorY = math.floor(block.pos.Y / GRID + 0.5)
+
+        floors[floorY] = floors[floorY] or {}
+        table.insert(floors[floorY], block)
+    end
+
+    local floorNumbers = {}
+
+    for floorY in pairs(floors) do
+        table.insert(floorNumbers, floorY)
+    end
+
+    table.sort(floorNumbers)
+
+    local result = {}
+
+    for _, floorY in ipairs(floorNumbers) do
+        local floorBlocks = floors[floorY]
+
+        -- Shuffle blocks on this floor.
+        for i = #floorBlocks, 2, -1 do
+            local j = math.random(1, i)
+            floorBlocks[i], floorBlocks[j] =
+                floorBlocks[j], floorBlocks[i]
+        end
+
+        for _, block in ipairs(floorBlocks) do
+            table.insert(result, block)
+        end
+    end
+
+    return result
+end
+
+finalBuildQueue = randomizeFloors(finalBuildQueue)
+        -- First pass: original queue order and original placement method.
         for i, blockData in ipairs(finalBuildQueue) do
-
-            while isPaused and isBuilding do
-                task.wait(0.05)
-            end
-
-            if not isBuilding then
+            if not waitWhilePaused() then
                 break
             end
 
-            local success = placeBlock(
+            placeBlock(
                 blockData.material,
                 blockData.pos
             )
 
-            if success then
-                placedCount += 1
-            else
-                table.insert(pending, blockData)
-            end
-
             StatusLabel.Text =
-                "Building: " .. i .. "/" .. total ..
-                " | Waiting: " .. #pending
+                "Building... (" ..
+                i .. "/" .. #finalBuildQueue .. ")"
 
             task.wait(BUILD_SPEED)
         end
 
-        -- SUPPORT RETRIES
-        local retryPass = 0
-        local noProgressPasses = 0
-
-        while isBuilding
-            and #pending > 0
-            and noProgressPasses < 3 do
-
-            while isPaused and isBuilding do
-                task.wait(0.05)
-            end
-
-            if not isBuilding then
-                break
-            end
-
-            retryPass += 1
-
-            local stillPending = {}
-            local placedThisPass = 0
-
-            for _, blockData in ipairs(pending) do
-
-                while isPaused and isBuilding do
-                    task.wait(0.05)
-                end
-
-                if not isBuilding then
-                    break
-                end
-
-                local success = placeBlock(
-                    blockData.material,
-                    blockData.pos
-                )
-
-                if success then
-                    placedCount += 1
-                    placedThisPass += 1
-                else
-                    table.insert(stillPending, blockData)
-                end
-
-                StatusLabel.Text =
-                    "Support pass " .. retryPass ..
-                    " | Placed: " .. placedCount .. "/" .. total ..
-                    " | Waiting: " .. #stillPending
-
-                task.wait(BUILD_SPEED)
-            end
-
-            pending = stillPending
-
-            if placedThisPass == 0 then
-                noProgressPasses += 1
-            else
-                noProgressPasses = 0
-            end
-        end
-
-        -- FINAL POSITION CHECK
-        -- This scan happens once after the normal build.
         if isBuilding then
+            StatusLabel.Text = "Checking for missing blocks..."
+            StatusLabel.TextColor3 =
+                Color3.fromRGB(241, 196, 15)
 
-            StatusLabel.Text = "Checking build positions..."
-            StatusLabel.TextColor3 = Color3.fromRGB(241, 196, 15)
-
-            -- Allow placed parts time to replicate.
-            task.wait(0.15)
+            local completed = retryMissingBlocks(finalBuildQueue)
 
             if isBuilding then
-
-                local targetParent = getTargetParent()
-                local existingBlocks = {}
-
-                -- Create a lookup of existing blocks.
-                -- No full workspace scan is done per expected block.
-                local descendants = targetParent:GetDescendants()
-
-                for _, obj in ipairs(descendants) do
-
-                    if obj:IsA("BasePart") then
-
-                        local relative = obj.Position - groundPos
-
-                        local gx = math.floor(relative.X / GRID + 0.5)
-                        local gy = math.floor(relative.Y / GRID + 0.5)
-                        local gz = math.floor(relative.Z / GRID + 0.5)
-
-                        local key =
-                            gx .. ":" .. gy .. ":" .. gz
-
-                        if not existingBlocks[key] then
-                            existingBlocks[key] = {}
-                        end
-
-                        table.insert(existingBlocks[key], obj)
-                    end
-                end
-
-                -- Remove duplicate target positions from the
-                -- expected list so one occupied position is
-                -- not needlessly placed multiple times.
-                local expectedPositions = {}
-
-                for _, blockData in ipairs(finalBuildQueue) do
-
-                    local relative = blockData.pos - groundPos
-
-                    local gx = math.floor(relative.X / GRID + 0.5)
-                    local gy = math.floor(relative.Y / GRID + 0.5)
-                    local gz = math.floor(relative.Z / GRID + 0.5)
-
-                    local key =
-                        gx .. ":" .. gy .. ":" .. gz
-
-                    expectedPositions[key] = {
-                        material = blockData.material,
-                        pos = blockData.pos,
-                        key = key
-                    }
-                end
-
-                -- Find positions that are actually empty.
-                local repairQueue = {}
-
-                for key, blockData in pairs(expectedPositions) do
-
-                    local found = false
-                    local candidates = existingBlocks[key]
-
-                    if candidates then
-
-                        for _, part in ipairs(candidates) do
-
-                            if (part.Position - blockData.pos).Magnitude
-                                <= GRID * 0.45 then
-
-                                found = true
-                                break
-                            end
-                        end
-                    end
-
-                    if not found then
-                        table.insert(repairQueue, blockData)
-                    end
-                end
-
-                -- Sort ONLY the repair queue bottom-to-top.
-                table.sort(repairQueue, function(a, b)
-
-                    if a.pos.Y == b.pos.Y then
-
-                        if a.pos.X == b.pos.X then
-                            return a.pos.Z < b.pos.Z
-                        end
-
-                        return a.pos.X < b.pos.X
-                    end
-
-                    return a.pos.Y < b.pos.Y
-                end)
-
-                -- FINAL REPAIR PASS
-                if #repairQueue > 0 then
-
-                    StatusLabel.Text =
-                        "Repairing " .. #repairQueue .. " missing blocks..."
-
-                    for i, blockData in ipairs(repairQueue) do
-
-                        while isPaused and isBuilding do
-                            task.wait(0.05)
-                        end
-
-                        if not isBuilding then
-                            break
-                        end
-
-                        placeBlock(
-                            blockData.material,
-                            blockData.pos
-                        )
-
-                        StatusLabel.Text =
-                            "Final repair: " .. i .. "/" .. #repairQueue
-
-                        task.wait(BUILD_SPEED)
-                    end
-
-                    -- One final scan after repair.
-                    if isBuilding then
-
-                        task.wait(0.15)
-
-                        local remaining = {}
-                        local finalDescendants =
-                            targetParent:GetDescendants()
-
-                        local finalPositions = {}
-
-                        for _, obj in ipairs(finalDescendants) do
-
-                            if obj:IsA("BasePart") then
-
-                                local relative = obj.Position - groundPos
-
-                                local gx = math.floor(relative.X / GRID + 0.5)
-                                local gy = math.floor(relative.Y / GRID + 0.5)
-                                local gz = math.floor(relative.Z / GRID + 0.5)
-
-                                local key =
-                                    gx .. ":" .. gy .. ":" .. gz
-
-                                if not finalPositions[key] then
-                                    finalPositions[key] = {}
-                                end
-
-                                table.insert(finalPositions[key], obj)
-                            end
-                        end
-
-                        for key, blockData in pairs(expectedPositions) do
-
-                            local found = false
-                            local candidates = finalPositions[key]
-
-                            if candidates then
-
-                                for _, part in ipairs(candidates) do
-
-                                    if (part.Position - blockData.pos).Magnitude
-                                        <= GRID * 0.45 then
-
-                                        found = true
-                                        break
-                                    end
-                                end
-                            end
-
-                            if not found then
-                                table.insert(remaining, blockData)
-                            end
-                        end
-
-                        if #remaining == 0 then
-
-                            StatusLabel.Text =
-                                "✅ Build Complete! Final repair successful."
-
-                            StatusLabel.TextColor3 =
-                                Color3.fromRGB(46, 204, 113)
-
-                        else
-
-                            StatusLabel.Text =
-                                "⚠️ Build finished with " ..
-                                #remaining .. " missing blocks."
-
-                            StatusLabel.TextColor3 =
-                                Color3.fromRGB(241, 196, 15)
-                        end
-                    end
-
-                else
-
-                    StatusLabel.Text =
-                        "✅ Build Complete! All positions verified."
-
+                if completed then
+                    StatusLabel.Text = "✅ Build Complete!"
                     StatusLabel.TextColor3 =
                         Color3.fromRGB(46, 204, 113)
+                else
+                    local remaining = getMissingBlocks(finalBuildQueue)
+
+                    StatusLabel.Text =
+                        "⚠ Build finished with " ..
+                        #remaining .. " missing blocks"
+
+                    StatusLabel.TextColor3 =
+                        Color3.fromRGB(231, 76, 60)
                 end
             end
-        end
-
-        if not isBuilding then
-
-            StatusLabel.Text = "⏹ Status: Stopped"
-            StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
         end
 
         isBuilding = false
         isPaused = false
         currentBuildTask = nil
-        PauseBtn.Text = "⏸ Pause"
 
+        PauseBtn.Text = "⏸ Pause"
     end)
 end)
 
@@ -1505,7 +1820,6 @@ end)
 --==================================================
 
 PauseBtn.MouseButton1Click:Connect(function()
-
     if not isBuilding then
         return
     end
@@ -1513,12 +1827,9 @@ PauseBtn.MouseButton1Click:Connect(function()
     isPaused = not isPaused
 
     if isPaused then
-
         StatusLabel.Text = "⏸ Status: Paused"
         PauseBtn.Text = "▶ Resume"
-
     else
-
         StatusLabel.Text = "Status: Building..."
         PauseBtn.Text = "⏸ Pause"
     end
@@ -1529,7 +1840,6 @@ end)
 --==================================================
 
 StopBtn.MouseButton1Click:Connect(function()
-
     isBuilding = false
     isPaused = false
 
@@ -1539,7 +1849,6 @@ StopBtn.MouseButton1Click:Connect(function()
     StatusLabel.TextColor3 =
         Color3.fromRGB(231, 76, 60)
 
-    -- Let the running task exit cleanly.
     currentBuildTask = nil
 end)
 
