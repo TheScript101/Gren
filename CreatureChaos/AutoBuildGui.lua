@@ -239,7 +239,7 @@ end
 
 
 --==================================================
--- BLOCK PLACEMENT + EXACT MATERIAL SUBSTITUTION
+-- BLOCK PLACEMENT + MATERIAL SUBSTITUTION
 --==================================================
 
 local MATERIALS = {
@@ -280,40 +280,42 @@ local function getTargetParent()
     return workspace.Terrain
 end
 
-local function findBlockAtPosition(position)
+-- Check whether a block actually exists at the requested position.
+local function blockExists(position)
 
-    local targetParent = getTargetParent()
+    for _, obj in ipairs(workspace:GetDescendants()) do
 
-    for _, obj in ipairs(targetParent:GetDescendants()) do
+        if obj:IsA("BasePart") then
 
-        if obj:IsA("BasePart")
-            and (obj.Position - position).Magnitude < 1.5 then
+            local difference = obj.Position - position
 
-            return obj
+            if math.abs(difference.X) <= 1.5
+                and math.abs(difference.Y) <= 1.5
+                and math.abs(difference.Z) <= 1.5 then
+
+                return true
+            end
         end
     end
 
-    return nil
+    return false
 end
 
-local function blockExists(position)
-    return findBlockAtPosition(position) ~= nil
-end
-
+-- Try placing one material and wait for the block to appear.
 local function tryMaterial(material, position)
 
     if not isBuilding then
         return false
     end
 
-    local success, result = pcall(function()
+    pcall(function()
 
         ChangeBuildEvent:FireServer(
             "ChangeBlock",
             material
         )
 
-        return BuildRemote:InvokeServer(
+        BuildRemote:InvokeServer(
             "Place",
             {
                 material,
@@ -325,56 +327,57 @@ local function tryMaterial(material, position)
 
     end)
 
-    if not success then
-        return false
-    end
-
-    -- Verify actual placement.
-    for _ = 1, 3 do
+    -- Allow time for the server to create/replicate the block.
+    for i = 1, 6 do
 
         if not isBuilding then
             return false
         end
+
+        task.wait(0.05)
 
         if blockExists(position) then
             return true
         end
-
-        task.wait(0.01)
     end
 
-    return blockExists(position)
+    return false
 end
 
+-- Requested material first, then substitutes if necessary.
 local function placeBlock(material, position)
 
+    if not isBuilding then
+        return false
+    end
+
+    -- Don't place another block if one is already there.
     if blockExists(position) then
         return true
     end
 
-    -- Doors must remain doors.
+    -- Doors must only use the door material.
     if material == "door" then
         return tryMaterial("door", position)
     end
 
-    -- Requested material first.
+    -- Try the requested material first.
     if tryMaterial(material, position) then
         return true
     end
 
-    -- Try every other actual material.
-    for _, alternative in ipairs(MATERIALS) do
+    -- Try every other supported material.
+    for _, substitute in ipairs(MATERIALS) do
 
         if not isBuilding then
             return false
         end
 
-        if alternative ~= material then
+        if substitute ~= material then
 
-            if tryMaterial(alternative, position) then
+            if tryMaterial(substitute, position) then
                 return true
             end
-
         end
     end
 
@@ -1137,25 +1140,8 @@ SaveBuildBtn.MouseButton1Click:Connect(openRegionEditor)
 
 
 --==================================================
--- AUTO BUILD - CONTINUOUS RECOVERY
+-- AUTO BUILD + FINAL POSITION VERIFICATION
 --==================================================
-
-local function waitUntilResumed()
-
-    while isPaused and isBuilding do
-        task.wait(0.05)
-    end
-
-    return isBuilding
-end
-
-local function sortBuildQueue(queue)
-
-    table.sort(queue, function(a, b)
-        return a.pos.Y < b.pos.Y
-    end)
-
-end
 
 StartBtn.MouseButton1Click:Connect(function()
 
@@ -1164,22 +1150,19 @@ StartBtn.MouseButton1Click:Connect(function()
     end
 
     if #selectedQueue == 0 then
-
         StatusLabel.Text = "Please select a preset first!"
-        StatusLabel.TextColor3 =
-            Color3.fromRGB(231, 76, 60)
-
+        StatusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
         return
     end
 
     isBuilding = true
     isPaused = false
-
     PauseBtn.Text = "⏸ Pause"
 
     local groundPos = getGroundPosition()
     local finalBuildQueue = {}
 
+    -- Convert relative positions into world positions.
     for _, block in ipairs(selectedQueue) do
 
         table.insert(finalBuildQueue, {
@@ -1189,57 +1172,101 @@ StartBtn.MouseButton1Click:Connect(function()
 
     end
 
-    sortBuildQueue(finalBuildQueue)
+    -- Sort bottom to top.
+    local function sortBottomToTop(queue)
+
+        table.sort(queue, function(a, b)
+
+            if a.pos.Y == b.pos.Y then
+
+                if a.pos.X == b.pos.X then
+                    return a.pos.Z < b.pos.Z
+                end
+
+                return a.pos.X < b.pos.X
+            end
+
+            return a.pos.Y < b.pos.Y
+        end)
+
+    end
+
+    sortBottomToTop(finalBuildQueue)
 
     local total = #finalBuildQueue
 
     StatusLabel.Text = "Starting build..."
-    StatusLabel.TextColor3 =
-        Color3.fromRGB(241, 196, 15)
+    StatusLabel.TextColor3 = Color3.fromRGB(241, 196, 15)
 
     currentBuildTask = task.spawn(function()
 
         local placedCount = 0
 
-        -- FIRST PASS: Attempt every position.
+        -- FIRST PASS: normal building.
         for i, blockData in ipairs(finalBuildQueue) do
 
-            if not waitUntilResumed() then
+            while isPaused and isBuilding do
+                task.wait(0.05)
+            end
+
+            if not isBuilding then
                 break
             end
 
             if not blockExists(blockData.pos) then
+                placeBlock(blockData.material, blockData.pos)
+            end
 
-                if placeBlock(
-                    blockData.material,
-                    blockData.pos
-                ) then
-
-                    placedCount += 1
-                end
-
+            if blockExists(blockData.pos) then
+                placedCount += 1
             end
 
             StatusLabel.Text =
                 "Building: " .. i .. "/" .. total
 
-            task.wait(0.01)
-
+            task.wait(BUILD_SPEED)
         end
 
-        -- RECOVERY: Recheck and rearrange missing blocks.
-        local failedPasses = 0
-        local recoveryPass = 0
+        -- FINAL CHECK: find every missing block.
+        local pending = {}
 
-        while isBuilding do
+        if isBuilding then
 
-            if not waitUntilResumed() then
+            StatusLabel.Text = "Checking all block positions..."
+
+            for _, blockData in ipairs(finalBuildQueue) do
+
+                if not blockExists(blockData.pos) then
+                    table.insert(pending, blockData)
+                end
+
+            end
+        end
+
+        -- FINAL RESORT: retry missing blocks bottom to top.
+        -- This gives lower supports another chance to appear
+        -- before higher blocks are attempted.
+        local retryPass = 0
+        local noProgressPasses = 0
+
+        while isBuilding
+            and #pending > 0
+            and noProgressPasses < 3 do
+
+            while isPaused and isBuilding do
+                task.wait(0.05)
+            end
+
+            if not isBuilding then
                 break
             end
 
+            retryPass += 1
+
+            -- Recheck positions before every retry pass.
             local missing = {}
 
-            for _, blockData in ipairs(finalBuildQueue) do
+            for _, blockData in ipairs(pending) do
 
                 if not blockExists(blockData.pos) then
                     table.insert(missing, blockData)
@@ -1247,106 +1274,108 @@ StartBtn.MouseButton1Click:Connect(function()
 
             end
 
-            if #missing == 0 then
-                break
-            end
-
-            recoveryPass += 1
-
-            -- Rearrange so ground-level pillars are prioritized.
-            sortBuildQueue(missing)
+            pending = missing
+            sortBottomToTop(pending)
 
             local placedThisPass = 0
 
-            for i, blockData in ipairs(missing) do
+            for i, blockData in ipairs(pending) do
 
-                if not waitUntilResumed() then
+                while isPaused and isBuilding do
+                    task.wait(0.05)
+                end
+
+                if not isBuilding then
                     break
                 end
 
+                -- Only retry if the position is still empty.
                 if not blockExists(blockData.pos) then
+                    placeBlock(blockData.material, blockData.pos)
+                end
 
-                    if placeBlock(
-                        blockData.material,
-                        blockData.pos
-                    ) then
-
-                        placedThisPass += 1
-                        placedCount += 1
-
-                    end
-
+                if blockExists(blockData.pos) then
+                    placedThisPass += 1
                 end
 
                 StatusLabel.Text =
-                    "Recovery " .. recoveryPass ..
-                    " | Missing: " .. (#missing - i)
+                    "Final check " .. retryPass ..
+                    " | Placing bottom-up: " .. i ..
+                    "/" .. #pending
 
-                task.wait(0.01)
+                task.wait(BUILD_SPEED)
+            end
+
+            -- Remove anything that successfully appeared.
+            local stillMissing = {}
+
+            for _, blockData in ipairs(pending) do
+
+                if not blockExists(blockData.pos) then
+                    table.insert(stillMissing, blockData)
+                end
 
             end
+
+            pending = stillMissing
 
             if placedThisPass == 0 then
-                failedPasses += 1
+                noProgressPasses += 1
             else
-                failedPasses = 0
+                noProgressPasses = 0
             end
-
-            -- Stop if nothing can be placed.
-            if failedPasses >= 3 then
-                break
-            end
-
         end
 
-        -- FINAL CHECK.
-        local remaining = 0
-
-        for _, blockData in ipairs(finalBuildQueue) do
-
-            if not blockExists(blockData.pos) then
-                remaining += 1
-            end
-
-        end
-
+        -- FINAL VERIFICATION.
         if isBuilding then
 
-            if remaining == 0 then
+            local finalMissing = {}
+            placedCount = 0
 
-                StatusLabel.Text = "✅ Build Complete!"
+            for _, blockData in ipairs(finalBuildQueue) do
+
+                if blockExists(blockData.pos) then
+                    placedCount += 1
+                else
+                    table.insert(finalMissing, blockData)
+                end
+
+            end
+
+            if #finalMissing == 0 then
+
+                StatusLabel.Text =
+                    "✅ Build Complete! (" ..
+                    placedCount .. "/" .. total .. ")"
+
                 StatusLabel.TextColor3 =
                     Color3.fromRGB(46, 204, 113)
-
-            elseif placedCount == 0 then
-
-                StatusLabel.Text = "❌ No blocks left!"
-                StatusLabel.TextColor3 =
-                    Color3.fromRGB(231, 76, 60)
 
             else
 
                 StatusLabel.Text =
                     "⚠️ Build incomplete: " ..
-                    remaining .. " blocks missing"
+                    #finalMissing .. " blocks missing"
 
                 StatusLabel.TextColor3 =
                     Color3.fromRGB(241, 196, 15)
-
             end
+
+        else
+
+            StatusLabel.Text = "⏹ Status: Stopped"
+            StatusLabel.TextColor3 =
+                Color3.fromRGB(231, 76, 60)
 
         end
 
         isBuilding = false
         isPaused = false
         currentBuildTask = nil
-
         PauseBtn.Text = "⏸ Pause"
 
     end)
-
 end)
-
 
 --==================================================
 -- PAUSE / RESUME
